@@ -20,12 +20,13 @@ The roadmap is organized by release gates, not calendar promises.
 - idempotent safe-mode scene injection
 - pause and one-click runtime restore
 
-## macOS Alpha
+## macOS Alpha — in progress
 
+- installable Apple Silicon DMG with explicit unnotarized-preview warnings
+- SHA-256 checksums, SPDX SBOM, and GitHub build attestations
 - adapter fixtures for current Codex versions
 - signed theme-package example fixtures
 - installation, sleep/wake, crash, upgrade, and uninstall smoke tests
-- clearly labeled unsigned preview artifacts
 
 ## Cross-platform Beta
 
