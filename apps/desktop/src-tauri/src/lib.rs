@@ -9,6 +9,21 @@ use model::{AppRuntime, RuntimeStatus};
 use serde_json::Value;
 use tauri::State;
 
+const SUPPORTED_CODEX_VERSIONS: &[&str] = &["26.707.72221", "26.707.91948"];
+
+fn compatibility_for_version(version: Option<&str>) -> model::Compatibility {
+    match version {
+        Some(version) if SUPPORTED_CODEX_VERSIONS.contains(&version) => {
+            model::Compatibility::Supported
+        }
+        _ => model::Compatibility::Safe,
+    }
+}
+
+fn is_valid_compatibility_mode(mode: &str) -> bool {
+    matches!(mode, "auto" | "compatibility" | "developer")
+}
+
 #[tauri::command]
 fn detect_codex() -> Result<model::CodexDetection, String> {
     codex::detect_codex().map_err(|error| error.to_string())
@@ -68,7 +83,7 @@ async fn launch_codex(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStat
     runtime.websocket_url = Some(session.websocket_url);
     runtime.child_id = Some(session.child_id);
     runtime.codex_version = detection.version;
-    runtime.compatibility = model::Compatibility::Safe;
+    runtime.compatibility = compatibility_for_version(runtime.codex_version.as_deref());
     runtime.message = Some("Connected through a temporary loopback-only CDP session".into());
     Ok(runtime.status())
 }
@@ -77,36 +92,67 @@ async fn launch_codex(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStat
 async fn apply_theme(
     theme: Value,
     variant: String,
+    compatibility_mode: String,
     state: State<'_, Mutex<AppRuntime>>,
 ) -> Result<RuntimeStatus, String> {
     if variant != "light" && variant != "dark" {
         return Err("Theme variant must be light or dark".into());
     }
-    let websocket_url = state
-        .lock()
-        .map_err(|_| "Runtime state is unavailable".to_string())?
-        .websocket_url
-        .clone()
-        .ok_or_else(|| "Codex is not connected".to_string())?;
+    if !is_valid_compatibility_mode(&compatibility_mode) {
+        return Err("Compatibility mode must be auto, compatibility, or developer".into());
+    }
+    let websocket_url = {
+        let runtime = state
+            .lock()
+            .map_err(|_| "Runtime state is unavailable".to_string())?;
+        runtime
+            .websocket_url
+            .clone()
+            .ok_or_else(|| "Codex is not connected".to_string())?
+    };
 
     let theme_json = serde_json::to_string(&theme).map_err(|error| error.to_string())?;
     let variant_json = serde_json::to_string(&variant).map_err(|error| error.to_string())?;
+    let mode_json =
+        serde_json::to_string(&compatibility_mode).map_err(|error| error.to_string())?;
     let expression = format!(
-        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, true);",
+        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {});",
         include_str!("runtime.js"),
         theme_json,
         variant_json,
+        mode_json,
     );
 
-    cdp::evaluate(&websocket_url, &expression)
+    let response = cdp::evaluate(&websocket_url, &expression)
         .await
         .map_err(|error| error.to_string())?;
+
+    let outcome = response.pointer("/result/result/value");
+    let resolved_mode = outcome
+        .and_then(|value| value.get("resolvedMode"))
+        .and_then(Value::as_str)
+        .unwrap_or("compatibility");
+    let fallback_reason = outcome
+        .and_then(|value| value.get("reason"))
+        .and_then(Value::as_str);
 
     let mut runtime = state
         .lock()
         .map_err(|_| "Runtime state is unavailable".to_string())?;
     runtime.state = model::RuntimeState::Applied;
-    runtime.message = Some("Theme applied in safe compatibility mode".into());
+    runtime.compatibility = if matches!(resolved_mode, "semantic" | "developer") {
+        model::Compatibility::Supported
+    } else {
+        model::Compatibility::Safe
+    };
+    runtime.message = Some(match resolved_mode {
+        "semantic" => "Theme applied after live Codex interface verification".into(),
+        "developer" => "Theme applied in developer mode without compatibility enforcement".into(),
+        _ => fallback_reason.map_or_else(
+            || "Theme applied in isolated compatibility mode".into(),
+            |reason| format!("Automatic verification fell back to compatibility mode: {reason}"),
+        ),
+    });
     Ok(runtime.status())
 }
 
@@ -169,4 +215,38 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running Codex Styler");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_codex_version_uses_the_semantic_adapter() {
+        assert_eq!(
+            compatibility_for_version(Some("26.707.72221")),
+            model::Compatibility::Supported
+        );
+        assert_eq!(
+            compatibility_for_version(Some("26.707.91948")),
+            model::Compatibility::Supported
+        );
+    }
+
+    #[test]
+    fn unknown_codex_version_remains_unverified_until_runtime_check() {
+        assert_eq!(
+            compatibility_for_version(Some("99.0.0")),
+            model::Compatibility::Safe
+        );
+        assert_eq!(compatibility_for_version(None), model::Compatibility::Safe);
+    }
+
+    #[test]
+    fn compatibility_mode_is_an_explicit_allowlist() {
+        assert!(is_valid_compatibility_mode("auto"));
+        assert!(is_valid_compatibility_mode("compatibility"));
+        assert!(is_valid_compatibility_mode("developer"));
+        assert!(!is_valid_compatibility_mode("force"));
+    }
 }

@@ -4,6 +4,32 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.2] - 2026-07-16
+
+### Added
+
+- Tested semantic Codex adapter signatures for `26.707.72221` and `26.707.91948`.
+- Local-theme deletion with a confirmation step and archive cleanup.
+- System-language preference as the first option in a native language dropdown.
+- Original eight-direction transparent Moss gecko atlas with pointer tracking.
+- Automatic, compatibility, and developer runtime strategies with live health checks.
+- Original light and dark Codex Styler identity assets and regenerated platform icons.
+- A native window drag region for the overlay title bar.
+
+### Changed
+
+- Restyled the manager as a neutral system utility with independent system, light, and dark modes.
+- Made every theme-index row clickable while retaining a separate Customize action.
+- Replaced the GitHub product screenshot with an English dark-mode capture.
+- Changed unknown-version handling from version-gated blocking to automatic apply-and-verify fallback.
+
+### Fixed
+
+- Semantic themes are no longer forced into safe mode on recognized Codex versions.
+- Background, main surface, header, conversation cards, dialogs, and composer materials now share the same tested adapter instead of styling only the sidebar.
+- Interactive entities now render in their own click-through foreground layer instead of being hidden behind the Codex interface.
+- Sprite preview positioning now respects each atlas's declared rows and columns.
+
 ## [0.1.0-alpha.1] - 2026-07-16
 
 ### Added

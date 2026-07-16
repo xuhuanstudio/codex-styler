@@ -1,6 +1,6 @@
 {
   "name": "codex-styler",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": true,
   "description": "Unofficial, open-source theme and interactive scene editor for OpenAI Codex Desktop.",
   "license": "Apache-2.0",

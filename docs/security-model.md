@@ -41,7 +41,7 @@ Styler never force-quits an already running Codex process. A future UI that offe
 
 CDP is a powerful local debugging interface. Styler exposes it only on loopback for a process it starts, but other software running as the same OS user may still be able to probe local ports. Do not run untrusted local software alongside a managed session.
 
-Unknown Codex releases can change page structure. Safe mode limits the blast radius to an isolated scene layer; semantic overrides remain opt-in until an adapter is verified.
+Codex releases can change page structure independently of their version number. Automatic mode applies the semantic adapter, verifies required anchors and computed surface styles, and falls back to the isolated compatibility layer when the check fails or a later redraw removes the injected runtime. Compatibility mode is always isolated. Developer mode deliberately bypasses automatic fallback and should be used only for adapter development.
 
 ## Reporting a vulnerability
 

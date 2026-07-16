@@ -56,6 +56,20 @@ async function loadArchive(themeId: string): Promise<Blob | null> {
   return archive;
 }
 
+export async function deleteThemeArchive(themeId: string): Promise<void> {
+  const database = await openDatabase();
+  if (!database) return;
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(archiveStore, "readwrite");
+    transaction.objectStore(archiveStore).delete(themeId);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () =>
+      reject(transaction.error ?? new Error("Could not delete theme package"));
+  });
+  database.close();
+}
+
 function mimeForPath(path: string): string {
   const lower = path.toLowerCase();
   if (lower.endsWith(".png")) return "image/png";
