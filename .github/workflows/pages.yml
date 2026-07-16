@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @codex-styler/site build
       - run: pnpm check:links
