@@ -40,6 +40,33 @@ export interface ThemeBackground {
   overlayOpacity: number;
 }
 
+/**
+ * Stable semantic color roles exposed to theme authors. Codex-specific CSS
+ * variables stay inside the compatibility adapter and are never part of a
+ * portable theme package.
+ */
+export interface ThemeSemanticPalette {
+  canvas?: string;
+  surfaceRaised?: string;
+  surfaceOverlay?: string;
+  surfaceSunken?: string;
+  control?: string;
+  controlHover?: string;
+  controlActive?: string;
+  textTertiary?: string;
+  onAccent?: string;
+  borderSubtle?: string;
+  borderStrong?: string;
+  focus?: string;
+  success?: string;
+  warning?: string;
+  danger?: string;
+  info?: string;
+  added?: string;
+  modified?: string;
+  deleted?: string;
+}
+
 export interface ThemeAppearance {
   accent: string;
   surface: string;
@@ -53,6 +80,7 @@ export interface ThemeAppearance {
   layout?: "native" | "editorial" | "immersive";
   iconStyle?: "native" | "contained" | "themed";
   decorations?: "none" | "subtle" | "expressive";
+  palette?: ThemeSemanticPalette;
 }
 
 export interface ThemeMotion {

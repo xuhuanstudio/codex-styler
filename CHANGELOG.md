@@ -4,6 +4,29 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.4] - 2026-07-16
+
+### Added
+
+- A workspace Home that summarizes the applied theme, companion, runtime strategy, and safest next action.
+- A unified theme library with Built-in and My Themes tabs, package import, and creation from an image, a blank canvas, or an existing theme.
+- Theme-local motion recipes for static, calm, fluid, and expressive interface behavior.
+- Complete semantic palette roles for the Codex interface, backed by generated schema validation and contrast-aware defaults.
+
+### Changed
+
+- Moved theme editing into the theme library so customization no longer breaks the user's navigation context.
+- Built-in theme customization now creates an editable local copy with its own save, export, apply, reset, and delete lifecycle.
+- Theme and companion selection remain independent while themes may still recommend a default pairing.
+- Reworked the desktop manager into a neutral system-tool design and updated the GitHub overview screenshot in English.
+
+### Fixed
+
+- Applied themes now cover the complete 182-token Codex semantic color surface instead of leaving native colors behind.
+- Icon treatments are scoped to their containers and no longer distort SVG geometry or turn circular controls into stretched ovals.
+- Responsive composition guards prevent the new-task workspace metadata and composer from overlapping at compact heights.
+- Custom themes now use the same runtime application path and connection handling as built-in themes.
+
 ## [0.1.0-alpha.3] - 2026-07-16
 
 ### Added

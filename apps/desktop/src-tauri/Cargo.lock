@@ -374,7 +374,7 @@ dependencies = [
 
 [[package]]
 name = "codex-styler"
-version = "0.1.0-alpha.3"
+version = "0.1.0-alpha.4"
 dependencies = [
  "futures-util",
  "reqwest",

@@ -32,6 +32,18 @@ describe("built-in themes", () => {
     ).toBe(true);
   });
 
+  it("accepts portable semantic palette overrides without exposing Codex tokens", () => {
+    const theme = structuredClone(nativeRefined);
+    theme.variants.dark.appearance.palette = {
+      canvas: "#101318",
+      surfaceRaised: "#252A31",
+      controlHover: "#303741",
+      success: "#52C982",
+    };
+    expect(validateTheme(theme)).toEqual({ ok: true, issues: [] });
+    expect(JSON.stringify(theme)).not.toContain("--color-token");
+  });
+
   it("uses a CSP-safe precompiled schema validator", async () => {
     const source = await readFile(
       new URL("../src/generated/theme-validator.ts", import.meta.url),

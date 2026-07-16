@@ -189,7 +189,32 @@
             "focusBlur": { "type": "number", "minimum": 0, "maximum": 32 },
             "layout": { "enum": ["native", "editorial", "immersive"] },
             "iconStyle": { "enum": ["native", "contained", "themed"] },
-            "decorations": { "enum": ["none", "subtle", "expressive"] }
+            "decorations": { "enum": ["none", "subtle", "expressive"] },
+            "palette": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "canvas": { "$ref": "#/$defs/color" },
+                "surfaceRaised": { "$ref": "#/$defs/color" },
+                "surfaceOverlay": { "$ref": "#/$defs/color" },
+                "surfaceSunken": { "$ref": "#/$defs/color" },
+                "control": { "$ref": "#/$defs/color" },
+                "controlHover": { "$ref": "#/$defs/color" },
+                "controlActive": { "$ref": "#/$defs/color" },
+                "textTertiary": { "$ref": "#/$defs/color" },
+                "onAccent": { "$ref": "#/$defs/color" },
+                "borderSubtle": { "$ref": "#/$defs/color" },
+                "borderStrong": { "$ref": "#/$defs/color" },
+                "focus": { "$ref": "#/$defs/color" },
+                "success": { "$ref": "#/$defs/color" },
+                "warning": { "$ref": "#/$defs/color" },
+                "danger": { "$ref": "#/$defs/color" },
+                "info": { "$ref": "#/$defs/color" },
+                "added": { "$ref": "#/$defs/color" },
+                "modified": { "$ref": "#/$defs/color" },
+                "deleted": { "$ref": "#/$defs/color" }
+              }
+            }
           }
         },
         "motion": {

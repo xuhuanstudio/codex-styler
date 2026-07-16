@@ -29,6 +29,86 @@ export interface AdaptiveThemeResult {
   selectedSchemeId: AdaptiveSchemeId;
 }
 
+function blankVariant(mode: "light" | "dark"): ThemeVariant {
+  const dark = mode === "dark";
+  return {
+    background: {
+      color: dark ? "#111318" : "#eef0f3",
+      position: { x: 50, y: 50 },
+      brightness: 1,
+      blur: 0,
+      overlay: dark ? "#111318" : "#eef0f3",
+      overlayOpacity: 0,
+    },
+    appearance: {
+      accent: dark ? "#8eaef7" : "#315fca",
+      surface: dark ? "#1c1f26" : "#ffffff",
+      surfaceOpacity: 0.94,
+      text: dark ? "#f3f4f7" : "#17191e",
+      mutedText: dark ? "#a6abb5" : "#656b76",
+      border: dark ? "#363b45" : "#d3d7df",
+      radius: 14,
+      focusOpacity: 0.86,
+      focusBlur: 12,
+      layout: "native",
+      iconStyle: "native",
+      decorations: "none",
+    },
+    motion: {
+      intensity: 0.25,
+      parallax: 4,
+      targetFps: 30,
+    },
+  };
+}
+
+export function createBlankTheme(): ThemeDefinition {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return {
+    format: THEME_FORMAT,
+    id: `local.untitled-${suffix}`,
+    version: "0.1.0",
+    metadata: {
+      name: "Untitled Theme",
+      description: "A clean local theme ready for your visual direction.",
+      author: "Local user",
+      license: "User-created",
+      tags: ["custom", "blank"],
+    },
+    compatibility: {
+      styler: { minimumVersion: "0.1.0" },
+      codex: { mode: "semantic", testedVersions: [] },
+    },
+    variants: {
+      light: blankVariant("light"),
+      dark: blankVariant("dark"),
+    },
+    scene: {
+      layers: [
+        {
+          id: "soft-vignette",
+          type: "vignette",
+          opacity: 0.16,
+          blendMode: "multiply",
+          parallax: 0,
+        },
+      ],
+      entities: [],
+    },
+    assets: [],
+    locales: {
+      en: {
+        name: "Untitled Theme",
+        description: "A clean local theme ready for your visual direction.",
+      },
+      "zh-CN": {
+        name: "未命名主题",
+        description: "一个等待你定义视觉方向的干净本地主题。",
+      },
+    },
+  };
+}
+
 const clamp = (value: number, minimum = 0, maximum = 255) =>
   Math.min(maximum, Math.max(minimum, value));
 

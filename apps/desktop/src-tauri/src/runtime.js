@@ -1,14 +1,37 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 6) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 11) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
   const ENTITY_ID = "codex-styler-entity-root";
   const STYLE_ID = "codex-styler-runtime-style";
+  const APP_ROOT_ATTRIBUTE = "data-codex-styler-app-root";
   const HEX = /^#[0-9a-f]{6}$/i;
   const DATA_IMAGE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
+  const PALETTE_KEYS = new Set([
+    "canvas",
+    "surfaceRaised",
+    "surfaceOverlay",
+    "surfaceSunken",
+    "control",
+    "controlHover",
+    "controlActive",
+    "textTertiary",
+    "onAccent",
+    "borderSubtle",
+    "borderStrong",
+    "focus",
+    "success",
+    "warning",
+    "danger",
+    "info",
+    "added",
+    "modified",
+    "deleted",
+  ]);
   let pointerHandler = null;
   let resizeHandler = null;
+  let layoutResizeHandler = null;
   let mutationObserver = null;
   let animationFrame = null;
   let healthTimer = null;
@@ -83,6 +106,23 @@
     ]) {
       if (typeof color !== "string" || !HEX.test(color)) {
         throw new Error("Codex Styler rejected an unsafe color value");
+      }
+    }
+    if (
+      appearance.palette !== undefined &&
+      (!appearance.palette ||
+        typeof appearance.palette !== "object" ||
+        Array.isArray(appearance.palette))
+    ) {
+      throw new Error("Codex Styler rejected an invalid semantic palette");
+    }
+    for (const [key, color] of Object.entries(appearance.palette || {})) {
+      if (
+        !PALETTE_KEYS.has(key) ||
+        typeof color !== "string" ||
+        !HEX.test(color)
+      ) {
+        throw new Error("Codex Styler rejected an unsafe semantic color");
       }
     }
     if (
@@ -172,11 +212,14 @@
     if (pointerHandler)
       window.removeEventListener("pointermove", pointerHandler);
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    if (layoutResizeHandler)
+      window.removeEventListener("resize", layoutResizeHandler);
     if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     if (healthTimer !== null) clearTimeout(healthTimer);
     entityCleanup?.();
     pointerHandler = null;
     resizeHandler = null;
+    layoutResizeHandler = null;
     animationFrame = null;
     healthTimer = null;
     entityCleanup = null;
@@ -191,13 +234,361 @@
     document.documentElement.removeAttribute("data-codex-styler-layout");
     document.documentElement.removeAttribute("data-codex-styler-icons");
     document.documentElement.removeAttribute("data-codex-styler-decorations");
+    document.documentElement.removeAttribute("data-codex-styler-density");
+    document.documentElement.removeAttribute(
+      "data-codex-styler-collision-guard",
+    );
+    document
+      .querySelectorAll(`[${APP_ROOT_ATTRIBUTE}]`)
+      .forEach((element) => element.removeAttribute(APP_ROOT_ATTRIBUTE));
   };
+
+  const updateAppRoot = () => {
+    const root = (
+      document.querySelector("aside.app-shell-left-panel") ||
+      document.querySelector("main.main-surface")
+    )?.closest("body > *");
+    document.querySelectorAll(`[${APP_ROOT_ATTRIBUTE}]`).forEach((element) => {
+      if (element !== root) element.removeAttribute(APP_ROOT_ATTRIBUTE);
+    });
+    root?.setAttribute(APP_ROOT_ATTRIBUTE, "");
+  };
+
+  const semanticPalette = (appearance, background, variant) => {
+    const custom = appearance.palette || {};
+    const textPrimary = readable(appearance.text, appearance.surface);
+    const textSecondary = readable(appearance.mutedText, appearance.surface);
+    const safeOverride = (candidate, foreground, fallback, minimum = 4.5) =>
+      candidate && contrast(foreground, candidate) >= minimum
+        ? candidate
+        : fallback;
+    const safeForeground = (candidate, backgroundColor, fallback) =>
+      candidate && contrast(candidate, backgroundColor) >= 4.5
+        ? candidate
+        : fallback;
+    const statusDefaults =
+      variant === "dark"
+        ? {
+            success: "#4BC47D",
+            warning: "#E7A645",
+            danger: "#F06A67",
+            info: "#83C3FF",
+          }
+        : {
+            success: "#197A43",
+            warning: "#9A5B12",
+            danger: "#B93232",
+            info: "#1F5F99",
+          };
+    const success = safeForeground(
+      custom.success,
+      appearance.surface,
+      statusDefaults.success,
+    );
+    const warning = safeForeground(
+      custom.warning,
+      appearance.surface,
+      statusDefaults.warning,
+    );
+    const danger = safeForeground(
+      custom.danger,
+      appearance.surface,
+      statusDefaults.danger,
+    );
+    const info = safeForeground(
+      custom.info || appearance.accent,
+      appearance.surface,
+      statusDefaults.info,
+    );
+    const onAccent = safeForeground(
+      custom.onAccent,
+      appearance.accent,
+      readable(appearance.surface, appearance.accent),
+    );
+    return {
+      canvas: safeOverride(custom.canvas, textPrimary, background.color),
+      surface: appearance.surface,
+      surfaceRaised: safeOverride(
+        custom.surfaceRaised,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 92%, ${appearance.text})`,
+      ),
+      surfaceOverlay: safeOverride(
+        custom.surfaceOverlay,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 86%, ${appearance.text})`,
+      ),
+      surfaceSunken: safeOverride(
+        custom.surfaceSunken,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 88%, ${background.color})`,
+      ),
+      control: safeOverride(
+        custom.control,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 90%, ${appearance.text})`,
+      ),
+      controlHover: safeOverride(
+        custom.controlHover,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 84%, ${appearance.text})`,
+      ),
+      controlActive: safeOverride(
+        custom.controlActive,
+        textPrimary,
+        `color-mix(in srgb, ${appearance.surface} 76%, ${appearance.text})`,
+      ),
+      textPrimary,
+      textSecondary,
+      textTertiary: safeForeground(
+        custom.textTertiary,
+        appearance.surface,
+        `color-mix(in srgb, ${textSecondary} 78%, ${appearance.surface})`,
+      ),
+      accent: appearance.accent,
+      onAccent,
+      border: appearance.border,
+      borderSubtle:
+        custom.borderSubtle ||
+        `color-mix(in srgb, ${appearance.border} 52%, transparent)`,
+      borderStrong:
+        custom.borderStrong ||
+        `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
+      focus: safeForeground(
+        custom.focus || appearance.accent,
+        appearance.surface,
+        statusDefaults.info,
+      ),
+      success,
+      warning,
+      danger,
+      info,
+      added: safeForeground(custom.added, appearance.surface, success),
+      modified: safeForeground(custom.modified, appearance.surface, warning),
+      deleted: safeForeground(custom.deleted, appearance.surface, danger),
+    };
+  };
+
+  const codexColorTokenDeclarations = (palette) => `
+    /* Stable semantic roles. Themes never depend on Codex-private tokens. */
+    --codex-styler-canvas: ${palette.canvas};
+    --codex-styler-surface: ${palette.surface};
+    --codex-styler-surface-raised: ${palette.surfaceRaised};
+    --codex-styler-surface-overlay: ${palette.surfaceOverlay};
+    --codex-styler-surface-sunken: ${palette.surfaceSunken};
+    --codex-styler-control: ${palette.control};
+    --codex-styler-control-hover: ${palette.controlHover};
+    --codex-styler-control-active: ${palette.controlActive};
+    --codex-styler-text-primary: ${palette.textPrimary};
+    --codex-styler-text-secondary: ${palette.textSecondary};
+    --codex-styler-text-tertiary: ${palette.textTertiary};
+    --codex-styler-accent: ${palette.accent};
+    --codex-styler-on-accent: ${palette.onAccent};
+    --codex-styler-border: ${palette.border};
+    --codex-styler-border-subtle: ${palette.borderSubtle};
+    --codex-styler-border-strong: ${palette.borderStrong};
+    --codex-styler-focus: ${palette.focus};
+    --codex-styler-success: ${palette.success};
+    --codex-styler-warning: ${palette.warning};
+    --codex-styler-danger: ${palette.danger};
+    --codex-styler-info: ${palette.info};
+    --codex-styler-added: ${palette.added};
+    --codex-styler-modified: ${palette.modified};
+    --codex-styler-deleted: ${palette.deleted};
+
+    /* Codex base palette. */
+    --color-background-surface-under: var(--codex-styler-canvas);
+    --color-background-surface: var(--codex-styler-surface);
+    --color-background-panel: var(--codex-styler-surface-raised);
+    --color-background-control: color-mix(in srgb, var(--codex-styler-control) 96%, transparent);
+    --color-background-control-opaque: var(--codex-styler-control);
+    --color-background-editor-opaque: var(--codex-styler-surface-sunken);
+    --color-background-elevated-primary: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent);
+    --color-background-elevated-primary-opaque: var(--codex-styler-surface-overlay);
+    --color-background-elevated-secondary: color-mix(in srgb, var(--codex-styler-surface-raised) 72%, transparent);
+    --color-background-elevated-secondary-opaque: var(--codex-styler-surface-raised);
+    --color-background-button-primary: var(--codex-styler-accent);
+    --color-background-button-primary-hover: color-mix(in srgb, var(--codex-styler-accent) 86%, var(--codex-styler-text-primary));
+    --color-background-button-primary-active: color-mix(in srgb, var(--codex-styler-accent) 76%, var(--codex-styler-text-primary));
+    --color-background-button-primary-inactive: color-mix(in srgb, var(--codex-styler-accent) 42%, transparent);
+    --color-background-button-secondary: var(--codex-styler-control);
+    --color-background-button-secondary-hover: var(--codex-styler-control-hover);
+    --color-background-button-secondary-active: var(--codex-styler-control-active);
+    --color-background-button-secondary-inactive: color-mix(in srgb, var(--codex-styler-control) 48%, transparent);
+    --color-background-button-tertiary: color-mix(in srgb, var(--codex-styler-control) 44%, transparent);
+    --color-background-button-tertiary-hover: var(--codex-styler-control-hover);
+    --color-background-button-tertiary-active: var(--codex-styler-control-active);
+    --color-text-foreground: var(--codex-styler-text-primary);
+    --color-text-foreground-secondary: var(--codex-styler-text-secondary);
+    --color-text-foreground-tertiary: var(--codex-styler-text-tertiary);
+    --color-text-button-primary: var(--codex-styler-on-accent);
+    --color-text-button-secondary: var(--codex-styler-text-primary);
+    --color-text-button-tertiary: var(--codex-styler-text-secondary);
+    --color-icon-primary: var(--codex-styler-text-primary);
+    --color-icon-secondary: var(--codex-styler-text-secondary);
+    --color-icon-tertiary: var(--codex-styler-text-tertiary);
+    --color-border: var(--codex-styler-border);
+    --color-border-light: var(--codex-styler-border-subtle);
+    --color-border-heavy: var(--codex-styler-border-strong);
+    --color-border-focus: color-mix(in srgb, var(--codex-styler-focus) 76%, transparent);
+    --color-simple-scrim: color-mix(in srgb, var(--codex-styler-text-primary) 10%, transparent);
+
+    /* Codex component aliases. */
+    --color-token-bg-primary: var(--codex-styler-canvas);
+    --color-token-bg-secondary: color-mix(in srgb, var(--codex-styler-surface) 92%, transparent);
+    --color-token-bg-tertiary: color-mix(in srgb, var(--codex-styler-surface-raised) 85%, transparent);
+    --color-token-bg-appshot: color-mix(in srgb, var(--codex-styler-canvas) 75%, transparent);
+    --color-token-bg-fog: color-mix(in srgb, var(--codex-styler-text-primary) 2.5%, transparent);
+    --color-token-side-bar-background: var(--codex-styler-canvas);
+    --color-token-main-surface-primary: color-mix(in srgb, var(--codex-styler-surface) 88%, transparent);
+    --color-token-foreground: var(--codex-styler-text-primary);
+    --color-token-text-primary: var(--codex-styler-text-primary);
+    --color-token-text-secondary: var(--codex-styler-text-secondary);
+    --color-token-text-tertiary: var(--codex-styler-text-tertiary);
+    --color-token-description-foreground: var(--codex-styler-text-secondary);
+    --color-token-disabled-foreground: var(--codex-styler-text-tertiary);
+    --color-token-icon-foreground: var(--codex-styler-text-primary);
+    --color-token-border: var(--codex-styler-border);
+    --color-token-border-default: var(--codex-styler-border);
+    --color-token-border-light: var(--codex-styler-border-subtle);
+    --color-token-border-heavy: var(--codex-styler-border-strong);
+    --color-token-focus-border: color-mix(in srgb, var(--codex-styler-focus) 76%, transparent);
+    --color-token-primary: var(--codex-styler-accent);
+    --color-token-on-accent: var(--codex-styler-on-accent);
+    --color-token-link: var(--codex-styler-info);
+    --color-token-text-link-foreground: var(--codex-styler-info);
+    --color-token-text-link-active-foreground: color-mix(in srgb, var(--codex-styler-info) 78%, var(--codex-styler-text-primary));
+    --color-token-button-background: var(--codex-styler-accent);
+    --color-token-button-foreground: var(--codex-styler-on-accent);
+    --color-token-button-border: color-mix(in srgb, var(--codex-styler-accent) 62%, var(--codex-styler-border));
+    --color-token-button-secondary-hover-background: var(--codex-styler-control-hover);
+    --color-token-input-background: color-mix(in srgb, var(--codex-styler-control) 96%, transparent);
+    --color-token-input-border: var(--codex-styler-border-strong);
+    --color-token-input-foreground: var(--codex-styler-text-primary);
+    --color-token-input-placeholder-foreground: var(--codex-styler-text-tertiary);
+    --color-token-checkbox-background: var(--codex-styler-surface-overlay);
+    --color-token-checkbox-border: var(--codex-styler-border);
+    --color-token-checkbox-foreground: var(--codex-styler-text-primary);
+    --color-token-dropdown-background: var(--codex-styler-control);
+    --color-token-dropdown-foreground: var(--codex-styler-text-primary);
+    --color-token-menu-background: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent);
+    --color-token-menu-border: var(--codex-styler-border);
+    --color-token-badge-background: color-mix(in srgb, var(--codex-styler-control) 72%, transparent);
+    --color-token-badge-foreground: var(--codex-styler-text-secondary);
+    --color-token-list-active-selection-background: color-mix(in srgb, var(--codex-styler-accent) 18%, transparent);
+    --color-token-list-active-selection-foreground: var(--codex-styler-text-primary);
+    --color-token-list-active-selection-icon-foreground: var(--codex-styler-text-primary);
+    --color-token-list-hover-background: color-mix(in srgb, var(--codex-styler-accent) 11%, transparent);
+    --color-token-list-focus-outline: color-mix(in srgb, var(--codex-styler-focus) 76%, transparent);
+    --color-token-toolbar-hover-background: color-mix(in srgb, var(--codex-styler-accent) 11%, transparent);
+    --color-token-menubar-selection-background: color-mix(in srgb, var(--codex-styler-accent) 11%, transparent);
+    --color-token-menubar-selection-foreground: var(--codex-styler-text-primary);
+    --color-token-scrollbar-slider-background: color-mix(in srgb, var(--codex-styler-text-secondary) 18%, transparent);
+    --color-token-scrollbar-slider-hover-background: color-mix(in srgb, var(--codex-styler-text-secondary) 30%, transparent);
+    --color-token-scrollbar-slider-active-background: color-mix(in srgb, var(--codex-styler-text-primary) 30%, transparent);
+    --color-token-conversation-body: color-mix(in srgb, var(--codex-styler-text-primary) 60%, transparent);
+    --color-token-conversation-header: color-mix(in srgb, var(--codex-styler-text-primary) 34%, transparent);
+    --color-token-conversation-summary-leading: color-mix(in srgb, var(--codex-styler-text-secondary) 90%, transparent);
+    --color-token-conversation-summary-trailing: color-mix(in srgb, var(--codex-styler-text-primary) 46%, transparent);
+    --color-token-non-assistant-body-descendant: color-mix(in srgb, var(--codex-styler-text-primary) 54%, transparent);
+    --color-token-editor-background: var(--codex-styler-surface-sunken);
+    --color-token-editor-widget-background: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent);
+    --color-token-editor-foreground: var(--codex-styler-text-primary);
+    --color-token-editor-selection-background: color-mix(in srgb, var(--codex-styler-accent) 28%, transparent);
+    --color-token-editor-find-match-background: color-mix(in srgb, var(--codex-styler-accent) 22%, transparent);
+    --color-token-editor-find-match-highlight-background: color-mix(in srgb, var(--codex-styler-accent) 28%, transparent);
+    --color-token-editor-group-drop-background: color-mix(in srgb, var(--codex-styler-accent) 28%, transparent);
+    --color-token-editor-group-drop-into-prompt-background: color-mix(in srgb, var(--codex-styler-accent) 28%, transparent);
+    --color-token-editor-group-drop-into-prompt-foreground: var(--codex-styler-text-primary);
+    --color-token-text-code-block-background: color-mix(in srgb, var(--codex-styler-control) 72%, transparent);
+    --color-token-text-preformat-background: color-mix(in srgb, var(--codex-styler-surface-raised) 72%, transparent);
+    --color-token-text-preformat-foreground: var(--codex-styler-text-primary);
+    --color-token-diff-surface: color-mix(in srgb, var(--codex-styler-surface) 94%, var(--codex-styler-text-primary));
+    --color-token-terminal-background: color-mix(in srgb, var(--codex-styler-surface-sunken) 94%, transparent);
+    --color-token-terminal-border: var(--codex-styler-border);
+    --color-token-terminal-foreground: var(--codex-styler-text-primary);
+    --color-token-terminal-ansi-black: var(--codex-styler-text-tertiary);
+    --color-token-terminal-ansi-bright-black: var(--codex-styler-text-secondary);
+    --color-token-terminal-ansi-white: var(--codex-styler-text-primary);
+    --color-token-terminal-ansi-bright-white: var(--codex-styler-text-primary);
+    --color-token-terminal-ansi-blue: var(--codex-styler-info);
+    --color-token-terminal-ansi-bright-blue: var(--codex-styler-info);
+    --color-token-terminal-ansi-cyan: color-mix(in srgb, var(--codex-styler-info) 78%, var(--codex-styler-success));
+    --color-token-terminal-ansi-bright-cyan: color-mix(in srgb, var(--codex-styler-info) 78%, var(--codex-styler-success));
+    --color-token-terminal-ansi-green: var(--codex-styler-success);
+    --color-token-terminal-ansi-bright-green: var(--codex-styler-success);
+    --color-token-terminal-ansi-yellow: var(--codex-styler-warning);
+    --color-token-terminal-ansi-bright-yellow: var(--codex-styler-warning);
+    --color-token-terminal-ansi-red: var(--codex-styler-danger);
+    --color-token-terminal-ansi-bright-red: var(--codex-styler-danger);
+    --color-token-terminal-ansi-magenta: var(--codex-styler-accent);
+    --color-token-terminal-ansi-bright-magenta: var(--codex-styler-accent);
+
+    /* Functional colors keep their meaning while remaining theme-overridable. */
+    --color-accent-blue: var(--codex-styler-info);
+    --color-accent-green: var(--codex-styler-success);
+    --color-accent-orange: var(--codex-styler-warning);
+    --color-accent-red: var(--codex-styler-danger);
+    --color-accent-yellow: var(--codex-styler-warning);
+    --color-accent-purple: var(--codex-styler-accent);
+    --color-text-accent: var(--codex-styler-info);
+    --color-text-success: var(--codex-styler-success);
+    --color-text-warning: var(--codex-styler-warning);
+    --color-text-error: var(--codex-styler-danger);
+    --color-text-on-accent: var(--codex-styler-on-accent);
+    --color-icon-accent: var(--codex-styler-info);
+    --color-icon-success: var(--codex-styler-success);
+    --color-icon-warning: var(--codex-styler-warning);
+    --color-icon-error: var(--codex-styler-danger);
+    --color-border-warning: color-mix(in srgb, var(--codex-styler-warning) 46%, transparent);
+    --color-border-error: color-mix(in srgb, var(--codex-styler-danger) 46%, transparent);
+    --color-background-accent: color-mix(in srgb, var(--codex-styler-accent) 16%, var(--codex-styler-surface));
+    --color-background-accent-hover: color-mix(in srgb, var(--codex-styler-accent) 22%, var(--codex-styler-surface));
+    --color-background-accent-active: color-mix(in srgb, var(--codex-styler-accent) 28%, var(--codex-styler-surface));
+    --color-background-status-success: color-mix(in srgb, var(--codex-styler-success) 16%, var(--codex-styler-surface));
+    --color-background-status-warning: color-mix(in srgb, var(--codex-styler-warning) 16%, var(--codex-styler-surface));
+    --color-background-status-error: color-mix(in srgb, var(--codex-styler-danger) 16%, var(--codex-styler-surface));
+    --color-background-danger-active: color-mix(in srgb, var(--codex-styler-danger) 30%, transparent);
+    --color-decoration-added: var(--codex-styler-added);
+    --color-decoration-modified: var(--codex-styler-modified);
+    --color-decoration-deleted: var(--codex-styler-deleted);
+    --color-decoration-unchanged: var(--codex-styler-border-strong);
+    --color-editor-added: color-mix(in srgb, var(--codex-styler-added) 23%, transparent);
+    --color-editor-deleted: color-mix(in srgb, var(--codex-styler-deleted) 23%, transparent);
+    --color-token-error-foreground: var(--codex-styler-danger);
+    --color-token-editor-error-foreground: var(--codex-styler-danger);
+    --color-token-editor-warning-foreground: var(--codex-styler-warning);
+    --color-token-diff-editor-inserted-line-background: color-mix(in srgb, var(--codex-styler-added) 23%, transparent);
+    --color-token-diff-editor-removed-line-background: color-mix(in srgb, var(--codex-styler-deleted) 23%, transparent);
+    --color-token-diff-editor-removed-text-background: color-mix(in srgb, var(--codex-styler-deleted) 30%, transparent);
+    --color-token-git-decoration-added-resource-foreground: var(--codex-styler-added);
+    --color-token-git-decoration-untracked-resource-foreground: var(--codex-styler-added);
+    --color-token-git-decoration-modified-resource-foreground: var(--codex-styler-modified);
+    --color-token-git-decoration-renamed-resource-foreground: var(--codex-styler-modified);
+    --color-token-git-decoration-ignored-resource-foreground: var(--codex-styler-text-tertiary);
+    --color-token-git-decoration-deleted-resource-foreground: var(--codex-styler-deleted);
+    --color-token-input-validation-info-background: color-mix(in srgb, var(--codex-styler-info) 16%, var(--codex-styler-surface));
+    --color-token-input-validation-warning-background: color-mix(in srgb, var(--codex-styler-warning) 16%, var(--codex-styler-surface));
+    --color-token-input-validation-warning-border: color-mix(in srgb, var(--codex-styler-warning) 46%, transparent);
+    --color-token-input-validation-error-background: color-mix(in srgb, var(--codex-styler-danger) 16%, var(--codex-styler-surface));
+    --color-token-input-validation-error-border: color-mix(in srgb, var(--codex-styler-danger) 46%, transparent);
+    --color-token-charts-blue: var(--codex-styler-info);
+    --color-token-charts-green: var(--codex-styler-success);
+    --color-token-charts-orange: var(--codex-styler-warning);
+    --color-token-charts-red: var(--codex-styler-danger);
+    --color-token-charts-yellow: var(--codex-styler-warning);
+    --color-token-charts-purple: var(--codex-styler-accent);
+    --color-token-activity-bar-badge-background: var(--codex-styler-accent);
+    --color-token-activity-bar-badge-foreground: var(--codex-styler-on-accent);
+    --color-token-progress-bar-background: var(--codex-styler-accent);
+    --color-token-radio-active-foreground: var(--codex-styler-on-accent);
+    --color-token-radio-inactive-border: var(--codex-styler-border-strong);
+  `;
 
   const installStyles = (theme, variant, safeMode) => {
     const visual = theme.variants[variant];
     const { appearance, background } = visual;
     const protectedText = readable(appearance.text, appearance.surface);
-    const protectedMuted = readable(appearance.mutedText, appearance.surface);
     const protectedOpacity = background.image
       ? Math.max(0.72, appearance.surfaceOpacity)
       : appearance.surfaceOpacity;
@@ -207,25 +598,20 @@
       : Math.max(38, Math.round(surfacePercent * 0.62));
     const strongSurfacePercent = Math.min(94, Math.max(58, surfacePercent));
     const accentText = readable(appearance.surface, appearance.accent);
+    const palette = semanticPalette(appearance, background, variant);
     const style = document.createElement("style");
     style.id = STYLE_ID;
     const semantic = safeMode
       ? ""
       : `
-        html[data-codex-styler][data-codex-styler-mode="semantic"] {
+        html[data-codex-styler][data-codex-styler-mode="semantic"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           color-scheme: ${variant};
-          --color-token-foreground: ${protectedText};
-          --color-token-text-primary: ${protectedText};
-          --color-token-text-secondary: ${protectedMuted};
-          --color-token-text-tertiary: color-mix(in srgb, ${protectedMuted} 82%, ${protectedText});
-          --color-token-description-foreground: ${protectedMuted};
-          --color-token-border: ${appearance.border};
-          --color-token-border-default: ${appearance.border};
-          --color-token-main-surface-primary: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent);
-          --color-token-input-background: color-mix(in srgb, ${appearance.surface} ${Math.min(96, strongSurfacePercent + 6)}%, transparent);
+          ${codexColorTokenDeclarations(palette)}
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
-        html[data-codex-styler][data-codex-styler-mode="semantic"] body > div:first-child {
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           background: transparent !important;
           color: ${protectedText};
         }
@@ -251,14 +637,36 @@
           box-shadow: inset 3px 0 ${appearance.accent} !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface {
-          margin: 7px 8px 8px 6px !important;
           overflow: clip !important;
           color: ${protectedText} !important;
           background: color-mix(in srgb, ${appearance.surface} ${quietSurfacePercent}%, transparent) !important;
           border: 1px solid color-mix(in srgb, ${appearance.border} 84%, transparent) !important;
-          border-radius: ${Math.max(10, appearance.radius + 4)}px !important;
           border-color: ${appearance.border} !important;
           backdrop-filter: saturate(1.04) blur(${Math.max(2, Math.round(appearance.focusBlur * 0.35))}px) !important;
+          transition: margin 180ms ease, border-radius 180ms ease, box-shadow 180ms ease !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="native"] main.main-surface {
+          margin: 0 !important;
+          border-color: color-mix(in srgb, ${appearance.border} 48%, transparent) !important;
+          border-radius: 0 !important;
+          box-shadow: none !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="editorial"] main.main-surface {
+          margin: 7px 8px 8px 6px !important;
+          border-radius: ${Math.max(12, appearance.radius + 4)}px !important;
+          box-shadow: 0 18px 48px rgb(0 0 0 / 13%), inset 0 1px color-mix(in srgb, ${protectedText} 5%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="immersive"] main.main-surface {
+          margin: 10px 12px 12px 9px !important;
+          border-radius: ${Math.max(18, appearance.radius + 10)}px !important;
+          background: color-mix(in srgb, ${appearance.surface} ${Math.max(50, quietSurfacePercent - 8)}%, transparent) !important;
+          box-shadow: 0 26px 72px rgb(0 0 0 / 18%), inset 0 1px color-mix(in srgb, ${protectedText} 7%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="editorial"] main.main-surface [role="main"] {
+          --thread-content-max-width: min(920px, calc(100cqw - 48px)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="immersive"] main.main-surface [role="main"] {
+          --thread-content-max-width: min(1040px, calc(100cqw - 40px)) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="task"] main.main-surface {
           background-blend-mode: normal !important;
@@ -333,29 +741,17 @@
           background-color: color-mix(in srgb, ${appearance.accent} 10%, transparent) !important;
         }
 
-        /* Theme-owned icon treatment. The native glyph remains accessible while its
-           container, weight, and home mark are replaced by the selected theme. */
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] aside.app-shell-left-panel button svg,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] [data-pip-obstacle="thread-summary-panel"] svg {
-          box-sizing: border-box;
-          width: 25px !important;
-          height: 25px !important;
-          padding: 5px;
-          border-radius: 8px;
+        /* Icon treatments preserve every native SVG dimension and padding. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] aside.app-shell-left-panel button > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] [data-pip-obstacle="thread-summary-panel"] button > svg:first-child {
           color: ${appearance.accent} !important;
-          background: color-mix(in srgb, ${appearance.accent} 11%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.accent} 13%, transparent);
+          filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 22%, transparent));
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] aside.app-shell-left-panel button svg,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] [data-pip-obstacle="thread-summary-panel"] [data-slot] svg {
-          box-sizing: border-box;
-          width: 27px !important;
-          height: 27px !important;
-          padding: 6px;
-          border-radius: 50%;
-          color: ${accentText} !important;
-          background: linear-gradient(145deg, color-mix(in srgb, ${appearance.accent} 82%, white), ${appearance.accent});
-          box-shadow: 0 5px 14px color-mix(in srgb, ${appearance.accent} 24%, transparent), inset 0 1px rgb(255 255 255 / 24%);
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] aside.app-shell-left-panel button > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] [data-pip-obstacle="thread-summary-panel"] button > svg:first-child {
+          color: color-mix(in srgb, ${appearance.accent} 86%, ${protectedText}) !important;
+          stroke-width: 2.25px;
+          filter: drop-shadow(0 3px 7px color-mix(in srgb, ${appearance.accent} 34%, transparent));
         }
 
         /* Full home composition: hero, suggestions, project rail, and composer. */
@@ -369,7 +765,7 @@
           isolation: isolate;
           width: calc(100% - 38px) !important;
           max-width: none !important;
-          min-height: 238px !important;
+          min-height: clamp(190px, 30cqh, 238px) !important;
           padding: 0 !important;
           overflow: hidden !important;
           border: 1px solid color-mix(in srgb, ${appearance.accent} 38%, ${appearance.border}) !important;
@@ -382,7 +778,7 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-layout="immersive"] [role="main"]:has([data-feature="game-source"]) > div:first-child > div:first-child > div:first-child {
           width: calc(100% - 26px) !important;
-          min-height: 270px !important;
+          min-height: clamp(210px, 34cqh, 270px) !important;
           border-radius: ${Math.max(22, appearance.radius + 12)}px !important;
           background-image: linear-gradient(90deg, color-mix(in srgb, ${appearance.surface} 94%, transparent) 0%, color-mix(in srgb, ${appearance.surface} 64%, transparent) 44%, transparent 100%)${background.image ? `, url('${background.image}')` : ""} !important;
         }
@@ -395,7 +791,7 @@
           max-width: 560px !important;
           color: ${protectedText} !important;
           text-align: left !important;
-          font-size: clamp(20px, 2vw, 29px) !important;
+          font-size: clamp(20px, min(2vw, 3.6cqh), 29px) !important;
           font-weight: 720 !important;
           line-height: 1.25 !important;
           text-shadow: 0 2px 18px rgb(0 0 0 / ${variant === "dark" ? "42%" : "14%"});
@@ -414,8 +810,8 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] .group\\/home-suggestions button {
           position: relative !important;
-          min-height: 118px !important;
-          padding: 15px !important;
+          min-height: clamp(96px, 14cqh, 118px) !important;
+          padding: clamp(12px, 1.8cqh, 15px) !important;
           border: 1px solid color-mix(in srgb, ${appearance.accent} 20%, ${appearance.border}) !important;
           border-radius: ${Math.max(16, appearance.radius + 5)}px !important;
           color: ${protectedText} !important;
@@ -441,7 +837,9 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector) {
           position: relative;
-          padding: 32px 10px 10px !important;
+          /* Codex intentionally tucks the rail shell behind the composer.
+             Keep its lower safe area so the interactive row never follows. */
+          padding: clamp(26px, 4cqh, 32px) 10px 27px !important;
           border: 1px solid color-mix(in srgb, ${appearance.accent} 14%, ${appearance.border}) !important;
           border-bottom: 0 !important;
           border-radius: ${Math.max(14, appearance.radius + 3)}px ${Math.max(14, appearance.radius + 3)}px 0 0;
@@ -451,47 +849,64 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector)::before {
           content: "WORKSPACE";
           position: absolute;
-          top: 10px;
+          top: clamp(8px, 1.25cqh, 10px);
           left: 14px;
           color: ${appearance.accent};
           font: 700 10px/1 system-ui, sans-serif;
           letter-spacing: .15em;
+          pointer-events: none;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-density="compact"] .group\\/home-suggestions button {
+          min-height: 88px !important;
+          padding: 11px 12px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-density="compact"] .group\\/home-suggestions button:hover {
+          transform: translateY(-2px) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-density="compact"] [data-feature="game-source"] {
+          font-size: clamp(18px, 3.2cqh, 24px) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-density="compact"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector) {
+          padding-top: 24px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-density="compact"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector)::before {
+          top: 7px;
+          font-size: 9px;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-collision-guard] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector) {
+          padding-top: 8px !important;
+          padding-bottom: 27px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"][data-codex-styler-collision-guard] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector)::before {
+          display: none;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome {
           position: relative;
           overflow: visible !important;
           border-width: 1px !important;
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] .composer-surface-chrome::before {
-          content: "";
-          position: absolute;
-          left: -8px;
-          top: -8px;
-          width: 18px;
-          height: 18px;
-          border: 4px solid ${appearance.accent};
-          border-right-color: transparent;
-          border-radius: 50%;
-          background: ${appearance.surface};
-          box-shadow: 0 0 16px color-mix(in srgb, ${appearance.accent} 34%, transparent);
-          transform: rotate(-25deg);
-          pointer-events: none;
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] main.main-surface {
+          box-shadow: inset 0 1px color-mix(in srgb, ${appearance.accent} 14%, transparent), 0 14px 38px rgb(0 0 0 / 10%) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] .composer-surface-chrome {
+          border-color: color-mix(in srgb, ${appearance.accent} 30%, ${appearance.border}) !important;
+          box-shadow: 0 12px 32px rgb(0 0 0 / 11%), 0 0 0 2px color-mix(in srgb, ${appearance.accent} 5%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] main.main-surface {
+          border-color: color-mix(in srgb, ${appearance.accent} 34%, ${appearance.border}) !important;
+          box-shadow: 0 26px 72px rgb(0 0 0 / 18%), inset 0 2px color-mix(in srgb, ${appearance.accent} 24%, transparent), 0 0 0 3px color-mix(in srgb, ${appearance.accent} 6%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] main.main-surface > header,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] header.app-header-tint {
+          border-bottom-color: color-mix(in srgb, ${appearance.accent} 36%, ${appearance.border}) !important;
+          box-shadow: inset 0 -1px color-mix(in srgb, ${appearance.accent} 12%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] .composer-surface-chrome {
+          border-color: color-mix(in srgb, ${appearance.accent} 54%, ${appearance.border}) !important;
+          box-shadow: 0 16px 42px rgb(0 0 0 / 18%), 0 0 0 3px color-mix(in srgb, ${appearance.accent} 9%, transparent) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="task"] [data-message-author-role="user"] {
           border-left: 3px solid ${appearance.accent} !important;
-        }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] main.main-surface::after {
-          content: "";
-          position: absolute;
-          right: 22px;
-          bottom: 18px;
-          width: 74px;
-          height: 22px;
-          border: 1px solid color-mix(in srgb, ${appearance.accent} 28%, transparent);
-          border-radius: 50%;
-          transform: rotate(-12deg);
-          pointer-events: none;
-          opacity: .72;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] pre,
         html[data-codex-styler][data-codex-styler-mode="semantic"] code {
@@ -511,8 +926,13 @@
       html[data-codex-styler] body {
         background: transparent !important;
       }
-      html[data-codex-styler] body > div:first-child {
+      /* The marked application root stays above the backdrop even when Codex
+         prepends transient popover portals and changes direct-child ordering. */
+      html[data-codex-styler] body > [${APP_ROOT_ATTRIBUTE}] {
         position: relative; z-index: 1;
+      }
+      html[data-codex-styler] body > :not([${APP_ROOT_ATTRIBUTE}]):not(#${BACKDROP_ID}):not(#${ENTITY_ID}) {
+        z-index: 2;
       }
       #${BACKDROP_ID} {
         position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -556,6 +976,35 @@
       "data-codex-styler-page",
       home ? "home" : "task",
     );
+  };
+
+  const updateResponsiveLayout = () => {
+    const root = document.documentElement;
+    if (root.getAttribute("data-codex-styler-page") !== "home") {
+      root.removeAttribute("data-codex-styler-density");
+      root.removeAttribute("data-codex-styler-collision-guard");
+      return;
+    }
+
+    const hero = document.querySelector('[data-feature="game-source"]');
+    const homeMain = hero?.closest('[role="main"]');
+    const compact = Boolean(
+      homeMain && (homeMain.clientHeight < 680 || homeMain.clientWidth < 720),
+    );
+    if (compact) root.setAttribute("data-codex-styler-density", "compact");
+    else root.removeAttribute("data-codex-styler-density");
+
+    if (!root.hasAttribute("data-codex-styler-collision-guard")) {
+      const project = document.querySelector(".group\\/project-selector");
+      const composer = document.querySelector(".composer-surface-chrome");
+      if (project && composer) {
+        const projectBounds = project.getBoundingClientRect();
+        const composerBounds = composer.getBoundingClientRect();
+        if (projectBounds.bottom > composerBounds.top - 4) {
+          root.setAttribute("data-codex-styler-collision-guard", "");
+        }
+      }
+    }
   };
 
   const entityTarget = (target) => {
@@ -926,8 +1375,10 @@
       "data-codex-styler-decorations",
       appearance.decorations || "none",
     );
+    updateAppRoot();
     installStyles(theme, variant, Boolean(safeMode));
     updatePageKind();
+    updateResponsiveLayout();
 
     const backdrop = document.createElement("div");
     backdrop.id = BACKDROP_ID;
@@ -944,6 +1395,8 @@
     entityRoot.setAttribute("aria-hidden", "true");
     document.body.appendChild(entityRoot);
     installEntity(entityRoot, theme, variant);
+    layoutResizeHandler = () => updateResponsiveLayout();
+    window.addEventListener("resize", layoutResizeHandler, { passive: true });
 
     activeState = {
       theme,
@@ -953,7 +1406,9 @@
       resolvedMode,
     };
     mutationObserver = new MutationObserver(() => {
+      updateAppRoot();
       updatePageKind();
+      updateResponsiveLayout();
       entityPositioner?.();
       if (
         activeState &&
@@ -1067,7 +1522,7 @@
   };
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 6,
+    version: 11,
     apply,
     pause: remove,
     restore: remove,

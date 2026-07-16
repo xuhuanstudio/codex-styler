@@ -94,6 +94,7 @@ export const docs: DocPage[] = [
           heading: "A theme is data, not code",
           paragraphs: [
             "A .codex-styler-theme package contains theme.json, local PNG, JPEG, or WebP assets, and LICENSES.json. JavaScript, remote URLs, SVG, video, arbitrary CSS, and executable fonts are rejected.",
+            "The compact appearance colors generate a complete accessible palette for surfaces, controls, interaction states, code, diffs, terminals, charts, and status feedback. Advanced packages may override stable semantic roles without depending on Codex CSS variables.",
             "Use the checked-in JSON Schema and the theme validation command before sharing a package.",
           ],
         },
@@ -115,6 +116,7 @@ export const docs: DocPage[] = [
           heading: "主题是数据，不是代码",
           paragraphs: [
             ".codex-styler-theme 包只包含 theme.json、本地 PNG/JPEG/WebP 资源和 LICENSES.json。JavaScript、远程 URL、SVG、视频、任意 CSS 和可执行字体都会被拒绝。",
+            "基础外观色会自动推导出覆盖表面、控件、交互状态、代码、Diff、终端、图表和状态反馈的完整可读色板；高级主题也可覆写稳定的语义角色，而不依赖 Codex 私有 CSS 变量。",
             "分享之前，请使用仓库内公开的 JSON Schema 和主题校验命令。",
           ],
         },

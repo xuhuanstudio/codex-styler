@@ -8,7 +8,6 @@ import {
   Languages,
   Layers3,
   Leaf,
-  Library,
   LockKeyhole,
   Monitor,
   Moon,
@@ -23,7 +22,6 @@ import {
   RotateCcw,
   Settings,
   ShieldCheck,
-  SlidersHorizontal,
   Sparkles,
   Sun,
   Trash2,
@@ -83,6 +81,7 @@ import {
   type RuntimeStatus,
 } from "./lib/runtime";
 import {
+  createBlankTheme,
   createAdaptiveTheme,
   type AdaptiveScheme,
   type AdaptiveSchemeId,
@@ -98,7 +97,9 @@ import {
 } from "./lib/theme-files";
 import { themeAssetUrl } from "./lib/assets";
 
-type View = "themes" | "companions" | "create" | "library" | "settings";
+type View = "home" | "themes" | "companions" | "settings" | "editor";
+type ThemeCollection = "builtIn" | "mine";
+type NewThemeStep = "choose" | "existing";
 type ThemeVariantName = "light" | "dark";
 
 const initialRuntime: RuntimeStatus = {
@@ -113,7 +114,7 @@ const initialRuntime: RuntimeStatus = {
 
 export function App() {
   const [settings, setSettings] = useState<UserSettings>(loadSettings);
-  const [view, setView] = useState<View>("themes");
+  const [view, setView] = useState<View>("home");
   const [selectedTheme, setSelectedTheme] = useState<ThemeDefinition>(
     builtinThemes[0],
   );
@@ -125,6 +126,9 @@ export function App() {
   const [detection, setDetection] = useState<CodexDetection | null>(null);
   const [localThemes, setLocalThemes] =
     useState<ThemeDefinition[]>(loadLocalThemes);
+  const [themeCollection, setThemeCollection] =
+    useState<ThemeCollection>("builtIn");
+  const [newThemeStep, setNewThemeStep] = useState<NewThemeStep | null>(null);
   const [themeAssetMaps, setThemeAssetMaps] = useState<
     Record<string, ThemeAssetMap>
   >({});
@@ -142,6 +146,9 @@ export function App() {
   } | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const backgroundImportRef = useRef<HTMLInputElement>(null);
+  const [backgroundImportMode, setBackgroundImportMode] = useState<
+    "create" | "replace"
+  >("create");
   const [adaptiveSchemes, setAdaptiveSchemes] = useState<AdaptiveScheme[]>([]);
   const [activeAdaptiveScheme, setActiveAdaptiveScheme] =
     useState<AdaptiveSchemeId | null>(null);
@@ -152,6 +159,10 @@ export function App() {
     themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
   const selectedCompanion =
     builtinCompanions.find((item) => item.id === settings.companionId) ?? null;
+  const appliedTheme =
+    [...builtinThemes, ...localThemes].find(
+      (theme) => theme.id === settings.appliedThemeId,
+    ) ?? selectedTheme;
   const composeTheme = (
     theme: ThemeDefinition,
     companion = selectedCompanion,
@@ -229,7 +240,16 @@ export function App() {
     const composed = composeTheme(theme, companion);
     setBusy(true);
     try {
-      let next = runtime;
+      let next = await getRuntimeStatus();
+      setRuntime(next);
+      if (!next.connected) {
+        const currentDetection = await detectCodex();
+        setDetection(currentDetection);
+        if (currentDetection.running) {
+          setPendingApplication({ theme, companion });
+          return;
+        }
+      }
       if (!next.connected) next = await launchCodex();
       next = await applyTheme(
         composed,
@@ -238,22 +258,25 @@ export function App() {
         resolveAsset,
       );
       setRuntime(next);
+      setSelectedTheme(theme);
+      updateSettings({ appliedThemeId: theme.id });
       setDetection(await detectCodex());
       setToast(t("connected"));
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
       setRuntime({
         ...runtime,
         state: "error",
-        message: error instanceof Error ? error.message : String(error),
+        message: detail,
       });
-      setToast(t("connectionError"));
+      setToast(`${t("applyFailed")}: ${detail}`);
     } finally {
       setBusy(false);
     }
   }
 
   function requestApply(
-    theme: ThemeDefinition = view === "create" ? draftTheme : selectedTheme,
+    theme: ThemeDefinition = view === "editor" ? draftTheme : selectedTheme,
     companion: CompanionDefinition | null = selectedCompanion,
   ) {
     if (needsManualRestart) {
@@ -298,22 +321,17 @@ export function App() {
     void getCurrentWindow().startDragging();
   }
 
-  function chooseTheme(theme: ThemeDefinition, openEditor = false) {
+  function chooseTheme(theme: ThemeDefinition) {
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
-    const pairing = defaultCompanionForTheme(theme.id);
-    updateSettings({ companionId: pairing?.id ?? null });
-    if (openEditor) setView("create");
   }
 
   function chooseAndApplyTheme(theme: ThemeDefinition) {
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
-    const pairing = defaultCompanionForTheme(theme.id);
     setSelectedTheme(theme);
-    updateSettings({ companionId: pairing?.id ?? null });
-    requestApply(theme, pairing);
+    requestApply(theme, selectedCompanion);
   }
 
   function updateVariant(
@@ -369,22 +387,23 @@ export function App() {
 
   function resetDraft() {
     setDraftTheme(structuredClone(selectedTheme));
-    const pairing = defaultCompanionForTheme(selectedTheme.id);
-    const nextAnchors = { ...settings.companionAnchors };
-    const nextSizes = { ...settings.companionSizes };
-    const nextAttachments = { ...settings.companionAttachments };
-    if (pairing) {
-      delete nextAnchors[pairing.id];
-      delete nextSizes[pairing.id];
-      delete nextAttachments[pairing.id];
-    }
-    updateSettings({
-      companionId: pairing?.id ?? null,
-      companionAnchors: nextAnchors,
-      companionSizes: nextSizes,
-      companionAttachments: nextAttachments,
-    });
     setToast(t("resetTheme"));
+  }
+
+  function openLocalThemeEditor(theme: ThemeDefinition) {
+    setAdaptiveSchemes([]);
+    setActiveAdaptiveScheme(null);
+    setSelectedTheme(theme);
+    setDraftTheme(structuredClone(theme));
+    setView("editor");
+  }
+
+  function openThemeEditor(theme: ThemeDefinition) {
+    if (localThemes.some((item) => item.id === theme.id)) {
+      openLocalThemeEditor(theme);
+      return;
+    }
+    void duplicateTheme(theme);
   }
 
   async function duplicateTheme(theme: ThemeDefinition) {
@@ -398,6 +417,12 @@ export function App() {
         Math.random().toString(36).slice(2, 7);
       duplicate.version = "0.1.0";
       duplicate.metadata.name += " Copy";
+      if (duplicate.locales.en) {
+        duplicate.locales.en.name += " Copy";
+      }
+      if (duplicate.locales["zh-CN"]) {
+        duplicate.locales["zh-CN"].name += " 副本";
+      }
       const assetMap = await persistThemeCopy(duplicate, (_, path) =>
         resolveAsset(theme, path),
       );
@@ -411,7 +436,8 @@ export function App() {
       setSelectedTheme(duplicate);
       setDraftTheme(duplicate);
       setToast(t("savedCopy"));
-      setView("create");
+      setThemeCollection("mine");
+      setView("editor");
     } catch (error) {
       console.error(error);
       setToast(t("invalidTheme"));
@@ -438,7 +464,8 @@ export function App() {
       saveLocalThemes(next);
       setSelectedTheme(importedTheme);
       setToast(t("imported"));
-      setView("library");
+      setThemeCollection("mine");
+      setView("themes");
     } catch (error) {
       console.error(error);
       setToast(t("invalidTheme"));
@@ -453,6 +480,33 @@ export function App() {
     setBusy(true);
     try {
       const generated = await createAdaptiveTheme(file);
+      if (backgroundImportMode === "replace") {
+        const replacement = structuredClone(draftTheme);
+        replacement.variants = structuredClone(generated.theme.variants);
+        replacement.scene.layers = structuredClone(generated.theme.scene.layers);
+        replacement.assets = structuredClone(generated.theme.assets);
+        delete replacement.metadata.preview;
+        const assetMap = await persistGeneratedTheme(
+          replacement,
+          generated.files,
+        );
+        const next = [
+          replacement,
+          ...localThemes.filter((theme) => theme.id !== replacement.id),
+        ];
+        setThemeAssetMaps((current) => ({
+          ...current,
+          [replacement.id]: assetMap,
+        }));
+        setLocalThemes(next);
+        saveLocalThemes(next);
+        setSelectedTheme(structuredClone(replacement));
+        setDraftTheme(structuredClone(replacement));
+        setAdaptiveSchemes(generated.schemes);
+        setActiveAdaptiveScheme(generated.selectedSchemeId);
+        setToast(t("themeImageUpdated"));
+        return;
+      }
       const assetMap = await persistGeneratedTheme(
         generated.theme,
         generated.files,
@@ -471,7 +525,8 @@ export function App() {
       setDraftTheme(structuredClone(generated.theme));
       setAdaptiveSchemes(generated.schemes);
       setActiveAdaptiveScheme(generated.selectedSchemeId);
-      setView("create");
+      setThemeCollection("mine");
+      setView("editor");
       setToast(t("adaptiveThemeCreated"));
     } catch (error) {
       console.error(error);
@@ -493,7 +548,7 @@ export function App() {
   async function handleExport() {
     try {
       await exportTheme(
-        view === "create" ? draftTheme : selectedTheme,
+        view === "editor" ? draftTheme : selectedTheme,
         resolveAsset,
       );
       setToast(t("exportReady"));
@@ -501,6 +556,59 @@ export function App() {
       console.error(error);
       setToast(t("invalidTheme"));
     }
+  }
+
+  function handleCreateBlankTheme() {
+    const theme = createBlankTheme();
+    const next = [theme, ...localThemes];
+    setLocalThemes(next);
+    saveLocalThemes(next);
+    setSelectedTheme(theme);
+    setDraftTheme(structuredClone(theme));
+    setAdaptiveSchemes([]);
+    setActiveAdaptiveScheme(null);
+    setThemeCollection("mine");
+    setNewThemeStep(null);
+    setView("editor");
+    setToast(t("blankThemeCreated"));
+  }
+
+  async function saveDraftTheme() {
+    setBusy(true);
+    try {
+      const assetMap = draftTheme.assets.length
+        ? await persistThemeCopy(draftTheme, resolveAsset)
+        : {};
+      const next = [
+        structuredClone(draftTheme),
+        ...localThemes.filter((theme) => theme.id !== draftTheme.id),
+      ];
+      setThemeAssetMaps((current) => ({
+        ...current,
+        [draftTheme.id]: assetMap,
+      }));
+      setLocalThemes(next);
+      saveLocalThemes(next);
+      setSelectedTheme(structuredClone(draftTheme));
+      setToast(t("themeSaved"));
+      return true;
+    } catch (error) {
+      console.error(error);
+      setToast(t("invalidTheme"));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveAndApplyDraft() {
+    if (await saveDraftTheme()) requestApply(draftTheme);
+  }
+
+  function changeThemeCollection(collection: ThemeCollection) {
+    setThemeCollection(collection);
+    const first = collection === "builtIn" ? builtinThemes[0] : localThemes[0];
+    if (first) chooseTheme(first);
   }
 
   async function handleDeleteTheme() {
@@ -529,12 +637,12 @@ export function App() {
   }
 
   const navItems: Array<{ id: View; label: MessageKey; icon: ReactNode }> = [
+    { id: "home", label: "home", icon: <Monitor size={17} /> },
     { id: "themes", label: "themes", icon: <Palette size={17} /> },
     { id: "companions", label: "companions", icon: <PawPrint size={17} /> },
-    { id: "create", label: "create", icon: <SlidersHorizontal size={17} /> },
-    { id: "library", label: "library", icon: <Library size={17} /> },
     { id: "settings", label: "settings", icon: <Settings size={17} /> },
   ];
+  const activeNavigation = view === "editor" ? "themes" : view;
 
   return (
     <div className="app" data-manager-theme={appTheme}>
@@ -552,7 +660,7 @@ export function App() {
             <button
               key={item.id}
               className={
-                view === item.id
+                activeNavigation === item.id
                   ? "app-nav__item app-nav__item--active"
                   : "app-nav__item"
               }
@@ -560,9 +668,6 @@ export function App() {
             >
               {item.icon}
               <span>{t(item.label)}</span>
-              {item.id === "library" && localThemes.length > 0 && (
-                <small>{localThemes.length}</small>
-              )}
             </button>
           ))}
         </nav>
@@ -664,16 +769,48 @@ export function App() {
           </div>
         </header>
 
+        {view === "home" && (
+          <HomeView
+            locale={locale}
+            theme={composeTheme(appliedTheme)}
+            sourceTheme={appliedTheme}
+            companion={selectedCompanion}
+            runtime={runtime}
+            runtimeStrategy={settings.runtimeStrategy}
+            variant={variant}
+            reduceMotion={settings.reduceMotion}
+            t={t}
+            onApply={() => requestApply(appliedTheme)}
+            onEdit={() => openThemeEditor(appliedTheme)}
+            onBrowse={() => setView("themes")}
+            onCreateFromImage={() => {
+              setBackgroundImportMode("create");
+              setNewThemeStep(null);
+              backgroundImportRef.current?.click();
+            }}
+            onCompanions={() => setView("companions")}
+            onRestore={handleRestore}
+            resolveAsset={resolveAsset}
+          />
+        )}
+
         {view === "themes" && (
           <ThemesView
             locale={locale}
             selectedTheme={selectedTheme}
             previewTheme={composeTheme(selectedTheme)}
+            localThemes={localThemes}
+            collection={themeCollection}
             variant={variant}
             reduceMotion={settings.reduceMotion}
             t={t}
             onSelect={chooseTheme}
             onApply={chooseAndApplyTheme}
+            onEdit={openThemeEditor}
+            onDelete={setPendingDelete}
+            onCollectionChange={changeThemeCollection}
+            onNew={() => setNewThemeStep("choose")}
+            onImport={() => importRef.current?.click()}
             resolveAsset={resolveAsset}
           />
         )}
@@ -693,7 +830,7 @@ export function App() {
           />
         )}
 
-        {view === "create" && (
+        {view === "editor" && (
           <CreateView
             theme={composeTheme(draftTheme)}
             variant={variant}
@@ -706,28 +843,23 @@ export function App() {
             onUpdateEntityAttachment={updateEntityAttachment}
             onSetCompanion={selectCompanion}
             companion={selectedCompanion}
+            onBack={() => {
+              setThemeCollection("mine");
+              setView("themes");
+            }}
             onReset={resetDraft}
-            onApply={() => requestApply(draftTheme)}
+            onSave={() => void saveDraftTheme()}
+            onApply={() => void saveAndApplyDraft()}
             onExport={handleExport}
-            onDuplicate={() => duplicateTheme(draftTheme)}
-            onImportBackground={() => backgroundImportRef.current?.click()}
+            onImportBackground={() => {
+              setBackgroundImportMode("replace");
+              backgroundImportRef.current?.click();
+            }}
             adaptiveSchemes={adaptiveSchemes}
             activeAdaptiveScheme={activeAdaptiveScheme}
             onSelectAdaptiveScheme={selectAdaptiveScheme}
             resolveAsset={resolveAsset}
             busy={busy}
-          />
-        )}
-
-        {view === "library" && (
-          <LibraryView
-            themes={localThemes}
-            locale={locale}
-            t={t}
-            onImport={() => importRef.current?.click()}
-            onOpen={(theme) => chooseTheme(theme, true)}
-            onDelete={setPendingDelete}
-            resolveAsset={resolveAsset}
           />
         )}
 
@@ -771,6 +903,28 @@ export function App() {
               : undefined
           }
           t={t}
+        />
+      )}
+
+      {newThemeStep && (
+        <NewThemeDialog
+          step={newThemeStep}
+          themes={[...builtinThemes, ...localThemes]}
+          locale={locale}
+          t={t}
+          onClose={() => setNewThemeStep(null)}
+          onChooseStep={setNewThemeStep}
+          onBlank={handleCreateBlankTheme}
+          onImage={() => {
+            setBackgroundImportMode("create");
+            setNewThemeStep(null);
+            backgroundImportRef.current?.click();
+          }}
+          onExisting={(theme) => {
+            setNewThemeStep(null);
+            void duplicateTheme(theme);
+          }}
+          resolveAsset={resolveAsset}
         />
       )}
 
@@ -857,27 +1011,168 @@ interface SharedViewProps {
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
 }
 
+function HomeView({
+  locale,
+  theme,
+  sourceTheme,
+  companion,
+  runtime,
+  runtimeStrategy,
+  variant,
+  reduceMotion,
+  t,
+  onApply,
+  onEdit,
+  onBrowse,
+  onCreateFromImage,
+  onCompanions,
+  onRestore,
+  resolveAsset,
+}: SharedViewProps & {
+  theme: ThemeDefinition;
+  sourceTheme: ThemeDefinition;
+  companion: CompanionDefinition | null;
+  runtime: RuntimeStatus;
+  runtimeStrategy: RuntimeStrategy;
+  variant: ThemeVariantName;
+  reduceMotion: boolean;
+  onApply: () => void;
+  onEdit: () => void;
+  onBrowse: () => void;
+  onCreateFromImage: () => void;
+  onCompanions: () => void;
+  onRestore: () => void;
+}) {
+  const copy =
+    sourceTheme.locales[locale] ?? sourceTheme.locales.en;
+  const companionCopy = companion
+    ? companion.locales[locale] ?? companion.locales.en
+    : null;
+  return (
+    <div className="page home-page">
+      <section className="page-heading home-heading">
+        <div>
+          <span className="page-kicker">WORKSPACE CONTROL</span>
+          <h1>{t("homeTitle")}</h1>
+          <p>{t("homeDescription")}</p>
+        </div>
+        <div className="home-heading__status">
+          <span className={runtime.state === "applied" ? "is-live" : ""} />
+          <div>
+            <small>{t("codexAppearance")}</small>
+            <strong>
+              {runtime.state === "applied" ? t("themeActive") : t("ready")}
+            </strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="home-current">
+        <div className="home-current__preview">
+          <span className="home-current__label">{t("currentSetup")}</span>
+          <PreviewWorkspace
+            theme={theme}
+            variant={variant}
+            locale={locale}
+            reduceMotion={reduceMotion}
+            resolveAsset={resolveAsset}
+          />
+        </div>
+        <div className="home-current__content">
+          <span className="home-current__eyebrow">{t("appliedTheme")}</span>
+          <h2>{copy.name}</h2>
+          <p>{copy.description}</p>
+          <dl className="home-current__facts">
+            <div>
+              <dt>{t("companion")}</dt>
+              <dd>{companionCopy?.name ?? t("noCompanion")}</dd>
+            </div>
+            <div>
+              <dt>{t("runtimeStrategy")}</dt>
+              <dd>
+                {runtimeStrategy === "enhanced"
+                  ? t("automaticMode")
+                  : t("compatibilityMode")}
+              </dd>
+            </div>
+          </dl>
+          <div className="button-row">
+            <button className="primary-button" onClick={onApply}>
+              <Play size={14} />
+              {t("apply")}
+            </button>
+            <button className="secondary-button" onClick={onEdit}>
+              {t("editTheme")}
+              <ChevronRight size={15} />
+            </button>
+          </div>
+          <button className="home-restore" onClick={onRestore}>
+            <RotateCcw size={13} />
+            {t("restore")}
+          </button>
+        </div>
+      </section>
+
+      <section className="home-actions" aria-label={t("quickActions")}>
+        <button onClick={onBrowse}>
+          <span><Palette size={18} /></span>
+          <strong>{t("browseThemes")}</strong>
+          <small>{t("browseThemesDetail")}</small>
+          <ChevronRight size={15} />
+        </button>
+        <button onClick={onCreateFromImage}>
+          <span><Image size={18} /></span>
+          <strong>{t("createFromImage")}</strong>
+          <small>{t("createFromImageDetail")}</small>
+          <ChevronRight size={15} />
+        </button>
+        <button onClick={onCompanions}>
+          <span><PawPrint size={18} /></span>
+          <strong>{t("chooseCompanion")}</strong>
+          <small>{t("chooseCompanionDetail")}</small>
+          <ChevronRight size={15} />
+        </button>
+      </section>
+    </div>
+  );
+}
+
 function ThemesView({
   locale,
   selectedTheme,
   previewTheme,
+  localThemes,
+  collection,
   variant,
   reduceMotion,
   t,
   onSelect,
   onApply,
+  onEdit,
+  onDelete,
+  onCollectionChange,
+  onNew,
+  onImport,
   resolveAsset,
 }: SharedViewProps & {
   selectedTheme: ThemeDefinition;
   previewTheme: ThemeDefinition;
+  localThemes: ThemeDefinition[];
+  collection: ThemeCollection;
   variant: ThemeVariantName;
   reduceMotion: boolean;
-  onSelect: (theme: ThemeDefinition, openEditor?: boolean) => void;
+  onSelect: (theme: ThemeDefinition) => void;
   onApply: (theme: ThemeDefinition) => void;
+  onEdit: (theme: ThemeDefinition) => void;
+  onDelete: (theme: ThemeDefinition) => void;
+  onCollectionChange: (collection: ThemeCollection) => void;
+  onNew: () => void;
+  onImport: () => void;
 }) {
+  const themes = collection === "builtIn" ? builtinThemes : localThemes;
   const localized = selectedTheme.locales[locale] ?? selectedTheme.locales.en;
   const selectedIndex =
-    builtinThemes.findIndex((theme) => theme.id === selectedTheme.id) + 1;
+    themes.findIndex((theme) => theme.id === selectedTheme.id) + 1;
   const performance =
     previewTheme.scene.entities.length > 0 ||
     Object.values(previewTheme.variants).some((item) =>
@@ -890,23 +1185,61 @@ function ThemesView({
     <div className="page page--themes">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">CURATED WORKSPACES / 001—003</span>
-          <h1>{t("overview")}</h1>
-          <p>{t("overviewDetail")}</p>
+          <span className="page-kicker">VISUAL SYSTEM LIBRARY</span>
+          <h1>{t("themeLibrary")}</h1>
+          <p>{t("themeLibraryDetail")}</p>
         </div>
-        <div className="page-heading__meta">
-          <span>
-            <LockKeyhole size={13} /> Local-first
-          </span>
-          <span>
-            <RotateCcw size={13} /> Reversible
-          </span>
+        <div className="page-heading__actions">
+          <button className="secondary-button" onClick={onImport}>
+            <Upload size={14} />
+            {t("importTheme")}
+          </button>
+          <button className="primary-button" onClick={onNew}>
+            <Plus size={14} />
+            {t("newTheme")}
+          </button>
         </div>
       </section>
 
-      <section className="featured-theme">
+      <div className="theme-collection-tabs" role="tablist" aria-label={t("themes")}>
+        <button
+          role="tab"
+          aria-selected={collection === "builtIn"}
+          className={collection === "builtIn" ? "is-active" : ""}
+          onClick={() => onCollectionChange("builtIn")}
+        >
+          {t("builtInThemes")}
+          <small>{builtinThemes.length}</small>
+        </button>
+        <button
+          role="tab"
+          aria-selected={collection === "mine"}
+          className={collection === "mine" ? "is-active" : ""}
+          onClick={() => onCollectionChange("mine")}
+        >
+          {t("myThemes")}
+          <small>{localThemes.length}</small>
+        </button>
+      </div>
+
+      {themes.length === 0 ? (
+        <section className="empty-state theme-empty-state">
+          <span className="empty-state__icon"><FolderOpen size={25} /></span>
+          <h2>{t("noLocalThemesTitle")}</h2>
+          <p>{t("noLocalThemes")}</p>
+          <div className="button-row">
+            <button className="primary-button" onClick={onNew}>
+              <Plus size={14} /> {t("newTheme")}
+            </button>
+            <button className="secondary-button" onClick={onImport}>
+              <Upload size={14} /> {t("importTheme")}
+            </button>
+          </div>
+        </section>
+      ) : (<>
+      <section className="featured-theme theme-detail-card">
         <div className="featured-theme__preview">
-          <div className="featured-theme__label">{t("featured")}</div>
+          <div className="featured-theme__label">{t("selectedTheme")}</div>
           <PreviewWorkspace
             theme={previewTheme}
             variant={variant}
@@ -944,9 +1277,9 @@ function ThemesView({
             </button>
             <button
               className="secondary-button"
-              onClick={() => onSelect(selectedTheme, true)}
+              onClick={() => onEdit(selectedTheme)}
             >
-              {t("customize")}
+              {collection === "builtIn" ? t("customizeCopy") : t("editTheme")}
               <ChevronRight size={15} />
             </button>
           </div>
@@ -957,12 +1290,12 @@ function ThemesView({
         <div className="section-heading">
           <div>
             <span>THEME INDEX</span>
-            <h2>{t("allThemes")}</h2>
+            <h2>{collection === "builtIn" ? t("builtInThemes") : t("myThemes")}</h2>
           </div>
-          <span className="section-count">03 ORIGINAL THEMES</span>
+          <span className="section-count">{themes.length} {t("themesCount")}</span>
         </div>
         <div className="theme-list">
-          {builtinThemes.map((theme, index) => (
+          {themes.map((theme, index) => (
             <ThemeRow
               key={theme.id}
               theme={theme}
@@ -972,12 +1305,15 @@ function ThemesView({
               resolveAsset={resolveAsset}
               onSelect={() => onSelect(theme)}
               onApply={() => onApply(theme)}
-              onCustomize={() => onSelect(theme, true)}
+              local={collection === "mine"}
+              onEdit={() => onEdit(theme)}
+              onDelete={() => onDelete(theme)}
               t={t}
             />
           ))}
         </div>
       </section>
+      </>)}
     </div>
   );
 }
@@ -989,7 +1325,9 @@ function ThemeRow({
   active,
   resolveAsset,
   onSelect,
-  onCustomize,
+  local,
+  onEdit,
+  onDelete,
   onApply,
   t,
 }: {
@@ -999,7 +1337,9 @@ function ThemeRow({
   active: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   onSelect: () => void;
-  onCustomize: () => void;
+  local: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
   onApply: () => void;
   t: (key: MessageKey) => string;
 }) {
@@ -1044,10 +1384,20 @@ function ThemeRow({
           <Play size={13} />
           {t("apply")}
         </button>
-        <button className="theme-row__action" onClick={onCustomize}>
-          {t("customize")}
+        <button className="theme-row__action" onClick={onEdit}>
+          {local ? t("editTheme") : t("customizeCopy")}
           <ChevronRight size={14} />
         </button>
+        {local && (
+          <button
+            className="theme-row__delete"
+            onClick={onDelete}
+            title={t("deleteTheme")}
+            aria-label={`${t("deleteTheme")}: ${localized.name}`}
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
       </div>
     </article>
   );
@@ -1163,10 +1513,11 @@ function CreateView({
   onUpdateEntityAttachment,
   onSetCompanion,
   companion,
+  onBack,
   onReset,
+  onSave,
   onApply,
   onExport,
-  onDuplicate,
   onImportBackground,
   adaptiveSchemes,
   activeAdaptiveScheme,
@@ -1187,10 +1538,11 @@ function CreateView({
   onUpdateEntityAttachment: (attachment: EntityAttachment | null) => void;
   onSetCompanion: (companion: CompanionDefinition | null) => void;
   companion: CompanionDefinition | null;
+  onBack: () => void;
   onReset: () => void;
+  onSave: () => void;
   onApply: () => void;
   onExport: () => void;
-  onDuplicate: () => void;
   onImportBackground: () => void;
   adaptiveSchemes: AdaptiveScheme[];
   activeAdaptiveScheme: AdaptiveSchemeId | null;
@@ -1199,7 +1551,7 @@ function CreateView({
 }) {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [activeLayer, setActiveLayer] = useState<
-    "background" | "surfaces" | "companion"
+    "background" | "surfaces" | "motion" | "companion"
   >("background");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const visual = theme.variants[variant];
@@ -1207,9 +1559,18 @@ function CreateView({
   return (
     <div className="editor-page">
       <header className="editor-header">
-        <div>
-          <span>CREATE / {theme.metadata.name.toUpperCase()}</span>
-          <h1>{theme.locales[locale]?.name ?? theme.metadata.name}</h1>
+        <div className="editor-header__identity">
+          <button
+            className="editor-back"
+            onClick={onBack}
+            aria-label={t("backToThemes")}
+          >
+            <ChevronRight size={16} />
+          </button>
+          <div>
+            <span>{t("themes")} / {t("editTheme")}</span>
+            <h1>{theme.locales[locale]?.name ?? theme.metadata.name}</h1>
+          </div>
         </div>
         <div className="editor-header__actions">
           <button className="secondary-button" onClick={onReset}>
@@ -1226,6 +1587,10 @@ function CreateView({
           <button className="secondary-button" onClick={onExport}>
             <Download size={14} />
             {t("exportTheme")}
+          </button>
+          <button className="secondary-button" onClick={onSave} disabled={busy}>
+            <Check size={14} />
+            {busy ? t("saving") : t("save")}
           </button>
           <button className="primary-button" onClick={onApply} disabled={busy}>
             <Play size={14} />
@@ -1301,6 +1666,23 @@ function CreateView({
               </span>
               <Layers3 size={13} />
             </button>
+            <button
+              className={
+                "layer-item" +
+                (activeLayer === "motion" ? " layer-item--active" : "")
+              }
+              onClick={() => setActiveLayer("motion")}
+              aria-label={t("motion")}
+            >
+              <span className="layer-icon">
+                <Sparkles size={15} />
+              </span>
+              <span>
+                <strong>{t("motion")}</strong>
+                <small>{t("motionLayer")}</small>
+              </span>
+              <Layers3 size={13} />
+            </button>
             {entity && (
               <button
                 className={
@@ -1323,11 +1705,11 @@ function CreateView({
           </div>
           <button
             className="layers-save-button"
-            onClick={onDuplicate}
+            onClick={onSave}
             disabled={busy}
           >
-            <Copy size={14} />
-            {t("duplicate")}
+            <Check size={14} />
+            {busy ? t("saving") : t("saveTheme")}
           </button>
           <div className="layers-panel__note">
             <ShieldCheck size={14} />
@@ -1524,6 +1906,7 @@ function CreateView({
                   </option>
                 </select>
               </label>
+              <p className="inspector-mode-note">{t("semanticControlsHint")}</p>
               <ColorControl
                 label="Accent"
                 value={visual.appearance.accent}
@@ -1564,11 +1947,47 @@ function CreateView({
               </div>
             </InspectorSection>
           )}
-          {activeLayer === "companion" && (
+          {activeLayer === "motion" && (
             <InspectorSection
-              title={t("companion")}
-              icon={<PawPrint size={14} />}
+              title={t("motion")}
+              icon={<Sparkles size={14} />}
             >
+              <div className="motion-recipes" aria-label={t("motionStyle")}>
+                {[
+                  { id: "none", intensity: 0, parallax: 0, fps: 30 },
+                  { id: "calm", intensity: 0.25, parallax: 4, fps: 30 },
+                  { id: "fluid", intensity: 0.5, parallax: 8, fps: 30 },
+                  { id: "expressive", intensity: 0.8, parallax: 14, fps: 60 },
+                ].map((recipe) => {
+                  const active =
+                    Math.abs(visual.motion.intensity - recipe.intensity) < 0.01 &&
+                    visual.motion.parallax === recipe.parallax;
+                  const label =
+                    recipe.id === "none"
+                      ? t("motionNone")
+                      : recipe.id === "calm"
+                        ? t("motionCalm")
+                        : recipe.id === "expressive"
+                          ? t("motionExpressive")
+                          : t("motionFluid");
+                  return (
+                    <button
+                      key={recipe.id}
+                      className={active ? "is-active" : ""}
+                      onClick={() => {
+                        onUpdateVariant("motion", "intensity", recipe.intensity);
+                        onUpdateVariant("motion", "parallax", recipe.parallax);
+                        onUpdateVariant("motion", "targetFps", recipe.fps);
+                      }}
+                    >
+                      <span />
+                      {label}
+                      {active && <Check size={12} />}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="inspector-mode-note">{t("motionDescription")}</p>
               <RangeControl
                 label={t("motionIntensity")}
                 value={visual.motion.intensity}
@@ -1580,6 +1999,24 @@ function CreateView({
                   onUpdateVariant("motion", "intensity", value)
                 }
               />
+              <RangeControl
+                label={t("parallaxDepth")}
+                value={visual.motion.parallax}
+                min={0}
+                max={20}
+                step={1}
+                display={visual.motion.parallax + "px"}
+                onChange={(value) =>
+                  onUpdateVariant("motion", "parallax", value)
+                }
+              />
+            </InspectorSection>
+          )}
+          {activeLayer === "companion" && (
+            <InspectorSection
+              title={t("companion")}
+              icon={<PawPrint size={14} />}
+            >
               {entity && (
                 <>
                   <label className="inspector-select-control">
@@ -1719,89 +2156,119 @@ function ColorControl({
   );
 }
 
-function LibraryView({
+function NewThemeDialog({
+  step,
   themes,
   locale,
   t,
-  onImport,
-  onOpen,
-  onDelete,
+  onClose,
+  onChooseStep,
+  onBlank,
+  onImage,
+  onExisting,
   resolveAsset,
 }: SharedViewProps & {
+  step: NewThemeStep;
   themes: ThemeDefinition[];
-  onImport: () => void;
-  onOpen: (theme: ThemeDefinition) => void;
-  onDelete: (theme: ThemeDefinition) => void;
+  onClose: () => void;
+  onChooseStep: (step: NewThemeStep) => void;
+  onBlank: () => void;
+  onImage: () => void;
+  onExisting: (theme: ThemeDefinition) => void;
 }) {
   return (
-    <div className="page library-page">
-      <section className="page-heading">
-        <div>
-          <span className="page-kicker">LOCAL THEME LIBRARY</span>
-          <h1>{t("library")}</h1>
-          <p>{t("localOnly")}</p>
-        </div>
-        <div className="button-row">
-          <button className="primary-button" onClick={onImport}>
-            <Upload size={14} />
-            {t("importTheme")}
+    <div className="confirm-backdrop" role="presentation">
+      <section
+        className="new-theme-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="new-theme-title"
+      >
+        <header className="new-theme-dialog__header">
+          <div>
+            {step === "existing" && (
+              <button
+                className="new-theme-dialog__back"
+                onClick={() => onChooseStep("choose")}
+                aria-label={t("back")}
+              >
+                <ChevronRight size={15} />
+              </button>
+            )}
+            <span>{t("createTheme")}</span>
+            <h2 id="new-theme-title">
+              {step === "existing" ? t("chooseStartingTheme") : t("startYourTheme")}
+            </h2>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label={t("cancel")}>
+            <X size={16} />
           </button>
-        </div>
-      </section>
-      {themes.length === 0 ? (
-        <div className="empty-state">
-          <span className="empty-state__icon">
-            <FolderOpen size={26} />
-          </span>
-          <h2>{t("noLocalThemes")}</h2>
-          <p>.codex-styler-theme · JSON + local raster assets · no scripts</p>
-          <button className="primary-button" onClick={onImport}>
-            <Upload size={14} />
-            {t("importTheme")}
-          </button>
-        </div>
-      ) : (
-        <div className="library-grid">
-          {themes.map((theme) => {
-            const localized = theme.locales[locale] ?? theme.locales.en;
-            const preview = theme.metadata.preview
-              ? resolveAsset(theme, theme.metadata.preview)
-              : undefined;
-            return (
-              <article key={theme.id} className="library-theme">
-                <button
-                  className="library-theme__open"
-                  onClick={() => onOpen(theme)}
-                  aria-label={`${t("customize")}: ${localized.name}`}
-                />
-                <span
-                  className="library-theme__visual"
-                  style={{
-                    backgroundColor: theme.variants.dark.background.color,
-                    backgroundImage: preview
-                      ? "url(" + preview + ")"
-                      : undefined,
-                  }}
-                />
-                <span className="library-theme__copy">
-                  <small>{theme.version}</small>
-                  <strong>{localized.name}</strong>
-                  <span>{localized.description}</span>
-                </span>
-                <button
-                  className="library-theme__delete"
-                  onClick={() => onDelete(theme)}
-                  aria-label={`${t("deleteTheme")}: ${localized.name}`}
-                  title={t("deleteTheme")}
-                >
-                  <Trash2 size={15} />
+        </header>
+
+        {step === "choose" ? (
+          <div className="new-theme-options">
+            <button className="new-theme-option new-theme-option--image" onClick={onImage}>
+              <span className="new-theme-option__icon"><Image size={21} /></span>
+              <span>
+                <small>{t("recommended")}</small>
+                <strong>{t("createFromImage")}</strong>
+                <p>{t("createFromImageLong")}</p>
+              </span>
+              <ChevronRight size={16} />
+            </button>
+            <button className="new-theme-option" onClick={onBlank}>
+              <span className="new-theme-option__icon"><Plus size={21} /></span>
+              <span>
+                <small>{t("cleanStart")}</small>
+                <strong>{t("startBlank")}</strong>
+                <p>{t("startBlankDetail")}</p>
+              </span>
+              <ChevronRight size={16} />
+            </button>
+            <button
+              className="new-theme-option"
+              onClick={() => onChooseStep("existing")}
+            >
+              <span className="new-theme-option__icon"><Copy size={21} /></span>
+              <span>
+                <small>{t("optionalStartingPoint")}</small>
+                <strong>{t("useExistingTheme")}</strong>
+                <p>{t("useExistingThemeDetail")}</p>
+              </span>
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        ) : (
+          <div className="new-theme-existing-list">
+            {themes.map((theme) => {
+              const copy = theme.locales[locale] ?? theme.locales.en;
+              const preview = theme.metadata.preview
+                ? resolveAsset(theme, theme.metadata.preview)
+                : undefined;
+              return (
+                <button key={theme.id} onClick={() => onExisting(theme)}>
+                  <span
+                    className="new-theme-existing-list__preview"
+                    style={{
+                      backgroundColor: theme.variants.dark.background.color,
+                      backgroundImage: preview ? `url(${preview})` : undefined,
+                    }}
+                  />
+                  <span>
+                    <strong>{copy.name}</strong>
+                    <small>{copy.description}</small>
+                  </span>
+                  <ChevronRight size={15} />
                 </button>
-                <ChevronRight className="library-theme__chevron" size={16} />
-              </article>
-            );
-          })}
-        </div>
-      )}
+              );
+            })}
+          </div>
+        )}
+        <footer className="new-theme-dialog__footer">
+          <LockKeyhole size={13} />
+          {t("newThemePrivacy")}
+        </footer>
+      </section>
     </div>
   );
 }

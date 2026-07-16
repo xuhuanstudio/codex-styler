@@ -11,6 +11,7 @@ export interface UserSettings {
   locale: LocalePreference;
   appearance: ManagerAppearance;
   runtimeStrategy: RuntimeStrategy;
+  appliedThemeId: string | null;
   companionId: string | null;
   companionAnchors: Record<string, { x: number; y: number }>;
   companionSizes: Record<string, number>;
@@ -51,6 +52,7 @@ function defaultSettings(): UserSettings {
     locale: "system",
     appearance: "system",
     runtimeStrategy: "enhanced",
+    appliedThemeId: null,
     companionId: null,
     companionAnchors: {},
     companionSizes: {},
