@@ -23,10 +23,11 @@ export const docs: DocPage[] = [
     body: {
       en: [
         {
-          heading: "Before you begin",
+          heading: "Download and install",
           paragraphs: [
-            "Install OpenAI Codex Desktop first. Codex Styler does not bundle, replace, patch, or redistribute the Codex application.",
-            "Alpha builds are unsigned previews. Stable releases will not ship until macOS notarization and Windows code signing are both in place.",
+            "Use Download Alpha in the site navigation to get the current macOS Apple Silicon DMG. It requires macOS 13 or later. Drag Codex Styler to Applications, then Control-click it and choose Open on first launch.",
+            "The Alpha is ad-hoc signed but not signed with an Apple Developer ID or notarized. Do not disable Gatekeeper globally. Stable releases will not ship until macOS notarization and Windows code signing are both in place.",
+            "Install OpenAI Codex Desktop separately. Codex Styler does not bundle, replace, patch, or redistribute the Codex application.",
           ],
         },
         {
@@ -45,10 +46,11 @@ export const docs: DocPage[] = [
       ],
       "zh-CN": [
         {
-          heading: "开始之前",
+          heading: "下载与安装",
           paragraphs: [
-            "请先安装 OpenAI Codex Desktop。Codex Styler 不捆绑、不替换、不修改也不分发 Codex 应用。",
-            "Alpha 版本是明确标注的未签名预览版；macOS 公证和 Windows 代码签名完成前不会发布稳定版。",
+            "通过网站导航中的“下载 Alpha”获取当前 macOS Apple Silicon DMG，需要 macOS 13 或更高版本。把 Codex Styler 拖入“应用程序”，首次启动时按住 Control 点击并选择“打开”。",
+            "该 Alpha 采用临时 ad-hoc 签名，但没有 Apple Developer ID 签名和公证。不要全局关闭 Gatekeeper；macOS 公证和 Windows 代码签名完成前不会发布稳定版。",
+            "请单独安装 OpenAI Codex Desktop。Codex Styler 不捆绑、不替换、不修改也不分发 Codex 应用。",
           ],
         },
         {
@@ -370,4 +372,3 @@ export const docs: DocPage[] = [
     },
   },
 ];
-

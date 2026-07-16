@@ -4,6 +4,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.1] - 2026-07-16
+
 ### Added
 
 - Tauri 2 desktop shell with React editor and Rust runtime core.
@@ -13,6 +15,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Original Codex Styler icon, two scene backgrounds, and a 16-direction Moss gecko atlas.
 - Loopback-only Codex launch, trusted CDP target selection, safe-mode injection, pause, and restore.
 - Astro bilingual website, documentation routes, canonical URLs, hreflang, sitemap, Open Graph, and structured data.
+- Installable macOS Apple Silicon DMG preview with checksums, SPDX SBOM, provenance attestations, and a human-reviewed draft release gate.
 
 ### Fixed
 

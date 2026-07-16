@@ -19,17 +19,23 @@ const english = new URL(base + path, Astro.site);
 const chinese = new URL(base + "/zh-cn" + path, Astro.site);
 const socialImage = new URL(base + image, Astro.site);
 const repo = "https://github.com/xuhuanstudio/codex-styler";
+const releaseTag = "v0.1.0-alpha.1";
+const releaseAsset = "Codex-Styler_0.1.0-alpha.1_aarch64-unsigned.dmg";
+const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
 const isChinese = locale === "zh-CN";
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Codex Styler",
   applicationCategory: "DeveloperApplication",
-  operatingSystem: "macOS, Windows",
+  operatingSystem: "macOS 13 or later",
   softwareVersion: "0.1.0-alpha.1",
   description,
   url: canonical.toString(),
-  downloadUrl: repo + "/releases",
+  downloadUrl,
+  releaseNotes: repo + "/releases/tag/" + releaseTag,
+  softwareRequirements: "macOS 13 or later; OpenAI Codex Desktop installed separately",
+  processorRequirements: "Apple Silicon (arm64)",
   codeRepository: repo,
   license: repo + "/blob/main/LICENSE",
   isAccessibleForFree: true,
@@ -73,6 +79,7 @@ const structuredData = {
       <nav aria-label={isChinese ? "主要导航" : "Primary navigation"}>
         <a href={base + (isChinese ? "/zh-cn/themes/" : "/themes/")}>{isChinese ? "主题" : "Themes"}</a>
         <a href={base + (isChinese ? "/zh-cn/docs/getting-started/" : "/docs/getting-started/")}>{isChinese ? "文档" : "Docs"}</a>
+        <a href={downloadUrl}>{isChinese ? "下载 Alpha" : "Download Alpha"}</a>
         <a href={repo}>GitHub</a>
         <a class="language-link" href={isChinese ? english : chinese}>{isChinese ? "EN" : "中文"}</a>
       </nav>

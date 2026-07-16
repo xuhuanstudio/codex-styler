@@ -22,6 +22,7 @@
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "check:links": "node scripts/check-site-links.mjs",
     "check:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",
+    "check:release-version": "node scripts/verify-release-version.mjs",
     "theme:validate": "pnpm --filter @codex-styler/theme-core theme:validate"
   },
   "devDependencies": {

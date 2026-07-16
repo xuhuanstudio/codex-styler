@@ -7,6 +7,9 @@ const zh = locale === "zh-CN";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const docsBase = base + (zh ? "/zh-cn/docs/" : "/docs/");
 const repo = "https://github.com/xuhuanstudio/codex-styler";
+const releaseTag = "v0.1.0-alpha.1";
+const releaseAsset = "Codex-Styler_0.1.0-alpha.1_aarch64-unsigned.dmg";
+const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
 const copy = zh
   ? {
       title: "Codex Styler — OpenAI Codex Desktop 主题与互动场景",
@@ -15,9 +18,9 @@ const copy = zh
       eyebrow: "为 OPENAI CODEX DESKTOP 打造 · 非官方",
       headline: "让工作空间拥有自己的气候。",
       lead: "自定义图片背景、克制的界面材质和会回应光标的 2D 伙伴；不修改应用包，并可一键恢复官方界面。",
-      source: "查看源码",
+      download: "下载 macOS Alpha",
       start: "阅读快速开始",
-      trust: "本地优先 · 无账号 · 无遥测 · 不修改 app.asar",
+      trust: "macOS 13+ · Apple Silicon · 未公证 Alpha",
     }
   : {
       title: "Codex Styler — Themes & Interactive Scenes for OpenAI Codex Desktop",
@@ -26,9 +29,9 @@ const copy = zh
       eyebrow: "FOR OPENAI CODEX DESKTOP · UNOFFICIAL",
       headline: "Give your workspace its own climate.",
       lead: "Shape image backgrounds, restrained interface materials, and a 2D companion that notices your pointer—without patching the app bundle.",
-      source: "View source",
+      download: "Download macOS Alpha",
       start: "Read the quickstart",
-      trust: "Local-first · No account · No telemetry · No app.asar changes",
+      trust: "macOS 13+ · Apple Silicon · Unnotarized Alpha",
     };
 ---
 
@@ -46,7 +49,7 @@ const copy = zh
         <h1>{copy.headline}</h1>
         <p>{copy.lead}</p>
         <div class="hero-actions">
-          <a class="button button-primary" href={repo}>{copy.source}<span>↗</span></a>
+          <a class="button button-primary" href={downloadUrl}>{copy.download}<span>↓</span></a>
           <a class="button button-secondary" href={docsBase + "getting-started/"}>{copy.start}<span>→</span></a>
         </div>
         <div class="trust-line"><span></span>{copy.trust}</div>
@@ -133,4 +136,3 @@ const copy = zh
     </section>
   </main>
 </BaseLayout>
-

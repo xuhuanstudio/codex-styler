@@ -1,0 +1,147 @@
+name: macOS preview release
+
+on:
+  push:
+    tags:
+      - "v*-alpha.*"
+
+permissions:
+  actions: read
+  artifact-metadata: write
+  attestations: write
+  contents: write
+  id-token: write
+
+concurrency:
+  group: preview-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos-apple-silicon:
+    name: macOS Apple Silicon preview
+    runs-on: macos-14
+    environment: preview-release
+    env:
+      APPLE_SIGNING_IDENTITY: "-"
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Prepare release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          test -f "$notes"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
+          echo "SBOM_NAME=Codex-Styler_${version}_aarch64.spdx.json" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify-release-version.mjs "${{ env.RELEASE_VERSION }}"
+      - run: pnpm check
+      - run: pnpm audit --audit-level high --registry=https://registry.npmjs.org
+
+      - name: Check Rust
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - uses: taiki-e/install-action@cargo-audit
+      - run: cargo audit
+        working-directory: apps/desktop/src-tauri
+
+      - name: Build ad-hoc signed Apple Silicon DMG
+        run: >-
+          pnpm --filter @codex-styler/desktop tauri build
+          --target aarch64-apple-darwin
+          --bundles dmg
+
+      - name: Stage and verify DMG
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dmg="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Codex Styler_${RELEASE_VERSION}_aarch64.dmg"
+          release_dir="$GITHUB_WORKSPACE/release"
+          scan_dir="$GITHUB_WORKSPACE/release-scan"
+          mount_dir="$RUNNER_TEMP/codex-styler-dmg"
+          mkdir -p "$release_dir" "$scan_dir" "$mount_dir"
+          cp "$source_dmg" "$release_dir/$DMG_NAME"
+
+          hdiutil verify "$release_dir/$DMG_NAME"
+          hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$release_dir/$DMG_NAME"
+          trap 'hdiutil detach "$mount_dir" >/dev/null 2>&1 || true' EXIT
+
+          app="$mount_dir/Codex Styler.app"
+          binary="$app/Contents/MacOS/codex-styler"
+          test "$(lipo -archs "$binary")" = "arm64"
+          test "$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")" = "$RELEASE_VERSION"
+          test "$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")" = "studio.xuhuan.codexstyler"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dvvv "$app" 2>&1 | grep -q "Signature=adhoc"
+          cp -R "$app" "$scan_dir/Codex Styler.app"
+
+          hdiutil detach "$mount_dir"
+          trap - EXIT
+          (cd "$release_dir" && shasum -a 256 "$DMG_NAME" > SHA256SUMS.txt)
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./release-scan/Codex Styler.app
+          format: spdx-json
+          artifact-name: ${{ env.SBOM_NAME }}
+          output-file: ./release/${{ env.SBOM_NAME }}
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: ./release/${{ env.DMG_NAME }}
+
+      - name: Attest SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: ./release/${{ env.DMG_NAME }}
+          sbom-path: ./release/${{ env.SBOM_NAME }}
+
+      - name: Retain reviewed release assets
+        uses: actions/upload-artifact@v5
+        with:
+          name: codex-styler-${{ env.RELEASE_VERSION }}-macos-aarch64
+          path: release/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create draft pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" ./release/*
+          --verify-tag
+          --draft
+          --prerelease
+          --title "Codex Styler ${RELEASE_VERSION} — macOS Apple Silicon Alpha"
+          --notes-file ".github/release-notes/${GITHUB_REF_NAME}.md"
