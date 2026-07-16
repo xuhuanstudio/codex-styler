@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import {
   builtinThemes,
+  composeThemeWithCompanion,
   exportThemePackage,
   importThemePackage,
   isSafeArchivePath,
   nativeRefined,
+  mossCompanion,
   pointerDirectionFrame,
   readImageDimensions,
   validateTheme,
@@ -19,12 +21,35 @@ describe("built-in themes", () => {
     }
   });
 
+  it("declares replaceable shell treatments instead of hard-coded theme ids", () => {
+    expect(
+      builtinThemes.map((theme) => theme.variants.dark.appearance.layout),
+    ).toEqual(["native", "editorial", "immersive"]);
+    expect(
+      builtinThemes.every(
+        (theme) => theme.variants.dark.appearance.iconStyle !== undefined,
+      ),
+    ).toBe(true);
+  });
+
   it("uses a CSP-safe precompiled schema validator", async () => {
     const source = await readFile(
       new URL("../src/generated/theme-validator.ts", import.meta.url),
       "utf8",
     );
     expect(source).not.toMatch(/\brequire\s*\(|\bnew Function\b|\beval\s*\(/u);
+  });
+
+  it("composes a companion independently without mutating the theme", () => {
+    const composed = composeThemeWithCompanion(nativeRefined, mossCompanion, {
+      anchor: { x: 40, y: 60 },
+    });
+    expect(nativeRefined.scene.entities).toHaveLength(0);
+    expect(composed.scene.entities[0]?.id).toBe("moss-gecko");
+    expect(composed.scene.entities[0]?.anchor).toEqual({ x: 40, y: 60 });
+    expect(composed.scene.entities[0]?.attachment?.target).toBe("composer");
+    expect(composed.scene.entities[0]?.renderer.normalization).toBe("grounded");
+    expect(validateTheme(composed)).toEqual({ ok: true, issues: [] });
   });
 });
 
@@ -39,8 +64,9 @@ describe("archive path safety", () => {
   it("rejects a path that ZIP normalization would otherwise hide", async () => {
     const zip = new JSZip();
     zip.file("../theme.json", "{}");
-    await expect(importThemePackage(await zip.generateAsync({ type: "uint8array" })))
-      .rejects.toThrow(/unsafe path|Disallowed archive path/);
+    await expect(
+      importThemePackage(await zip.generateAsync({ type: "uint8array" })),
+    ).rejects.toThrow(/unsafe path|Disallowed archive path/);
   });
 });
 

@@ -5,10 +5,7 @@ export type ThemeVariantName = "light" | "dark";
 export type AssetType = "background" | "sprite-atlas" | "preview";
 export type RendererType = "image" | "sprite-atlas";
 export type BehaviorType =
-  | "idle"
-  | "parallax"
-  | "look-at-pointer"
-  | "reduce-motion-fallback";
+  "idle" | "parallax" | "look-at-pointer" | "reduce-motion-fallback";
 
 export interface ThemeMetadata {
   name: string;
@@ -53,6 +50,9 @@ export interface ThemeAppearance {
   radius: number;
   focusOpacity: number;
   focusBlur: number;
+  layout?: "native" | "editorial" | "immersive";
+  iconStyle?: "native" | "contained" | "themed";
+  decorations?: "none" | "subtle" | "expressive";
 }
 
 export interface ThemeMotion {
@@ -72,12 +72,7 @@ export interface SceneLayer {
   type: "image" | "gradient" | "vignette";
   asset?: string;
   opacity: number;
-  blendMode:
-    | "normal"
-    | "multiply"
-    | "screen"
-    | "overlay"
-    | "soft-light";
+  blendMode: "normal" | "multiply" | "screen" | "overlay" | "soft-light";
   parallax: number;
 }
 
@@ -89,11 +84,25 @@ export interface SpriteAtlasRenderer {
   frameWidth: number;
   frameHeight: number;
   directions: 4 | 8 | 16;
+  normalization?: "preserve" | "grounded";
+  alphaThreshold?: number;
 }
 
 export interface ImageRenderer {
   type: "image";
   asset: string;
+  normalization?: "preserve" | "grounded";
+  alphaThreshold?: number;
+}
+
+export interface EntityAttachment {
+  target: "composer" | "main-surface" | "thread-summary";
+  edge: "top" | "bottom";
+  align: number;
+  offset: {
+    x: number;
+    y: number;
+  };
 }
 
 export interface SceneEntity {
@@ -105,6 +114,7 @@ export interface SceneEntity {
     x: number;
     y: number;
   };
+  attachment?: EntityAttachment;
   size: number;
   opacity: number;
 }

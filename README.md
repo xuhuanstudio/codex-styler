@@ -15,14 +15,14 @@
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.2/Codex-Styler_0.1.0-alpha.2_aarch64-unsigned.dmg">Download Alpha</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.3/Codex-Styler_0.1.0-alpha.3_aarch64-unsigned.dmg">Download Alpha</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/">Website</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/docs/getting-started/">Documentation</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/xuhuanstudio/codex-styler/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xuhuanstudio/codex-styler/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.2"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.2-2563EB?style=flat-square"></a>
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.3"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.3-2563EB?style=flat-square"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-365443?style=flat-square"></a>
   <a href="ASSET_LICENSES.md"><img alt="CC BY 4.0 assets" src="https://img.shields.io/badge/art-CC%20BY%204.0-9B6E3F?style=flat-square"></a>
   <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555D57?style=flat-square">
@@ -38,7 +38,7 @@
 OpenAI Codex Desktop already includes useful appearance controls and Pets. Codex Styler focuses on the layer they do not cover: image-led environments, restrained material styling, and replaceable 2D entities that can react to the pointer.
 
 - **Reversible runtime:** launches Codex with a temporary loopback CDP session; never edits <code>app.asar</code>, application resources, or signatures.
-- **Guided creator:** tune background focus, brightness, overlays, surfaces, radius, motion, and companion size without authoring CSS.
+- **Image-adaptive creator:** import a local PNG, JPEG, or WebP and Styler derives luminance, dominant color, accent, and contrast before fitting the image to one of four curated visual systems. You can then refine layout, icon treatment, details, surfaces, radius, motion, and companion placement without authoring CSS.
 - **Open scene model:** themes declare <code>layers[]</code>, <code>entities[]</code>, a renderer, and behaviors instead of reaching into Codex DOM internals.
 - **Data-only packages:** local raster assets and JSON; no scripts, arbitrary CSS, SVG, video, remote URLs, or executable fonts.
 - **Local-first:** no account, telemetry, cloud sync, online store, or background network requests.
@@ -46,21 +46,23 @@ OpenAI Codex Desktop already includes useful appearance controls and Pets. Codex
 
 ## Built-in themes
 
-| Theme | Direction | Interaction |
-| --- | --- | --- |
-| Native Refined | Low-distraction calibration of the native workspace | None |
+| Theme           | Direction                                            | Interaction     |
+| --------------- | ---------------------------------------------------- | --------------- |
+| Native Refined  | Low-distraction calibration of the native workspace  | None            |
 | Nocturne Studio | Ink-dark architecture, smoked glass, and amber light | Subtle parallax |
-| Quiet Garden Companion | Soft natural depth with an original gecko named Moss | 16-direction pointer gaze |
+| Quiet Garden    | Soft natural depth and readable translucent surfaces | Subtle parallax |
+
+Companions are selected independently from themes. The included **Moss** gecko uses an original 8-direction sprite atlas, follows the pointer, and can be dragged freely or snapped to a semantic Codex surface. Transparent padding is normalized with one shared scale and ground line across every frame, while a resize observer keeps the companion attached when the composer changes height. A theme may recommend a default companion, but the user can replace or disable it without changing the theme.
 
 Every shipped image and sprite is original project artwork. The reference repositories are studied for ideas only; their assets and source are not redistributed.
 
 ## Download the macOS Alpha
 
-**[Download Codex Styler 0.1.0-alpha.2 for macOS Apple Silicon (.dmg)](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.2/Codex-Styler_0.1.0-alpha.2_aarch64-unsigned.dmg)**
+**[Download Codex Styler 0.1.0-alpha.3 for macOS Apple Silicon (.dmg)](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.3/Codex-Styler_0.1.0-alpha.3_aarch64-unsigned.dmg)**
 
 Requires macOS 13 or later and an Apple Silicon Mac. Open the DMG, drag Codex Styler to Applications, then Control-click the app and choose **Open** on first launch. Do not disable Gatekeeper globally.
 
-The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.2) includes SHA-256 checksums, an SPDX SBOM, build attestations, tested scope, and known limitations. Windows and Intel macOS installers are not included in this Alpha.
+The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.3) includes SHA-256 checksums, an SPDX SBOM, build attestations, tested scope, and known limitations. Windows and Intel macOS installers are not included in this Alpha.
 
 ## Run from source
 
@@ -71,29 +73,29 @@ The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag
 - Rust stable
 - OpenAI Codex Desktop for real runtime testing
 
-~~~bash
+```bash
 pnpm install
 pnpm check
 pnpm tauri dev
-~~~
+```
 
 Run only the browser-based interface:
 
-~~~bash
+```bash
 pnpm dev
-~~~
+```
 
 Run the bilingual documentation site:
 
-~~~bash
+```bash
 pnpm dev:site
-~~~
+```
 
 ## Safety model
 
 Codex Styler reserves a random port on <code>127.0.0.1</code>, starts the installed Codex executable with that temporary debugging port, validates the returned page target, and injects one idempotent scene root plus one style node. Restore removes both.
 
-The default **Automatic** strategy first applies semantic styling and checks the live Codex structure and computed surfaces. If the check fails—on any version—it immediately falls back to the isolated background and scene layer. **Compatibility mode** always stays isolated, while **Developer mode** forces semantic styling without automatic fallback.
+The default **Enhanced mode** first applies the complete semantic treatment—including navigation, content surfaces, composer, dialogs, and the thread summary panel—then checks live anchors and computed styles. A different Codex version is informational, not a failure. Styler falls back only when the runtime health check detects an actual structural or rendering problem. **Conservative mode** always limits styling to the isolated background and scene layer. When Codex is already open, Styler asks for confirmation before sending a normal quit request and relaunching it; it never force-quits the process.
 
 See [the security model](docs/security-model.md), [theme package specification](docs/theme-format.md), and [security policy](SECURITY.md).
 
@@ -101,30 +103,30 @@ See [the security model](docs/security-model.md), [theme package specification](
 
 A <code>.codex-styler-theme</code> file is a validated ZIP containing:
 
-~~~text
+```text
 theme.json
 LICENSES.json
 assets/*.png | *.jpg | *.webp
 previews/*.png | *.jpg | *.webp
-~~~
+```
 
 The public format identifier is <code>codex-styler-theme-v1</code>. The JSON Schema and TypeScript interfaces live in <code>packages/theme-core</code>.
 
 Validate a manifest or package:
 
-~~~bash
+```bash
 pnpm theme:validate path/to/theme.json
 pnpm theme:validate path/to/theme.codex-styler-theme
-~~~
+```
 
 ## Project structure
 
-~~~text
+```text
 apps/desktop          React editor + Tauri desktop shell
 apps/site             Astro bilingual website and documentation
 packages/theme-core   Theme schema, validation, archives, built-in themes
 docs                  Architecture, safety, assets, and decisions
-~~~
+```
 
 The runtime is intentionally split into four boundaries:
 

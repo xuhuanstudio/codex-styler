@@ -30,6 +30,11 @@ fn detect_codex() -> Result<model::CodexDetection, String> {
 }
 
 #[tauri::command]
+async fn quit_codex() -> Result<model::CodexDetection, String> {
+    codex::quit_codex().await.map_err(|error| error.to_string())
+}
+
+#[tauri::command]
 fn runtime_status(state: State<'_, Mutex<AppRuntime>>) -> RuntimeStatus {
     state
         .lock()
@@ -207,6 +212,7 @@ pub fn run() {
         .manage(Mutex::new(AppRuntime::default()))
         .invoke_handler(tauri::generate_handler![
             detect_codex,
+            quit_codex,
             runtime_status,
             launch_codex,
             apply_theme,

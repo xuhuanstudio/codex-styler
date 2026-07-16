@@ -13,6 +13,7 @@ import {
   Monitor,
   Moon,
   MousePointer2,
+  PawPrint,
   Palette,
   PanelRightOpen,
   Pause,
@@ -31,7 +32,12 @@ import {
   X,
 } from "lucide-react";
 import {
+  builtinCompanions,
   builtinThemes,
+  composeThemeWithCompanion,
+  defaultCompanionForTheme,
+  type CompanionDefinition,
+  type EntityAttachment,
   type ThemeDefinition,
   type ThemeVariant,
 } from "@codex-styler/theme-core";
@@ -71,21 +77,28 @@ import {
   getRuntimeStatus,
   launchCodex,
   pauseTheme,
+  quitCodex,
   restoreOfficial,
   type CodexDetection,
   type RuntimeStatus,
 } from "./lib/runtime";
+import {
+  createAdaptiveTheme,
+  type AdaptiveScheme,
+  type AdaptiveSchemeId,
+} from "./lib/adaptive-theme";
 import {
   deleteThemeArchive,
   exportTheme,
   hydrateThemeAssetMaps,
   importTheme,
   persistThemeCopy,
+  persistGeneratedTheme,
   type ThemeAssetMap,
 } from "./lib/theme-files";
 import { themeAssetUrl } from "./lib/assets";
 
-type View = "themes" | "create" | "library" | "settings";
+type View = "themes" | "companions" | "create" | "library" | "settings";
 type ThemeVariantName = "light" | "dark";
 
 const initialRuntime: RuntimeStatus = {
@@ -110,26 +123,67 @@ export function App() {
   const [variant, setVariant] = useState<ThemeVariantName>("dark");
   const [runtime, setRuntime] = useState<RuntimeStatus>(initialRuntime);
   const [detection, setDetection] = useState<CodexDetection | null>(null);
-  const [localThemes, setLocalThemes] = useState<ThemeDefinition[]>(loadLocalThemes);
+  const [localThemes, setLocalThemes] =
+    useState<ThemeDefinition[]>(loadLocalThemes);
   const [themeAssetMaps, setThemeAssetMaps] = useState<
     Record<string, ThemeAssetMap>
   >({});
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(!settings.onboardingComplete);
-  const [pendingDelete, setPendingDelete] = useState<ThemeDefinition | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(
+    !settings.onboardingComplete,
+  );
+  const [pendingDelete, setPendingDelete] = useState<ThemeDefinition | null>(
+    null,
+  );
+  const [pendingApplication, setPendingApplication] = useState<{
+    theme: ThemeDefinition;
+    companion: CompanionDefinition | null;
+  } | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const backgroundImportRef = useRef<HTMLInputElement>(null);
+  const [adaptiveSchemes, setAdaptiveSchemes] = useState<AdaptiveScheme[]>([]);
+  const [activeAdaptiveScheme, setActiveAdaptiveScheme] =
+    useState<AdaptiveSchemeId | null>(null);
 
   const locale = resolveLocale(settings.locale);
   const t = (key: MessageKey) => translate(locale, key);
   const resolveAsset = (theme: ThemeDefinition, path: string) =>
     themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
+  const selectedCompanion =
+    builtinCompanions.find((item) => item.id === settings.companionId) ?? null;
+  const composeTheme = (
+    theme: ThemeDefinition,
+    companion = selectedCompanion,
+  ) => {
+    if (!companion) return composeThemeWithCompanion(theme, null);
+    const overrides: {
+      anchor?: { x: number; y: number };
+      attachment?: EntityAttachment | null;
+      size?: number;
+    } = {
+      anchor: settings.companionAnchors[companion.id],
+      size: settings.companionSizes[companion.id],
+    };
+    if (
+      Object.prototype.hasOwnProperty.call(
+        settings.companionAttachments,
+        companion.id,
+      )
+    ) {
+      overrides.attachment = settings.companionAttachments[companion.id];
+    }
+    return composeThemeWithCompanion(theme, companion, overrides);
+  };
 
   useEffect(() => {
     saveSettings(settings);
     document.documentElement.dataset.appearance = settings.appearance;
     document.documentElement.lang = locale;
-    document.documentElement.classList.toggle("reduce-motion", settings.reduceMotion);
+    document.documentElement.classList.toggle(
+      "reduce-motion",
+      settings.reduceMotion,
+    );
   }, [locale, settings]);
 
   useEffect(() => {
@@ -168,22 +222,23 @@ export function App() {
 
   const needsManualRestart = detection?.running === true && !runtime.connected;
 
-  async function handleApply() {
-    if (needsManualRestart) {
-      setToast(t("quitToContinue"));
-      return;
-    }
+  async function performApply(
+    theme: ThemeDefinition,
+    companion: CompanionDefinition | null = selectedCompanion,
+  ) {
+    const composed = composeTheme(theme, companion);
     setBusy(true);
     try {
       let next = runtime;
       if (!next.connected) next = await launchCodex();
       next = await applyTheme(
-        view === "create" ? draftTheme : selectedTheme,
+        composed,
         variant,
         settings.runtimeStrategy,
         resolveAsset,
       );
       setRuntime(next);
+      setDetection(await detectCodex());
       setToast(t("connected"));
     } catch (error) {
       setRuntime({
@@ -197,21 +252,29 @@ export function App() {
     }
   }
 
-  async function handleRefreshDetection() {
+  function requestApply(
+    theme: ThemeDefinition = view === "create" ? draftTheme : selectedTheme,
+    companion: CompanionDefinition | null = selectedCompanion,
+  ) {
+    if (needsManualRestart) {
+      setPendingApplication({ theme, companion });
+      return;
+    }
+    void performApply(theme, companion);
+  }
+
+  async function handleQuitAndApply() {
+    if (!pendingApplication) return;
+    const application = pendingApplication;
     setBusy(true);
     try {
-      const detected = await detectCodex();
+      const detected = await quitCodex();
       setDetection(detected);
-      setToast(
-        detected.running
-          ? t("quitToContinue")
-          : detected.installed
-            ? t("ready")
-            : t("disconnected"),
-      );
+      setPendingApplication(null);
+      await performApply(application.theme, application.companion);
     } catch (error) {
       console.error(error);
-      setToast(t("connectionError"));
+      setToast(t("codexQuitFailed"));
     } finally {
       setBusy(false);
     }
@@ -236,8 +299,21 @@ export function App() {
   }
 
   function chooseTheme(theme: ThemeDefinition, openEditor = false) {
+    setAdaptiveSchemes([]);
+    setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
+    const pairing = defaultCompanionForTheme(theme.id);
+    updateSettings({ companionId: pairing?.id ?? null });
     if (openEditor) setView("create");
+  }
+
+  function chooseAndApplyTheme(theme: ThemeDefinition) {
+    setAdaptiveSchemes([]);
+    setActiveAdaptiveScheme(null);
+    const pairing = defaultCompanionForTheme(theme.id);
+    setSelectedTheme(theme);
+    updateSettings({ companionId: pairing?.id ?? null });
+    requestApply(theme, pairing);
   }
 
   function updateVariant(
@@ -257,11 +333,58 @@ export function App() {
   }
 
   function updateEntitySize(size: number) {
-    setDraftTheme((current) => {
-      const next = structuredClone(current);
-      if (next.scene.entities[0]) next.scene.entities[0].size = size;
-      return next;
+    if (!selectedCompanion) return;
+    updateSettings({
+      companionSizes: {
+        ...settings.companionSizes,
+        [selectedCompanion.id]: size,
+      },
     });
+  }
+
+  function updateEntityAnchor(anchor: { x: number; y: number }) {
+    if (!selectedCompanion) return;
+    updateSettings({
+      companionAnchors: {
+        ...settings.companionAnchors,
+        [selectedCompanion.id]: anchor,
+      },
+    });
+  }
+
+  function updateEntityAttachment(attachment: EntityAttachment | null) {
+    if (!selectedCompanion) return;
+    updateSettings({
+      companionAttachments: {
+        ...settings.companionAttachments,
+        [selectedCompanion.id]: attachment,
+      },
+    });
+  }
+
+  function selectCompanion(companion: CompanionDefinition | null) {
+    updateSettings({ companionId: companion?.id ?? null });
+    setToast(t("companionUpdated"));
+  }
+
+  function resetDraft() {
+    setDraftTheme(structuredClone(selectedTheme));
+    const pairing = defaultCompanionForTheme(selectedTheme.id);
+    const nextAnchors = { ...settings.companionAnchors };
+    const nextSizes = { ...settings.companionSizes };
+    const nextAttachments = { ...settings.companionAttachments };
+    if (pairing) {
+      delete nextAnchors[pairing.id];
+      delete nextSizes[pairing.id];
+      delete nextAttachments[pairing.id];
+    }
+    updateSettings({
+      companionId: pairing?.id ?? null,
+      companionAnchors: nextAnchors,
+      companionSizes: nextSizes,
+      companionAttachments: nextAttachments,
+    });
+    setToast(t("resetTheme"));
   }
 
   async function duplicateTheme(theme: ThemeDefinition) {
@@ -278,7 +401,10 @@ export function App() {
       const assetMap = await persistThemeCopy(duplicate, (_, path) =>
         resolveAsset(theme, path),
       );
-      setThemeAssetMaps((current) => ({ ...current, [duplicate.id]: assetMap }));
+      setThemeAssetMaps((current) => ({
+        ...current,
+        [duplicate.id]: assetMap,
+      }));
       const next = [duplicate, ...localThemes];
       setLocalThemes(next);
       saveLocalThemes(next);
@@ -321,6 +447,49 @@ export function App() {
     }
   }
 
+  async function handleBackgroundImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const generated = await createAdaptiveTheme(file);
+      const assetMap = await persistGeneratedTheme(
+        generated.theme,
+        generated.files,
+      );
+      const next = [
+        generated.theme,
+        ...localThemes.filter((theme) => theme.id !== generated.theme.id),
+      ];
+      setThemeAssetMaps((current) => ({
+        ...current,
+        [generated.theme.id]: assetMap,
+      }));
+      setLocalThemes(next);
+      saveLocalThemes(next);
+      setSelectedTheme(generated.theme);
+      setDraftTheme(structuredClone(generated.theme));
+      setAdaptiveSchemes(generated.schemes);
+      setActiveAdaptiveScheme(generated.selectedSchemeId);
+      setView("create");
+      setToast(t("adaptiveThemeCreated"));
+    } catch (error) {
+      console.error(error);
+      setToast(t("imageImportFailed"));
+    } finally {
+      event.target.value = "";
+      setBusy(false);
+    }
+  }
+
+  function selectAdaptiveScheme(scheme: AdaptiveScheme) {
+    setActiveAdaptiveScheme(scheme.id);
+    setDraftTheme((current) => ({
+      ...structuredClone(current),
+      variants: structuredClone(scheme.variants),
+    }));
+  }
+
   async function handleExport() {
     try {
       await exportTheme(
@@ -361,6 +530,7 @@ export function App() {
 
   const navItems: Array<{ id: View; label: MessageKey; icon: ReactNode }> = [
     { id: "themes", label: "themes", icon: <Palette size={17} /> },
+    { id: "companions", label: "companions", icon: <PawPrint size={17} /> },
     { id: "create", label: "create", icon: <SlidersHorizontal size={17} /> },
     { id: "library", label: "library", icon: <Library size={17} /> },
     { id: "settings", label: "settings", icon: <Settings size={17} /> },
@@ -381,7 +551,11 @@ export function App() {
           {navItems.map((item) => (
             <button
               key={item.id}
-              className={view === item.id ? "app-nav__item app-nav__item--active" : "app-nav__item"}
+              className={
+                view === item.id
+                  ? "app-nav__item app-nav__item--active"
+                  : "app-nav__item"
+              }
               onClick={() => setView(item.id)}
             >
               {item.icon}
@@ -416,9 +590,9 @@ export function App() {
               ? t("trustedRuntime")
               : needsManualRestart
                 ? t("quitToContinue")
-              : detection?.installed === false
-                ? t("disconnected")
-                : t("unknownCompatibility")}
+                : detection?.installed === false
+                  ? t("disconnected")
+                  : t("unknownCompatibility")}
           </span>
           <div className="connection-card__actions">
             {runtime.state === "applied" ? (
@@ -427,17 +601,21 @@ export function App() {
                 {t("pause")}
               </button>
             ) : needsManualRestart ? (
-              <button onClick={handleRefreshDetection} disabled={busy}>
+              <button onClick={() => requestApply()} disabled={busy}>
                 <RefreshCw size={13} />
-                {busy ? t("checking") : t("checkAgain")}
+                {busy ? t("applying") : t("restartAndApply")}
               </button>
             ) : (
-              <button onClick={handleApply} disabled={busy}>
+              <button onClick={() => requestApply()} disabled={busy}>
                 <Play size={13} />
                 {busy ? t("applying") : t("apply")}
               </button>
             )}
-            <button className="icon-button" onClick={handleRestore} title={t("restore")}>
+            <button
+              className="icon-button"
+              onClick={handleRestore}
+              title={t("restore")}
+            >
               <RotateCcw size={14} />
             </button>
           </div>
@@ -465,21 +643,24 @@ export function App() {
                 ? t("compatibilityMode")
                 : t("unknownCompatibility")}
           </div>
-          <div className="variant-switch" aria-label="Theme variant">
-            <button
-              className={variant === "light" ? "is-active" : ""}
-              onClick={() => setVariant("light")}
-              aria-label={t("light")}
-            >
-              <Sun size={14} />
-            </button>
-            <button
-              className={variant === "dark" ? "is-active" : ""}
-              onClick={() => setVariant("dark")}
-              aria-label={t("dark")}
-            >
-              <Moon size={14} />
-            </button>
+          <div className="preview-variant-control">
+            <span>{t("codexPreview")}</span>
+            <div className="variant-switch" aria-label={t("codexPreview")}>
+              <button
+                className={variant === "light" ? "is-active" : ""}
+                onClick={() => setVariant("light")}
+                aria-label={t("light")}
+              >
+                <Sun size={14} />
+              </button>
+              <button
+                className={variant === "dark" ? "is-active" : ""}
+                onClick={() => setVariant("dark")}
+                aria-label={t("dark")}
+              >
+                <Moon size={14} />
+              </button>
+            </div>
           </div>
         </header>
 
@@ -487,26 +668,52 @@ export function App() {
           <ThemesView
             locale={locale}
             selectedTheme={selectedTheme}
+            previewTheme={composeTheme(selectedTheme)}
             variant={variant}
             reduceMotion={settings.reduceMotion}
             t={t}
             onSelect={chooseTheme}
+            onApply={chooseAndApplyTheme}
+            resolveAsset={resolveAsset}
+          />
+        )}
+
+        {view === "companions" && (
+          <CompanionsView
+            locale={locale}
+            selected={selectedCompanion}
+            theme={composeTheme(selectedTheme)}
+            variant={variant}
+            reduceMotion={settings.reduceMotion}
+            t={t}
+            onSelect={selectCompanion}
+            onAnchorChange={updateEntityAnchor}
+            onAttachmentChange={updateEntityAttachment}
             resolveAsset={resolveAsset}
           />
         )}
 
         {view === "create" && (
           <CreateView
-            theme={draftTheme}
+            theme={composeTheme(draftTheme)}
             variant={variant}
             locale={locale}
             reduceMotion={settings.reduceMotion}
             t={t}
             onUpdateVariant={updateVariant}
             onUpdateEntitySize={updateEntitySize}
-            onApply={handleApply}
+            onUpdateEntityAnchor={updateEntityAnchor}
+            onUpdateEntityAttachment={updateEntityAttachment}
+            onSetCompanion={selectCompanion}
+            companion={selectedCompanion}
+            onReset={resetDraft}
+            onApply={() => requestApply(draftTheme)}
             onExport={handleExport}
             onDuplicate={() => duplicateTheme(draftTheme)}
+            onImportBackground={() => backgroundImportRef.current?.click()}
+            adaptiveSchemes={adaptiveSchemes}
+            activeAdaptiveScheme={activeAdaptiveScheme}
+            onSelectAdaptiveScheme={selectAdaptiveScheme}
             resolveAsset={resolveAsset}
             busy={busy}
           />
@@ -541,6 +748,13 @@ export function App() {
         accept=".codex-styler-theme"
         onChange={handleImport}
       />
+      <input
+        ref={backgroundImportRef}
+        type="file"
+        className="visually-hidden"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={handleBackgroundImport}
+      />
 
       {showOnboarding && (
         <Onboarding
@@ -552,7 +766,9 @@ export function App() {
             setShowOnboarding(false);
           }}
           onClose={
-            settings.onboardingComplete ? () => setShowOnboarding(false) : undefined
+            settings.onboardingComplete
+              ? () => setShowOnboarding(false)
+              : undefined
           }
           t={t}
         />
@@ -566,16 +782,59 @@ export function App() {
             aria-modal="true"
             aria-labelledby="delete-theme-title"
           >
-            <span className="confirm-dialog__icon"><Trash2 size={18} /></span>
+            <span className="confirm-dialog__icon">
+              <Trash2 size={18} />
+            </span>
             <h2 id="delete-theme-title">{t("deleteThemeTitle")}</h2>
             <p>{t("deleteThemeBody")}</p>
-            <strong>{pendingDelete.locales[locale]?.name ?? pendingDelete.metadata.name}</strong>
+            <strong>
+              {pendingDelete.locales[locale]?.name ??
+                pendingDelete.metadata.name}
+            </strong>
             <div className="button-row">
-              <button className="secondary-button" onClick={() => setPendingDelete(null)}>
+              <button
+                className="secondary-button"
+                onClick={() => setPendingDelete(null)}
+              >
                 {t("cancel")}
               </button>
               <button className="danger-button" onClick={handleDeleteTheme}>
-                <Trash2 size={14} />{t("deleteTheme")}
+                <Trash2 size={14} />
+                {t("deleteTheme")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {pendingApplication && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog confirm-dialog--restart"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="restart-codex-title"
+          >
+            <span className="confirm-dialog__icon">
+              <RefreshCw size={18} />
+            </span>
+            <h2 id="restart-codex-title">{t("quitCodexTitle")}</h2>
+            <p>{t("quitCodexBody")}</p>
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                onClick={() => setPendingApplication(null)}
+                disabled={busy}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                className="primary-button"
+                onClick={handleQuitAndApply}
+                disabled={busy}
+              >
+                <RefreshCw size={14} />
+                {busy ? t("applying") : t("quitAndContinue")}
               </button>
             </div>
           </section>
@@ -601,27 +860,30 @@ interface SharedViewProps {
 function ThemesView({
   locale,
   selectedTheme,
+  previewTheme,
   variant,
   reduceMotion,
   t,
   onSelect,
+  onApply,
   resolveAsset,
 }: SharedViewProps & {
   selectedTheme: ThemeDefinition;
+  previewTheme: ThemeDefinition;
   variant: ThemeVariantName;
   reduceMotion: boolean;
   onSelect: (theme: ThemeDefinition, openEditor?: boolean) => void;
+  onApply: (theme: ThemeDefinition) => void;
 }) {
-  const localized =
-    selectedTheme.locales[locale] ?? selectedTheme.locales.en;
+  const localized = selectedTheme.locales[locale] ?? selectedTheme.locales.en;
   const selectedIndex =
     builtinThemes.findIndex((theme) => theme.id === selectedTheme.id) + 1;
   const performance =
-    selectedTheme.scene.entities.length > 0 ||
-    Object.values(selectedTheme.variants).some(
-      (item) => Boolean(item.background.image),
+    previewTheme.scene.entities.length > 0 ||
+    Object.values(previewTheme.variants).some((item) =>
+      Boolean(item.background.image),
     ) ||
-    selectedTheme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0)
+    previewTheme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0)
       ? t("medium")
       : t("low");
   return (
@@ -633,8 +895,12 @@ function ThemesView({
           <p>{t("overviewDetail")}</p>
         </div>
         <div className="page-heading__meta">
-          <span><LockKeyhole size={13} /> Local-first</span>
-          <span><RotateCcw size={13} /> Reversible</span>
+          <span>
+            <LockKeyhole size={13} /> Local-first
+          </span>
+          <span>
+            <RotateCcw size={13} /> Reversible
+          </span>
         </div>
       </section>
 
@@ -642,7 +908,7 @@ function ThemesView({
         <div className="featured-theme__preview">
           <div className="featured-theme__label">{t("featured")}</div>
           <PreviewWorkspace
-            theme={selectedTheme}
+            theme={previewTheme}
             variant={variant}
             locale={locale}
             reduceMotion={reduceMotion}
@@ -663,17 +929,25 @@ function ThemesView({
             </div>
             <div>
               <small>{t("interactive")}</small>
-              <strong>{selectedTheme.scene.entities.length ? "Pointer" : "—"}</strong>
+              <strong>
+                {previewTheme.scene.entities.length ? "Pointer" : "—"}
+              </strong>
             </div>
           </div>
           <div className="button-row">
-            <button className="primary-button" onClick={() => onSelect(selectedTheme, true)}>
+            <button
+              className="primary-button"
+              onClick={() => onApply(selectedTheme)}
+            >
+              <Play size={14} />
+              {t("apply")}
+            </button>
+            <button
+              className="secondary-button"
+              onClick={() => onSelect(selectedTheme, true)}
+            >
               {t("customize")}
               <ChevronRight size={15} />
-            </button>
-            <button className="secondary-button" onClick={() => onSelect(selectedTheme)}>
-              <Check size={14} />
-              {t("selected")}
             </button>
           </div>
         </div>
@@ -697,6 +971,7 @@ function ThemesView({
               active={selectedTheme.id === theme.id}
               resolveAsset={resolveAsset}
               onSelect={() => onSelect(theme)}
+              onApply={() => onApply(theme)}
               onCustomize={() => onSelect(theme, true)}
               t={t}
             />
@@ -715,6 +990,7 @@ function ThemeRow({
   resolveAsset,
   onSelect,
   onCustomize,
+  onApply,
   t,
 }: {
   theme: ThemeDefinition;
@@ -724,6 +1000,7 @@ function ThemeRow({
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   onSelect: () => void;
   onCustomize: () => void;
+  onApply: () => void;
   t: (key: MessageKey) => string;
 }) {
   const localized = theme.locales[locale] ?? theme.locales.en;
@@ -752,16 +1029,125 @@ function ThemeRow({
         <p>{localized.description}</p>
       </div>
       <div className="theme-row__badges">
-        {theme.scene.entities.length > 0 && (
-          <span><MousePointer2 size={12} />{t("interactive")}</span>
+        {defaultCompanionForTheme(theme.id) && (
+          <span>
+            <MousePointer2 size={12} />
+            {t("interactive")}
+          </span>
         )}
-        <span>{theme.compatibility.codex.mode === "safe" ? "SAFE" : "SEMANTIC"}</span>
+        <span>
+          {theme.compatibility.codex.mode === "safe" ? "SAFE" : "SEMANTIC"}
+        </span>
       </div>
-      <button className="theme-row__action" onClick={onCustomize}>
-        {t("customize")}
-        <ChevronRight size={14} />
-      </button>
+      <div className="theme-row__actions">
+        <button className="theme-row__apply" onClick={onApply}>
+          <Play size={13} />
+          {t("apply")}
+        </button>
+        <button className="theme-row__action" onClick={onCustomize}>
+          {t("customize")}
+          <ChevronRight size={14} />
+        </button>
+      </div>
     </article>
+  );
+}
+
+function CompanionsView({
+  locale,
+  selected,
+  theme,
+  variant,
+  reduceMotion,
+  t,
+  onSelect,
+  onAnchorChange,
+  onAttachmentChange,
+  resolveAsset,
+}: SharedViewProps & {
+  selected: CompanionDefinition | null;
+  theme: ThemeDefinition;
+  variant: ThemeVariantName;
+  reduceMotion: boolean;
+  onSelect: (companion: CompanionDefinition | null) => void;
+  onAnchorChange: (anchor: { x: number; y: number }) => void;
+  onAttachmentChange: (attachment: EntityAttachment | null) => void;
+}) {
+  return (
+    <div className="page companions-page">
+      <section className="page-heading">
+        <div>
+          <span className="page-kicker">INDEPENDENT SCENE ENTITIES</span>
+          <h1>{t("companions")}</h1>
+          <p>
+            {t("dragCompanion")}. {t("companionIndependence")}
+          </p>
+        </div>
+      </section>
+      <div className="companions-layout">
+        <section className="companion-preview-panel">
+          <PreviewWorkspace
+            theme={theme}
+            variant={variant}
+            locale={locale}
+            reduceMotion={reduceMotion}
+            resolveAsset={resolveAsset}
+            onEntityAnchorChange={onAnchorChange}
+            onEntityAttachmentChange={onAttachmentChange}
+          />
+          {selected && (
+            <span className="drag-hint">
+              <MousePointer2 size={13} />
+              {t("dragCompanion")}
+            </span>
+          )}
+        </section>
+        <section className="companion-list" aria-label={t("companions")}>
+          <button
+            className={
+              "companion-option" +
+              (!selected ? " companion-option--active" : "")
+            }
+            onClick={() => onSelect(null)}
+          >
+            <span className="companion-option__visual companion-option__visual--empty">
+              <X size={20} />
+            </span>
+            <span>
+              <strong>{t("noCompanion")}</strong>
+              <small>{t("themeOnly")}</small>
+            </span>
+            {!selected && <Check size={15} />}
+          </button>
+          {builtinCompanions.map((item) => {
+            const copy = item.locales[locale] ?? item.locales.en;
+            const active = selected?.id === item.id;
+            return (
+              <button
+                key={item.id}
+                className={
+                  "companion-option" +
+                  (active ? " companion-option--active" : "")
+                }
+                onClick={() => onSelect(item)}
+              >
+                <span
+                  className="companion-option__visual companion-option__visual--moss"
+                  style={{
+                    backgroundImage: `url(${resolveAsset(theme, item.entity.renderer.asset)})`,
+                  }}
+                />
+                <span>
+                  <strong>{copy.name}</strong>
+                  <small>{copy.description}</small>
+                </span>
+                {active ? <Check size={15} /> : <ChevronRight size={15} />}
+              </button>
+            );
+          })}
+        </section>
+      </div>
+    </div>
   );
 }
 
@@ -773,9 +1159,18 @@ function CreateView({
   t,
   onUpdateVariant,
   onUpdateEntitySize,
+  onUpdateEntityAnchor,
+  onUpdateEntityAttachment,
+  onSetCompanion,
+  companion,
+  onReset,
   onApply,
   onExport,
   onDuplicate,
+  onImportBackground,
+  adaptiveSchemes,
+  activeAdaptiveScheme,
+  onSelectAdaptiveScheme,
   resolveAsset,
   busy,
 }: SharedViewProps & {
@@ -788,12 +1183,25 @@ function CreateView({
     value: number | string,
   ) => void;
   onUpdateEntitySize: (size: number) => void;
+  onUpdateEntityAnchor: (anchor: { x: number; y: number }) => void;
+  onUpdateEntityAttachment: (attachment: EntityAttachment | null) => void;
+  onSetCompanion: (companion: CompanionDefinition | null) => void;
+  companion: CompanionDefinition | null;
+  onReset: () => void;
   onApply: () => void;
   onExport: () => void;
   onDuplicate: () => void;
+  onImportBackground: () => void;
+  adaptiveSchemes: AdaptiveScheme[];
+  activeAdaptiveScheme: AdaptiveSchemeId | null;
+  onSelectAdaptiveScheme: (scheme: AdaptiveScheme) => void;
   busy: boolean;
 }) {
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [activeLayer, setActiveLayer] = useState<
+    "background" | "surfaces" | "companion"
+  >("background");
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const visual = theme.variants[variant];
   const entity = theme.scene.entities[0];
   return (
@@ -804,6 +1212,10 @@ function CreateView({
           <h1>{theme.locales[locale]?.name ?? theme.metadata.name}</h1>
         </div>
         <div className="editor-header__actions">
+          <button className="secondary-button" onClick={onReset}>
+            <RotateCcw size={14} />
+            {t("reset")}
+          </button>
           <button
             className="secondary-button inspector-toggle"
             onClick={() => setInspectorOpen(true)}
@@ -826,23 +1238,85 @@ function CreateView({
         <aside className="layers-panel">
           <div className="panel-title">
             <span>{t("layers")}</span>
-            <button aria-label={t("addLayer")}><Plus size={14} /></button>
+            <div className="layer-add">
+              <button
+                aria-label={t("addLayer")}
+                onClick={() => setAddMenuOpen((open) => !open)}
+              >
+                <Plus size={14} />
+              </button>
+              {addMenuOpen && (
+                <div className="layer-add__menu" role="menu">
+                  {builtinCompanions.map((item) => (
+                    <button
+                      key={item.id}
+                      role="menuitem"
+                      onClick={() => {
+                        onSetCompanion(item);
+                        setActiveLayer("companion");
+                        setAddMenuOpen(false);
+                      }}
+                    >
+                      <PawPrint size={13} />
+                      <span>{item.locales[locale]?.name ?? item.name}</span>
+                      {companion?.id === item.id && <Check size={12} />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <div className="layer-stack">
-            <button className="layer-item layer-item--active">
-              <span className="layer-icon"><Image size={15} /></span>
-              <span><strong>{t("background")}</strong><small>Image + overlay</small></span>
+            <button
+              className={
+                "layer-item" +
+                (activeLayer === "background" ? " layer-item--active" : "")
+              }
+              onClick={() => setActiveLayer("background")}
+              aria-label={t("background")}
+            >
+              <span className="layer-icon">
+                <Image size={15} />
+              </span>
+              <span>
+                <strong>{t("background")}</strong>
+                <small>{t("backgroundLayer")}</small>
+              </span>
               <Layers3 size={13} />
             </button>
-            <button className="layer-item">
-              <span className="layer-icon"><Sparkles size={15} /></span>
-              <span><strong>{t("surfaces")}</strong><small>Semantic material</small></span>
+            <button
+              className={
+                "layer-item" +
+                (activeLayer === "surfaces" ? " layer-item--active" : "")
+              }
+              onClick={() => setActiveLayer("surfaces")}
+              aria-label={t("surfaces")}
+            >
+              <span className="layer-icon">
+                <Sparkles size={15} />
+              </span>
+              <span>
+                <strong>{t("surfaces")}</strong>
+                <small>{t("surfaceLayer")}</small>
+              </span>
               <Layers3 size={13} />
             </button>
             {entity && (
-              <button className="layer-item">
-                <span className="layer-icon layer-icon--green"><Leaf size={15} /></span>
-                <span><strong>{entity.name}</strong><small>Sprite · pointer</small></span>
+              <button
+                className={
+                  "layer-item" +
+                  (activeLayer === "companion" ? " layer-item--active" : "")
+                }
+                onClick={() => setActiveLayer("companion")}
+                aria-label={t("companion")}
+              >
+                <span className="layer-icon layer-icon--green">
+                  <Leaf size={15} />
+                </span>
+                <span>
+                  <strong>{entity.name}</strong>
+                  <small>Sprite · pointer</small>
+                </span>
                 <Layers3 size={13} />
               </button>
             )}
@@ -863,7 +1337,10 @@ function CreateView({
 
         <section className="editor-canvas">
           <div className="canvas-toolbar">
-            <span><Monitor size={13} />{t("livePreview")}</span>
+            <span>
+              <Monitor size={13} />
+              {t("livePreview")}
+            </span>
             <span>1280 × 760</span>
           </div>
           <div className="canvas-stage">
@@ -873,6 +1350,8 @@ function CreateView({
               locale={locale}
               reduceMotion={reduceMotion}
               resolveAsset={resolveAsset}
+              onEntityAnchorChange={onUpdateEntityAnchor}
+              onEntityAttachmentChange={onUpdateEntityAttachment}
             />
           </div>
         </section>
@@ -894,91 +1373,262 @@ function CreateView({
               </button>
             </div>
           </div>
-          <InspectorSection title={t("background")} icon={<Image size={14} />}>
-            <ColorControl
-              label={t("overlay")}
-              value={visual.background.overlay}
-              onChange={(value) => onUpdateVariant("background", "overlay", value)}
-            />
-            <RangeControl
-              label={t("brightness")}
-              value={visual.background.brightness}
-              min={0.2}
-              max={2}
-              step={0.01}
-              display={Math.round(visual.background.brightness * 100) + "%"}
-              onChange={(value) => onUpdateVariant("background", "brightness", value)}
-            />
-            <RangeControl
-              label={t("blur")}
-              value={visual.background.blur}
-              min={0}
-              max={40}
-              step={1}
-              display={visual.background.blur + "px"}
-              onChange={(value) => onUpdateVariant("background", "blur", value)}
-            />
-            <RangeControl
-              label={t("overlay")}
-              value={visual.background.overlayOpacity}
-              min={0}
-              max={1}
-              step={0.01}
-              display={Math.round(visual.background.overlayOpacity * 100) + "%"}
-              onChange={(value) =>
-                onUpdateVariant("background", "overlayOpacity", value)
-              }
-            />
-          </InspectorSection>
-          <InspectorSection title={t("surfaces")} icon={<Layers3 size={14} />}>
-            <ColorControl
-              label="Accent"
-              value={visual.appearance.accent}
-              onChange={(value) => onUpdateVariant("appearance", "accent", value)}
-            />
-            <RangeControl
-              label={t("surfaceOpacity")}
-              value={visual.appearance.surfaceOpacity}
-              min={0}
-              max={1}
-              step={0.01}
-              display={Math.round(visual.appearance.surfaceOpacity * 100) + "%"}
-              onChange={(value) =>
-                onUpdateVariant("appearance", "surfaceOpacity", value)
-              }
-            />
-            <RangeControl
-              label={t("radius")}
-              value={visual.appearance.radius}
-              min={0}
-              max={32}
-              step={1}
-              display={visual.appearance.radius + "px"}
-              onChange={(value) => onUpdateVariant("appearance", "radius", value)}
-            />
-          </InspectorSection>
-          <InspectorSection title={t("motion")} icon={<Sparkles size={14} />}>
-            <RangeControl
-              label={t("motionIntensity")}
-              value={visual.motion.intensity}
-              min={0}
-              max={1}
-              step={0.01}
-              display={Math.round(visual.motion.intensity * 100) + "%"}
-              onChange={(value) => onUpdateVariant("motion", "intensity", value)}
-            />
-            {entity && (
-              <RangeControl
-                label={t("companionSize")}
-                value={entity.size}
-                min={48}
-                max={240}
-                step={1}
-                display={entity.size + "px"}
-                onChange={onUpdateEntitySize}
+          {activeLayer === "background" && (
+            <InspectorSection
+              title={t("background")}
+              icon={<Image size={14} />}
+            >
+              <button
+                className="adaptive-import-button"
+                onClick={onImportBackground}
+                disabled={busy}
+              >
+                <Upload size={15} />
+                <span>
+                  <strong>{t("importBackground")}</strong>
+                  <small>PNG, JPEG, WebP · 20 MiB</small>
+                </span>
+              </button>
+              <div className="adaptive-intro">
+                <strong>{t("imageAdaptiveTitle")}</strong>
+                <p>{t("imageAdaptiveBody")}</p>
+              </div>
+              {adaptiveSchemes.length > 0 && (
+                <div className="adaptive-schemes">
+                  {adaptiveSchemes.map((scheme) => {
+                    const labelKey =
+                      scheme.id === "cinematic"
+                        ? "adaptiveCinematic"
+                        : scheme.id === "soft"
+                          ? "adaptiveSoft"
+                          : scheme.id === "vivid"
+                            ? "adaptiveVivid"
+                            : "adaptiveBalanced";
+                    const active = activeAdaptiveScheme === scheme.id;
+                    return (
+                      <button
+                        key={scheme.id}
+                        className={
+                          "adaptive-scheme" +
+                          (active ? " adaptive-scheme--active" : "")
+                        }
+                        onClick={() => onSelectAdaptiveScheme(scheme)}
+                      >
+                        <span className="adaptive-scheme__swatches">
+                          {scheme.swatches.map((color) => (
+                            <i key={color} style={{ background: color }} />
+                          ))}
+                        </span>
+                        <span>{t(labelKey)}</span>
+                        {active && <Check size={13} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <ColorControl
+                label={t("overlay")}
+                value={visual.background.overlay}
+                onChange={(value) =>
+                  onUpdateVariant("background", "overlay", value)
+                }
               />
-            )}
-          </InspectorSection>
+              <RangeControl
+                label={t("brightness")}
+                value={visual.background.brightness}
+                min={0.2}
+                max={2}
+                step={0.01}
+                display={Math.round(visual.background.brightness * 100) + "%"}
+                onChange={(value) =>
+                  onUpdateVariant("background", "brightness", value)
+                }
+              />
+              <RangeControl
+                label={t("blur")}
+                value={visual.background.blur}
+                min={0}
+                max={40}
+                step={1}
+                display={visual.background.blur + "px"}
+                onChange={(value) =>
+                  onUpdateVariant("background", "blur", value)
+                }
+              />
+              <RangeControl
+                label={t("overlay")}
+                value={visual.background.overlayOpacity}
+                min={0}
+                max={1}
+                step={0.01}
+                display={
+                  Math.round(visual.background.overlayOpacity * 100) + "%"
+                }
+                onChange={(value) =>
+                  onUpdateVariant("background", "overlayOpacity", value)
+                }
+              />
+            </InspectorSection>
+          )}
+          {activeLayer === "surfaces" && (
+            <InspectorSection
+              title={t("surfaces")}
+              icon={<Layers3 size={14} />}
+            >
+              <label className="inspector-select-control">
+                <span>{t("layoutTreatment")}</span>
+                <select
+                  value={visual.appearance.layout ?? "native"}
+                  onChange={(event) =>
+                    onUpdateVariant("appearance", "layout", event.target.value)
+                  }
+                >
+                  <option value="native">{t("layoutNative")}</option>
+                  <option value="editorial">{t("layoutEditorial")}</option>
+                  <option value="immersive">{t("layoutImmersive")}</option>
+                </select>
+              </label>
+              <label className="inspector-select-control">
+                <span>{t("iconTreatment")}</span>
+                <select
+                  value={visual.appearance.iconStyle ?? "native"}
+                  onChange={(event) =>
+                    onUpdateVariant(
+                      "appearance",
+                      "iconStyle",
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="native">{t("iconNative")}</option>
+                  <option value="contained">{t("iconContained")}</option>
+                  <option value="themed">{t("iconThemed")}</option>
+                </select>
+              </label>
+              <label className="inspector-select-control">
+                <span>{t("decorationTreatment")}</span>
+                <select
+                  value={visual.appearance.decorations ?? "none"}
+                  onChange={(event) =>
+                    onUpdateVariant(
+                      "appearance",
+                      "decorations",
+                      event.target.value,
+                    )
+                  }
+                >
+                  <option value="none">{t("decorationNone")}</option>
+                  <option value="subtle">{t("decorationSubtle")}</option>
+                  <option value="expressive">
+                    {t("decorationExpressive")}
+                  </option>
+                </select>
+              </label>
+              <ColorControl
+                label="Accent"
+                value={visual.appearance.accent}
+                onChange={(value) =>
+                  onUpdateVariant("appearance", "accent", value)
+                }
+              />
+              <RangeControl
+                label={t("surfaceOpacity")}
+                value={visual.appearance.surfaceOpacity}
+                min={0}
+                max={1}
+                step={0.01}
+                display={
+                  Math.round(visual.appearance.surfaceOpacity * 100) + "%"
+                }
+                onChange={(value) =>
+                  onUpdateVariant("appearance", "surfaceOpacity", value)
+                }
+              />
+              <RangeControl
+                label={t("radius")}
+                value={visual.appearance.radius}
+                min={0}
+                max={32}
+                step={1}
+                display={visual.appearance.radius + "px"}
+                onChange={(value) =>
+                  onUpdateVariant("appearance", "radius", value)
+                }
+              />
+              <div className="contrast-note">
+                <ShieldCheck size={14} />
+                <span>
+                  <strong>{t("contrastProtected")}</strong>
+                  <small>{t("contrastProtectedBody")}</small>
+                </span>
+              </div>
+            </InspectorSection>
+          )}
+          {activeLayer === "companion" && (
+            <InspectorSection
+              title={t("companion")}
+              icon={<PawPrint size={14} />}
+            >
+              <RangeControl
+                label={t("motionIntensity")}
+                value={visual.motion.intensity}
+                min={0}
+                max={1}
+                step={0.01}
+                display={Math.round(visual.motion.intensity * 100) + "%"}
+                onChange={(value) =>
+                  onUpdateVariant("motion", "intensity", value)
+                }
+              />
+              {entity && (
+                <>
+                  <label className="inspector-select-control">
+                    <span>{t("attachTo")}</span>
+                    <select
+                      value={entity.attachment?.target ?? "free"}
+                      onChange={(event) => {
+                        const target = event.target.value;
+                        if (target === "free") {
+                          onUpdateEntityAttachment(null);
+                          return;
+                        }
+                        onUpdateEntityAttachment({
+                          target: target as EntityAttachment["target"],
+                          edge: "top",
+                          align: 0.82,
+                          offset: { x: 0, y: 3 },
+                        });
+                      }}
+                    >
+                      <option value="composer">{t("composerEdge")}</option>
+                      <option value="main-surface">{t("workspaceEdge")}</option>
+                      <option value="free">{t("freePosition")}</option>
+                    </select>
+                  </label>
+                  <RangeControl
+                    label={t("companionSize")}
+                    value={entity.size}
+                    min={48}
+                    max={240}
+                    step={1}
+                    display={entity.size + "px"}
+                    onChange={onUpdateEntitySize}
+                  />
+                  <p className="inspector-help">
+                    <MousePointer2 size={13} />
+                    {t("dragCompanion")}
+                  </p>
+                  <button
+                    className="danger-text-button"
+                    onClick={() => onSetCompanion(null)}
+                  >
+                    <Trash2 size={13} />
+                    {t("removeCompanion")}
+                  </button>
+                </>
+              )}
+            </InspectorSection>
+          )}
         </aside>
       </div>
     </div>
@@ -996,7 +1646,10 @@ function InspectorSection({
 }) {
   return (
     <section className="inspector-section">
-      <h3>{icon}{title}</h3>
+      <h3>
+        {icon}
+        {title}
+      </h3>
       {children}
     </section>
   );
@@ -1022,7 +1675,10 @@ function RangeControl({
   const percentage = ((value - min) / (max - min)) * 100;
   return (
     <label className="range-control">
-      <span><strong>{label}</strong><small>{display}</small></span>
+      <span>
+        <strong>{label}</strong>
+        <small>{display}</small>
+      </span>
       <input
         type="range"
         min={min}
@@ -1047,7 +1703,10 @@ function ColorControl({
 }) {
   return (
     <label className="color-control">
-      <span><strong>{label}</strong><small>{value.toUpperCase()}</small></span>
+      <span>
+        <strong>{label}</strong>
+        <small>{value.toUpperCase()}</small>
+      </span>
       <span className="color-control__field">
         <i style={{ background: value }} />
         <input
@@ -1084,17 +1743,21 @@ function LibraryView({
         </div>
         <div className="button-row">
           <button className="primary-button" onClick={onImport}>
-            <Upload size={14} />{t("importTheme")}
+            <Upload size={14} />
+            {t("importTheme")}
           </button>
         </div>
       </section>
       {themes.length === 0 ? (
         <div className="empty-state">
-          <span className="empty-state__icon"><FolderOpen size={26} /></span>
+          <span className="empty-state__icon">
+            <FolderOpen size={26} />
+          </span>
           <h2>{t("noLocalThemes")}</h2>
           <p>.codex-styler-theme · JSON + local raster assets · no scripts</p>
           <button className="primary-button" onClick={onImport}>
-            <Upload size={14} />{t("importTheme")}
+            <Upload size={14} />
+            {t("importTheme")}
           </button>
         </div>
       ) : (
@@ -1105,10 +1768,7 @@ function LibraryView({
               ? resolveAsset(theme, theme.metadata.preview)
               : undefined;
             return (
-              <article
-                key={theme.id}
-                className="library-theme"
-              >
+              <article key={theme.id} className="library-theme">
                 <button
                   className="library-theme__open"
                   onClick={() => onOpen(theme)}
@@ -1118,7 +1778,9 @@ function LibraryView({
                   className="library-theme__visual"
                   style={{
                     backgroundColor: theme.variants.dark.background.color,
-                    backgroundImage: preview ? "url(" + preview + ")" : undefined,
+                    backgroundImage: preview
+                      ? "url(" + preview + ")"
+                      : undefined,
                   }}
                 />
                 <span className="library-theme__copy">
@@ -1168,7 +1830,10 @@ function SettingsView({
         <section className="settings-group">
           <div className="settings-group__title">
             <Languages size={17} />
-            <div><h2>{t("language")}</h2><p>Interface and local theme metadata</p></div>
+            <div>
+              <h2>{t("language")}</h2>
+              <p>{t("languageDescription")}</p>
+            </div>
           </div>
           <label className="select-control">
             <select
@@ -1187,12 +1852,19 @@ function SettingsView({
         <section className="settings-group">
           <div className="settings-group__title">
             <Palette size={17} />
-            <div><h2>{t("managerAppearance")}</h2><p>Independent from the applied Codex theme</p></div>
+            <div>
+              <h2>{t("managerAppearance")}</h2>
+              <p>{t("managerAppearanceDescription")}</p>
+            </div>
           </div>
           <SegmentedControl
             value={settings.appearance}
             options={[
-              { value: "system", label: t("system"), icon: <Monitor size={13} /> },
+              {
+                value: "system",
+                label: t("system"),
+                icon: <Monitor size={13} />,
+              },
               { value: "light", label: t("light"), icon: <Sun size={13} /> },
               { value: "dark", label: t("dark"), icon: <Moon size={13} /> },
             ]}
@@ -1213,40 +1885,33 @@ function SettingsView({
             <select
               value={settings.runtimeStrategy}
               onChange={(event) =>
-                onChange({ runtimeStrategy: event.target.value as RuntimeStrategy })
+                onChange({
+                  runtimeStrategy: event.target.value as RuntimeStrategy,
+                })
               }
             >
-              <option value="auto">{t("automaticMode")}</option>
-              <option value="compatibility">{t("compatibilityMode")}</option>
-              <option value="developer">{t("developerMode")}</option>
+              <option value="enhanced">{t("automaticMode")}</option>
+              <option value="conservative">{t("compatibilityMode")}</option>
             </select>
             <ChevronRight size={14} aria-hidden="true" />
           </label>
-          <p
-            className={
-              settings.runtimeStrategy === "developer"
-                ? "settings-mode-note settings-mode-note--warning"
-                : "settings-mode-note"
-            }
-          >
-            {settings.runtimeStrategy === "auto"
+          <p className="settings-mode-note">
+            {settings.runtimeStrategy === "enhanced"
               ? t("automaticModeDescription")
-              : settings.runtimeStrategy === "compatibility"
-                ? t("compatibilityModeDescription")
-                : t("developerModeDescription")}
+              : t("compatibilityModeDescription")}
           </p>
         </section>
         <SettingToggle
           icon={<Sparkles size={17} />}
           title={t("reduceMotion")}
-          description="Freezes pointer tracking and non-essential parallax."
+          description={t("reduceMotionDescription")}
           checked={settings.reduceMotion}
           onChange={(checked) => onChange({ reduceMotion: checked })}
         />
         <SettingToggle
           icon={<WifiOff size={17} />}
           title={t("updateChecks")}
-          description="Never runs automatically in the background."
+          description={t("updateChecksDescription")}
           checked={settings.manualUpdateChecks}
           onChange={(checked) => onChange({ manualUpdateChecks: checked })}
         />
@@ -1263,7 +1928,8 @@ function SettingsView({
           </article>
         </section>
         <button className="text-button" onClick={onOpenOnboarding}>
-          {t("openOnboarding")}<ChevronRight size={14} />
+          {t("openOnboarding")}
+          <ChevronRight size={14} />
         </button>
       </div>
     </div>
@@ -1287,7 +1953,8 @@ function SegmentedControl({
           className={value === option.value ? "is-active" : ""}
           onClick={() => onChange(option.value)}
         >
-          {option.icon}{option.label}
+          {option.icon}
+          {option.label}
         </button>
       ))}
     </div>
@@ -1311,7 +1978,10 @@ function SettingToggle({
     <section className="settings-group settings-group--row">
       <div className="settings-group__title">
         {icon}
-        <div><h2>{title}</h2><p>{description}</p></div>
+        <div>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
       </div>
       <button
         className={"toggle" + (checked ? " toggle--on" : "")}

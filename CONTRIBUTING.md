@@ -11,21 +11,22 @@ Thank you for helping build a safer and more expressive Codex Desktop customizat
 
 ## Local setup
 
-~~~bash
+```bash
 pnpm install
 pnpm check
 . ~/.cargo/env
 cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml
-~~~
+```
 
 For the Tauri desktop application:
 
-~~~bash
+```bash
 pnpm tauri dev
-~~~
+```
 
 ## Pull requests
 
+- Use English for branch names, commit subjects, pull request titles and descriptions, changelog entries, and release notes. Localized product documentation remains welcome.
 - Keep one behavioral change per pull request.
 - Add or update tests for schema, archive, direction mapping, runtime, or compatibility changes.
 - Include before-and-after screenshots for visible changes.
@@ -47,9 +48,9 @@ A built-in theme must provide:
 
 Run the validator before submitting:
 
-~~~bash
+```bash
 pnpm theme:validate path/to/theme.json
-~~~
+```
 
 ## Compatibility reports
 
@@ -58,4 +59,3 @@ Include the operating system, architecture, Codex version, Codex Styler commit o
 ## Security
 
 Do not report vulnerabilities in a public issue. Follow [SECURITY.md](SECURITY.md).
-

@@ -4,6 +4,30 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.3] - 2026-07-16
+
+### Added
+
+- Local image analysis and four curated adaptive visual systems.
+- Theme-level workspace layout, icon treatment, and detail controls.
+- Alpha-aware grounded sprite normalization with a shared scale and baseline.
+- Semantic companion attachments for the composer, workspace, and thread summary.
+- Managed Codex quit confirmation and restart directly from the connection card.
+
+### Changed
+
+- Expanded runtime styling across stable semantic Codex surfaces and home compositions.
+- Separated theme selection from companion selection while retaining optional default pairings.
+- Made Enhanced mode the default live apply-and-verify strategy, with Conservative mode available for isolated rendering.
+- Updated all current GitHub-facing release metadata and contribution guidance to English.
+
+### Fixed
+
+- Companion frames no longer float, resize, or shift vertically because of inconsistent transparent padding.
+- Attached companions now follow composer height changes and interface re-rendering.
+- The lower-left connection action now opens the real restart-and-apply flow instead of only refreshing detection.
+- Light themes protect text contrast against imported backgrounds and translucent surfaces.
+
 ## [0.1.0-alpha.2] - 2026-07-16
 
 ### Added

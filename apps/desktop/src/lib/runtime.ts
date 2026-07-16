@@ -67,6 +67,11 @@ export async function launchCodex(): Promise<RuntimeStatus> {
   return invoke<RuntimeStatus>("launch_codex");
 }
 
+export async function quitCodex(): Promise<CodexDetection> {
+  if (!isTauri()) return detectCodex();
+  return invoke<CodexDetection>("quit_codex");
+}
+
 export async function applyTheme(
   theme: ThemeDefinition,
   variant: "light" | "dark",
@@ -87,7 +92,8 @@ export async function applyTheme(
   return invoke<RuntimeStatus>("apply_theme", {
     theme: payload,
     variant,
-    compatibilityMode: runtimeStrategy,
+    compatibilityMode:
+      runtimeStrategy === "enhanced" ? "auto" : "compatibility",
   });
 }
 

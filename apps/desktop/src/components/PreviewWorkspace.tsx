@@ -1,4 +1,12 @@
-import { useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type PointerEvent,
+} from "react";
 import {
   Check,
   ChevronDown,
@@ -12,9 +20,12 @@ import {
 } from "lucide-react";
 import {
   pointerDirectionFrame,
+  type EntityAttachment,
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import type { Locale } from "../lib/i18n";
+import { readableColor } from "../lib/contrast";
+import { drawSpriteFrame } from "../lib/sprite-normalization";
 
 interface PreviewWorkspaceProps {
   theme: ThemeDefinition;
@@ -23,6 +34,8 @@ interface PreviewWorkspaceProps {
   reduceMotion: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   compact?: boolean;
+  onEntityAnchorChange?: (anchor: { x: number; y: number }) => void;
+  onEntityAttachmentChange?: (attachment: EntityAttachment | null) => void;
 }
 
 export function PreviewWorkspace({
@@ -32,9 +45,18 @@ export function PreviewWorkspace({
   reduceMotion,
   resolveAsset,
   compact = false,
+  onEntityAnchorChange,
+  onEntityAttachmentChange,
 }: PreviewWorkspaceProps) {
   const previewRef = useRef<HTMLDivElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const composerRef = useRef<HTMLDivElement>(null);
+  const entityRef = useRef<HTMLDivElement>(null);
+  const spriteCanvasRef = useRef<HTMLCanvasElement>(null);
+  const spriteImageRef = useRef<HTMLImageElement | null>(null);
   const [direction, setDirection] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [spriteReady, setSpriteReady] = useState(0);
   const visual = theme.variants[variant];
   const entity = theme.scene.entities[0];
   const backgroundImage = visual.background.image
@@ -43,12 +65,99 @@ export function PreviewWorkspace({
   const entityImage = entity
     ? resolveAsset(theme, entity.renderer.asset)
     : undefined;
+  const protectedText = readableColor(
+    visual.appearance.text,
+    visual.appearance.surface,
+  );
+  const protectedMuted = readableColor(
+    visual.appearance.mutedText,
+    visual.appearance.surface,
+    4.5,
+  );
+  const protectedSurfaceOpacity = backgroundImage
+    ? Math.max(0.72, visual.appearance.surfaceOpacity)
+    : visual.appearance.surfaceOpacity;
+
+  useEffect(() => {
+    if (!entityImage || entity?.renderer.type !== "sprite-atlas") {
+      spriteImageRef.current = null;
+      return;
+    }
+    const image = new window.Image();
+    image.decoding = "async";
+    image.onload = () => {
+      spriteImageRef.current = image;
+      setSpriteReady((value) => value + 1);
+    };
+    image.src = entityImage;
+    return () => {
+      image.onload = null;
+      if (spriteImageRef.current === image) spriteImageRef.current = null;
+    };
+  }, [entity?.renderer.type, entityImage]);
+
+  useEffect(() => {
+    if (
+      !entity ||
+      entity.renderer.type !== "sprite-atlas" ||
+      !spriteCanvasRef.current ||
+      !spriteImageRef.current
+    )
+      return;
+    const height =
+      entity.size * (entity.renderer.frameHeight / entity.renderer.frameWidth);
+    drawSpriteFrame(
+      spriteCanvasRef.current,
+      spriteImageRef.current,
+      entity.renderer,
+      direction,
+      entity.size,
+      height,
+    );
+  }, [direction, entity, spriteReady]);
+
+  useEffect(() => {
+    const element = entityRef.current;
+    const preview = previewRef.current;
+    const attachment = entity?.attachment;
+    if (!element || !preview || !attachment) return;
+    const target =
+      attachment.target === "composer"
+        ? composerRef.current
+        : attachment.target === "main-surface"
+          ? mainRef.current
+          : null;
+    if (!target) return;
+
+    const update = () => {
+      const previewBounds = preview.getBoundingClientRect();
+      const targetBounds = target.getBoundingClientRect();
+      const edgeY =
+        attachment.edge === "bottom" ? targetBounds.bottom : targetBounds.top;
+      element.style.left =
+        targetBounds.left -
+        previewBounds.left +
+        targetBounds.width * attachment.align +
+        attachment.offset.x +
+        "px";
+      element.style.top =
+        edgeY - previewBounds.top + attachment.offset.y + "px";
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(preview);
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [entity]);
 
   const style = useMemo(
     () =>
       ({
         "--preview-bg": visual.background.color,
-        "--preview-image": backgroundImage ? "url(" + backgroundImage + ")" : "none",
+        "--preview-image": backgroundImage
+          ? "url(" + backgroundImage + ")"
+          : "none",
         "--preview-image-x": visual.background.position.x + "%",
         "--preview-image-y": visual.background.position.y + "%",
         "--preview-brightness": visual.background.brightness,
@@ -56,22 +165,35 @@ export function PreviewWorkspace({
         "--preview-overlay": visual.background.overlay,
         "--preview-overlay-opacity": visual.background.overlayOpacity,
         "--preview-surface": visual.appearance.surface,
-        "--preview-surface-opacity": visual.appearance.surfaceOpacity,
-        "--preview-text": visual.appearance.text,
-        "--preview-muted": visual.appearance.mutedText,
+        "--preview-surface-opacity": protectedSurfaceOpacity,
+        "--preview-text": protectedText,
+        "--preview-muted": protectedMuted,
         "--preview-border": visual.appearance.border,
         "--preview-accent": visual.appearance.accent,
         "--preview-radius": visual.appearance.radius + "px",
+        "--preview-focus-blur": visual.appearance.focusBlur + "px",
       }) as CSSProperties,
-    [backgroundImage, visual],
+    [
+      backgroundImage,
+      protectedMuted,
+      protectedSurfaceOpacity,
+      protectedText,
+      visual,
+    ],
   );
 
   function handlePointer(event: MouseEvent<HTMLDivElement>) {
-    if (!entity || reduceMotion || entity.renderer.type !== "sprite-atlas") return;
-    const bounds = previewRef.current?.getBoundingClientRect();
+    if (
+      !entity ||
+      dragging ||
+      reduceMotion ||
+      entity.renderer.type !== "sprite-atlas"
+    )
+      return;
+    const bounds = entityRef.current?.getBoundingClientRect();
     if (!bounds) return;
-    const anchorX = bounds.left + (bounds.width * entity.anchor.x) / 100;
-    const anchorY = bounds.top + (bounds.height * entity.anchor.y) / 100;
+    const anchorX = bounds.left + bounds.width / 2;
+    const anchorY = bounds.top + bounds.height / 2;
     setDirection(
       pointerDirectionFrame(
         event.clientX,
@@ -83,11 +205,61 @@ export function PreviewWorkspace({
     );
   }
 
+  function handleEntityPointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!entity || (!onEntityAnchorChange && !onEntityAttachmentChange)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragging(true);
+  }
+
+  function handleEntityPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    const bounds = previewRef.current?.getBoundingClientRect();
+    if (!bounds) return;
+    const composerBounds = composerRef.current?.getBoundingClientRect();
+    if (
+      composerBounds &&
+      onEntityAttachmentChange &&
+      Math.abs(event.clientY - composerBounds.top) <= 52
+    ) {
+      onEntityAttachmentChange({
+        target: "composer",
+        edge: "top",
+        align: Math.max(
+          0.08,
+          Math.min(
+            0.92,
+            (event.clientX - composerBounds.left) / composerBounds.width,
+          ),
+        ),
+        offset: { x: 0, y: 3 },
+      });
+      return;
+    }
+    onEntityAttachmentChange?.(null);
+    if (!onEntityAnchorChange) return;
+    onEntityAnchorChange({
+      x: Math.max(
+        4,
+        Math.min(96, ((event.clientX - bounds.left) / bounds.width) * 100),
+      ),
+      y: Math.max(
+        6,
+        Math.min(94, ((event.clientY - bounds.top) / bounds.height) * 100),
+      ),
+    });
+  }
+
+  function handleEntityPointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (!dragging) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setDragging(false);
+  }
+
   const isChinese = locale === "zh-CN";
-  const columns = entity?.renderer.type === "sprite-atlas" ? entity.renderer.columns : 1;
-  const rows = entity?.renderer.type === "sprite-atlas" ? entity.renderer.rows : 1;
-  const frameX = direction % columns;
-  const frameY = Math.floor(direction / columns);
   const entityStyle = entity
     ? ({
         "--entity-image": entityImage ? "url(" + entityImage + ")" : "none",
@@ -101,19 +273,21 @@ export function PreviewWorkspace({
               "px"
             : entity.size + "px",
         "--entity-opacity": entity.opacity,
-        "--entity-background-size": `${columns * 100}% ${rows * 100}%`,
-        "--entity-background-x": `${columns > 1 ? (frameX / (columns - 1)) * 100 : 0}%`,
-        "--entity-background-y": `${rows > 1 ? (frameY / (rows - 1)) * 100 : 0}%`,
       } as CSSProperties)
     : undefined;
 
   return (
     <div
       ref={previewRef}
-      className={"workspace-preview" + (compact ? " workspace-preview--compact" : "")}
+      className={
+        "workspace-preview" + (compact ? " workspace-preview--compact" : "")
+      }
       style={style}
       onMouseMove={handlePointer}
       data-theme-variant={variant}
+      data-layout={visual.appearance.layout ?? "native"}
+      data-icon-style={visual.appearance.iconStyle ?? "native"}
+      data-decorations={visual.appearance.decorations ?? "none"}
     >
       <div className="workspace-preview__backdrop" />
       <div className="workspace-preview__overlay" />
@@ -139,14 +313,18 @@ export function PreviewWorkspace({
             {isChinese ? "最近" : "RECENT"}
           </div>
           <button className="workspace-task workspace-task--active">
-            <span>{isChinese ? "主题架构与安全模型" : "Theme architecture & safety"}</span>
+            <span>
+              {isChinese ? "主题架构与安全模型" : "Theme architecture & safety"}
+            </span>
             <MoreHorizontal size={11} />
           </button>
           <button className="workspace-task">
             <span>{isChinese ? "文档站元数据" : "Documentation metadata"}</span>
           </button>
           <button className="workspace-task">
-            <span>{isChinese ? "互动场景渲染器" : "Interactive scene renderer"}</span>
+            <span>
+              {isChinese ? "互动场景渲染器" : "Interactive scene renderer"}
+            </span>
           </button>
           <div className="workspace-sidebar__footer">
             <Search size={12} />
@@ -154,10 +332,14 @@ export function PreviewWorkspace({
           </div>
         </aside>
 
-        <main className="workspace-main">
+        <main className="workspace-main" ref={mainRef}>
           <header className="workspace-header">
             <div>
-              <strong>{isChinese ? "主题架构与安全模型" : "Theme architecture & safety"}</strong>
+              <strong>
+                {isChinese
+                  ? "主题架构与安全模型"
+                  : "Theme architecture & safety"}
+              </strong>
               <span className="workspace-branch">
                 <GitBranch size={10} />
                 main
@@ -175,7 +357,9 @@ export function PreviewWorkspace({
                 <Check size={12} />
               </div>
               <div>
-                <strong>{isChinese ? "方案已建立" : "Foundation is in place"}</strong>
+                <strong>
+                  {isChinese ? "方案已建立" : "Foundation is in place"}
+                </strong>
                 <p>
                   {isChinese
                     ? "主题保持纯数据，互动层不会接管任何点击事件。"
@@ -203,7 +387,7 @@ export function PreviewWorkspace({
           </section>
 
           <footer className="workspace-composer">
-            <div className="workspace-composer__field">
+            <div className="workspace-composer__field" ref={composerRef}>
               <span>
                 {isChinese
                   ? "让 Codex 继续完善这个主题…"
@@ -218,14 +402,27 @@ export function PreviewWorkspace({
 
         {entity && (
           <div
+            ref={entityRef}
             className={
               "scene-entity" + (reduceMotion ? " scene-entity--reduced" : "")
             }
             style={entityStyle}
             aria-label={entity.name}
+            data-draggable={Boolean(
+              onEntityAnchorChange || onEntityAttachmentChange,
+            )}
+            data-dragging={dragging}
+            data-attached={Boolean(entity.attachment)}
+            data-attachment-edge={entity.attachment?.edge}
+            onPointerDown={handleEntityPointerDown}
+            onPointerMove={handleEntityPointerMove}
+            onPointerUp={handleEntityPointerUp}
+            onPointerCancel={handleEntityPointerUp}
           >
-            {entityImage ? (
-              <div className="scene-entity__sprite" />
+            {entityImage && entity.renderer.type === "sprite-atlas" ? (
+              <canvas ref={spriteCanvasRef} className="scene-entity__sprite" />
+            ) : entityImage ? (
+              <div className="scene-entity__image" />
             ) : (
               <div className="scene-entity__fallback">
                 <span className="scene-gecko__tail" />

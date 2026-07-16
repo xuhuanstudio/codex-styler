@@ -5,6 +5,9 @@ export function themeSlug(theme: ThemeDefinition): string {
 }
 
 export function themeAssetUrl(theme: ThemeDefinition, path: string): string {
+  if (path.startsWith("assets/companions/")) {
+    return "/companions/" + path.slice("assets/companions/".length);
+  }
   return "/themes/" + themeSlug(theme) + "/" + path;
 }
 
@@ -15,14 +18,18 @@ export async function assetToDataUrl(url: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Could not read asset"));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read asset"));
     reader.readAsDataURL(blob);
   });
 }
 
 export async function prepareThemeForRuntime(
   theme: ThemeDefinition,
-  resolveAsset: (theme: ThemeDefinition, path: string) => string = themeAssetUrl,
+  resolveAsset: (
+    theme: ThemeDefinition,
+    path: string,
+  ) => string = themeAssetUrl,
 ): Promise<ThemeDefinition> {
   const clone = structuredClone(theme);
   const replacements = new Map<string, string>();

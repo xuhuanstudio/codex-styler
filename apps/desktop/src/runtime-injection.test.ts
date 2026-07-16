@@ -13,15 +13,17 @@ interface InjectedRuntime {
 }
 
 function runtime(): InjectedRuntime {
-  return (window as typeof window & { __CODEX_STYLER_RUNTIME__: InjectedRuntime })
-    .__CODEX_STYLER_RUNTIME__;
+  return (
+    window as typeof window & { __CODEX_STYLER_RUNTIME__: InjectedRuntime }
+  ).__CODEX_STYLER_RUNTIME__;
 }
 
 describe("injected compatibility runtime", () => {
   beforeEach(() => {
     document.head.innerHTML = "";
     document.body.innerHTML = "";
-    delete (window as unknown as Record<string, unknown>).__CODEX_STYLER_RUNTIME__;
+    delete (window as unknown as Record<string, unknown>)
+      .__CODEX_STYLER_RUNTIME__;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(performance.now() + 20);
       return 1;
@@ -39,7 +41,9 @@ describe("injected compatibility runtime", () => {
     const outcome = await runtime().apply(nativeRefined, "dark", "auto");
     expect(outcome.resolvedMode).toBe("compatibility");
     expect(outcome.reason).toContain("sidebar anchor");
-    expect(document.documentElement.dataset.codexStylerMode).toBe("compatibility");
+    expect(document.documentElement.dataset.codexStylerMode).toBe(
+      "compatibility",
+    );
   });
 
   it("uses semantic styling when live adapter verification succeeds", async () => {
@@ -65,9 +69,17 @@ describe("injected compatibility runtime", () => {
     expect(outcome.reason).toBeNull();
     expect(document.documentElement.dataset.codexStylerMode).toBe("semantic");
     expect(document.documentElement.dataset.codexStylerPage).toBe("home");
+    expect(document.documentElement.dataset.codexStylerLayout).toBe("native");
+    expect(document.documentElement.dataset.codexStylerIcons).toBe("contained");
     const stylesheet = document.getElementById("codex-styler-runtime-style");
     expect(stylesheet?.textContent).toContain("main.main-surface article");
+    expect(stylesheet?.textContent).toContain(
+      '[data-pip-obstacle="thread-summary-panel"]',
+    );
+    expect(stylesheet?.textContent).toContain("pointer-events: auto");
     expect(stylesheet?.textContent).toContain("background-image:");
+    expect(stylesheet?.textContent).toContain("group\\/home-suggestions");
+    expect(stylesheet?.textContent).toContain('[data-testid="home-icon"]');
   });
 
   it("allows developer mode to force semantic styling", async () => {

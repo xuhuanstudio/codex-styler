@@ -11,6 +11,14 @@ function variant(
   overlay: string,
   overlayOpacity: number,
   surfaceOpacity: number,
+  chrome: Pick<
+    ThemeVariant["appearance"],
+    "layout" | "iconStyle" | "decorations"
+  > = {
+    layout: "native",
+    iconStyle: "native",
+    decorations: "none",
+  },
 ): ThemeVariant {
   return {
     background: {
@@ -31,6 +39,7 @@ function variant(
       radius: 14,
       focusOpacity: 0.84,
       focusBlur: 12,
+      ...chrome,
     },
     motion: {
       intensity: 0.5,
@@ -46,7 +55,8 @@ export const nativeRefined: ThemeDefinition = {
   version: "1.0.0",
   metadata: {
     name: "Native Refined",
-    description: "A quieter, more deliberate interpretation of the native workspace.",
+    description:
+      "A quieter, more deliberate interpretation of the native workspace.",
     author: "Codex Styler contributors",
     license: "CC-BY-4.0",
     tags: ["minimal", "native", "light", "dark"],
@@ -70,6 +80,7 @@ export const nativeRefined: ThemeDefinition = {
       "#e9e7e1",
       0.06,
       0.88,
+      { layout: "native", iconStyle: "contained", decorations: "subtle" },
     ),
     dark: variant(
       "#151716",
@@ -81,6 +92,7 @@ export const nativeRefined: ThemeDefinition = {
       "#0c0e0d",
       0.18,
       0.9,
+      { layout: "native", iconStyle: "contained", decorations: "subtle" },
     ),
   },
   scene: {
@@ -106,7 +118,8 @@ export const nativeRefined: ThemeDefinition = {
   locales: {
     en: {
       name: "Native Refined",
-      description: "The native workspace, with calmer contrast and cleaner rhythm.",
+      description:
+        "The native workspace, with calmer contrast and cleaner rhythm.",
     },
     "zh-CN": {
       name: "原生精修",
@@ -121,7 +134,8 @@ export const nocturneStudio: ThemeDefinition = {
   version: "1.0.0",
   metadata: {
     name: "Nocturne Studio",
-    description: "A cinematic midnight workspace shaped by ink, glass, and amber light.",
+    description:
+      "A cinematic midnight workspace shaped by ink, glass, and amber light.",
     author: "Codex Styler contributors",
     license: "CC-BY-4.0",
     tags: ["cinematic", "dark", "image", "studio"],
@@ -145,6 +159,7 @@ export const nocturneStudio: ThemeDefinition = {
       "#ddd6ca",
       0.16,
       0.82,
+      { layout: "editorial", iconStyle: "themed", decorations: "expressive" },
     ),
     dark: {
       ...variant(
@@ -157,6 +172,7 @@ export const nocturneStudio: ThemeDefinition = {
         "#071014",
         0.42,
         0.72,
+        { layout: "editorial", iconStyle: "themed", decorations: "expressive" },
       ),
       background: {
         color: "#090b0d",
@@ -206,7 +222,8 @@ export const nocturneStudio: ThemeDefinition = {
   locales: {
     en: {
       name: "Nocturne Studio",
-      description: "Ink-dark surfaces, quiet glass, and a controlled amber horizon.",
+      description:
+        "Ink-dark surfaces, quiet glass, and a controlled amber horizon.",
     },
     "zh-CN": {
       name: "夜曲工作室",
@@ -220,11 +237,12 @@ export const quietGarden: ThemeDefinition = {
   id: "codex-styler.quiet-garden",
   version: "1.0.0",
   metadata: {
-    name: "Quiet Garden Companion",
-    description: "A living garden workspace with an original pointer-aware companion.",
+    name: "Quiet Garden",
+    description:
+      "A living garden workspace with calm, legible translucent surfaces.",
     author: "Codex Styler contributors",
     license: "CC-BY-4.0",
-    tags: ["nature", "interactive", "companion", "image"],
+    tags: ["nature", "calm", "image", "light", "dark"],
     preview: "previews/quiet-garden.webp",
   },
   compatibility: {
@@ -246,6 +264,7 @@ export const quietGarden: ThemeDefinition = {
         "#dbe3d6",
         0.18,
         0.76,
+        { layout: "immersive", iconStyle: "themed", decorations: "expressive" },
       ),
       background: {
         color: "#d9dfd2",
@@ -268,6 +287,7 @@ export const quietGarden: ThemeDefinition = {
         "#0d1510",
         0.34,
         0.68,
+        { layout: "immersive", iconStyle: "themed", decorations: "expressive" },
       ),
       background: {
         color: "#101612",
@@ -298,37 +318,13 @@ export const quietGarden: ThemeDefinition = {
         parallax: 0,
       },
     ],
-    entities: [
-      {
-        id: "moss-gecko",
-        name: "Moss",
-        renderer: {
-          type: "sprite-atlas",
-          asset: "assets/moss-gecko-atlas-v2.png",
-          columns: 4,
-          rows: 2,
-          frameWidth: 443,
-          frameHeight: 443,
-          directions: 8,
-        },
-        behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
-        anchor: { x: 84, y: 70 },
-        size: 136,
-        opacity: 0.96,
-      },
-    ],
+    entities: [],
   },
   assets: [
     {
       id: "garden-background",
       path: "assets/quiet-garden.webp",
       type: "background",
-      license: "CC-BY-4.0",
-    },
-    {
-      id: "moss-gecko-atlas",
-      path: "assets/moss-gecko-atlas-v2.png",
-      type: "sprite-atlas",
       license: "CC-BY-4.0",
     },
     {
@@ -340,12 +336,13 @@ export const quietGarden: ThemeDefinition = {
   ],
   locales: {
     en: {
-      name: "Quiet Garden Companion",
-      description: "A calm green workspace watched over by Moss, a tiny attentive gecko.",
+      name: "Quiet Garden",
+      description:
+        "A quiet garden scene with readable, translucent workspace surfaces.",
     },
     "zh-CN": {
-      name: "静谧花园伙伴",
-      description: "安静的绿色工作空间，以及会留意光标方向的小壁虎 Moss。",
+      name: "静谧花园",
+      description: "安静的花园场景，搭配清晰易读的半透明工作区表面。",
     },
   },
 };
