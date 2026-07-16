@@ -37,7 +37,7 @@ jobs:
       - run: pnpm --filter @codex-styler/site build
       - run: pnpm check:links
       - run: pnpm check:lighthouse
-      - uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: apps/site/dist
 
