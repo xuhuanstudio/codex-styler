@@ -205,9 +205,9 @@ export const docs: DocPage[] = [
           ],
         },
         {
-          heading: "Safe mode for unknown versions",
+          heading: "Automatic verification and fallback",
           paragraphs: [
-            "An unknown Codex version receives only the isolated background and scene layer. Semantic surface overrides remain disabled until an adapter version is explicitly verified.",
+            "Automatic mode first applies semantic styling, verifies live anchors and computed surface styles, and falls back to the isolated background and scene layer only when the health check fails. Compatibility mode stays isolated; Developer mode bypasses automatic fallback.",
           ],
         },
       ],
@@ -225,9 +225,9 @@ export const docs: DocPage[] = [
           ],
         },
         {
-          heading: "未知版本使用安全模式",
+          heading: "自动验证与异常回退",
           paragraphs: [
-            "未知 Codex 版本只接收隔离的背景和场景层；语义表面覆盖会保持关闭，直到对应适配器被明确验证。",
+            "自动模式会先应用语义样式、检查实时锚点与最终表面样式，只有健康检查失败时才回退到隔离的背景与场景层。兼容模式始终隔离，开发者模式则跳过自动回退。",
           ],
         },
       ],
@@ -255,7 +255,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex updates",
           paragraphs: [
-            "Codex Desktop may change internal structure. Styler isolates selectors in a versioned adapter and treats unrecognized versions as safe-mode only.",
+            "Codex Desktop may change internal structure. Styler isolates selectors in an adapter and uses live health checks instead of blocking solely by version number. Failed checks fall back to the isolated compatibility layer.",
           ],
         },
       ],
@@ -269,7 +269,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex 更新",
           paragraphs: [
-            "Codex Desktop 的内部结构可能变化。Styler 将选择器集中在版本化适配器中，并让无法识别的版本只运行安全模式。",
+            "Codex Desktop 的内部结构可能变化。Styler 将选择器集中在适配器中，并使用实时健康检查，而不是只根据版本号阻止应用；检查失败时会回退到隔离兼容层。",
           ],
         },
       ],
@@ -303,7 +303,7 @@ export const docs: DocPage[] = [
         {
           heading: "The interface changed after a Codex update",
           paragraphs: [
-            "Restore the official interface and remain in safe mode. Include the Codex and Styler versions in a GitHub issue, but do not attach personal workspace content or raw diagnostic logs without reviewing them.",
+            "Restore the official interface, then switch to Compatibility mode if Automatic mode did not already fall back. Include the Codex and Styler versions in a GitHub issue, but do not attach personal workspace content or raw diagnostic logs without reviewing them.",
           ],
         },
       ],
@@ -323,7 +323,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex 更新后界面变化",
           paragraphs: [
-            "先恢复官方界面并保持安全模式。提交 GitHub Issue 时附上 Codex 和 Styler 版本，但不要在未检查前上传个人工作区内容或原始诊断日志。",
+            "先恢复官方界面；如果自动模式尚未自行回退，再切换到兼容模式。提交 GitHub Issue 时附上 Codex 和 Styler 版本，但不要在未检查前上传个人工作区内容或原始诊断日志。",
           ],
         },
       ],

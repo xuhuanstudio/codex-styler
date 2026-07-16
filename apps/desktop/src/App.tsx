@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Sun,
+  Trash2,
   Upload,
   WifiOff,
   X,
@@ -41,18 +42,27 @@ import {
   useState,
   type CSSProperties,
   type ChangeEvent,
+  type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BrandMark } from "./components/BrandMark";
 import { Onboarding } from "./components/Onboarding";
 import { PreviewWorkspace } from "./components/PreviewWorkspace";
-import { detectLocale, translate, type Locale, type MessageKey } from "./lib/i18n";
+import {
+  resolveLocale,
+  translate,
+  type Locale,
+  type LocalePreference,
+  type MessageKey,
+} from "./lib/i18n";
 import {
   loadLocalThemes,
   loadSettings,
   saveLocalThemes,
   saveSettings,
   type ManagerAppearance,
+  type RuntimeStrategy,
   type UserSettings,
 } from "./lib/storage";
 import {
@@ -66,6 +76,7 @@ import {
   type RuntimeStatus,
 } from "./lib/runtime";
 import {
+  deleteThemeArchive,
   exportTheme,
   hydrateThemeAssetMaps,
   importTheme,
@@ -88,9 +99,7 @@ const initialRuntime: RuntimeStatus = {
 };
 
 export function App() {
-  const [settings, setSettings] = useState<UserSettings>(() =>
-    loadSettings(detectLocale()),
-  );
+  const [settings, setSettings] = useState<UserSettings>(loadSettings);
   const [view, setView] = useState<View>("themes");
   const [selectedTheme, setSelectedTheme] = useState<ThemeDefinition>(
     builtinThemes[0],
@@ -108,18 +117,20 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(!settings.onboardingComplete);
+  const [pendingDelete, setPendingDelete] = useState<ThemeDefinition | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
-  const t = (key: MessageKey) => translate(settings.locale, key);
+  const locale = resolveLocale(settings.locale);
+  const t = (key: MessageKey) => translate(locale, key);
   const resolveAsset = (theme: ThemeDefinition, path: string) =>
     themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
 
   useEffect(() => {
     saveSettings(settings);
     document.documentElement.dataset.appearance = settings.appearance;
-    document.documentElement.lang = settings.locale;
+    document.documentElement.lang = locale;
     document.documentElement.classList.toggle("reduce-motion", settings.reduceMotion);
-  }, [settings]);
+  }, [locale, settings]);
 
   useEffect(() => {
     void Promise.all([detectCodex(), getRuntimeStatus()]).then(
@@ -169,6 +180,7 @@ export function App() {
       next = await applyTheme(
         view === "create" ? draftTheme : selectedTheme,
         variant,
+        settings.runtimeStrategy,
         resolveAsset,
       );
       setRuntime(next);
@@ -216,6 +228,11 @@ export function App() {
 
   function updateSettings(patch: Partial<UserSettings>) {
     setSettings((current) => ({ ...current, ...patch }));
+  }
+
+  function startWindowDrag(event: ReactMouseEvent<HTMLDivElement>) {
+    if (event.button !== 0 || !("__TAURI_INTERNALS__" in window)) return;
+    void getCurrentWindow().startDragging();
   }
 
   function chooseTheme(theme: ThemeDefinition, openEditor = false) {
@@ -317,6 +334,31 @@ export function App() {
     }
   }
 
+  async function handleDeleteTheme() {
+    if (!pendingDelete) return;
+    const themeId = pendingDelete.id;
+    try {
+      await deleteThemeArchive(themeId);
+      const next = localThemes.filter((theme) => theme.id !== themeId);
+      setLocalThemes(next);
+      saveLocalThemes(next);
+      setThemeAssetMaps((current) => {
+        for (const url of Object.values(current[themeId] ?? {})) {
+          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        }
+        const remaining = { ...current };
+        delete remaining[themeId];
+        return remaining;
+      });
+      if (selectedTheme.id === themeId) setSelectedTheme(builtinThemes[0]);
+      setPendingDelete(null);
+      setToast(t("themeDeleted"));
+    } catch (error) {
+      console.error(error);
+      setToast(t("invalidTheme"));
+    }
+  }
+
   const navItems: Array<{ id: View; label: MessageKey; icon: ReactNode }> = [
     { id: "themes", label: "themes", icon: <Palette size={17} /> },
     { id: "create", label: "create", icon: <SlidersHorizontal size={17} /> },
@@ -409,10 +451,19 @@ export function App() {
 
       <main className="app-main">
         <header className="app-topbar">
-          <div className="window-drag-region" data-tauri-drag-region />
+          <div
+            className="window-drag-region"
+            data-tauri-drag-region
+            onMouseDown={startWindowDrag}
+            aria-hidden="true"
+          />
           <div className="topbar-status">
             <span className="topbar-status__dot" />
-            {t("unknownCompatibility")}
+            {runtime.connected && runtime.compatibility === "supported"
+              ? t("compatible")
+              : runtime.state === "applied"
+                ? t("compatibilityMode")
+                : t("unknownCompatibility")}
           </div>
           <div className="variant-switch" aria-label="Theme variant">
             <button
@@ -434,7 +485,7 @@ export function App() {
 
         {view === "themes" && (
           <ThemesView
-            locale={settings.locale}
+            locale={locale}
             selectedTheme={selectedTheme}
             variant={variant}
             reduceMotion={settings.reduceMotion}
@@ -448,7 +499,7 @@ export function App() {
           <CreateView
             theme={draftTheme}
             variant={variant}
-            locale={settings.locale}
+            locale={locale}
             reduceMotion={settings.reduceMotion}
             t={t}
             onUpdateVariant={updateVariant}
@@ -464,10 +515,11 @@ export function App() {
         {view === "library" && (
           <LibraryView
             themes={localThemes}
-            locale={settings.locale}
+            locale={locale}
             t={t}
             onImport={() => importRef.current?.click()}
             onOpen={(theme) => chooseTheme(theme, true)}
+            onDelete={setPendingDelete}
             resolveAsset={resolveAsset}
           />
         )}
@@ -492,7 +544,7 @@ export function App() {
 
       {showOnboarding && (
         <Onboarding
-          locale={settings.locale}
+          locale={locale}
           selectedTheme={selectedTheme}
           onSelectTheme={setSelectedTheme}
           onComplete={() => {
@@ -504,6 +556,30 @@ export function App() {
           }
           t={t}
         />
+      )}
+
+      {pendingDelete && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-theme-title"
+          >
+            <span className="confirm-dialog__icon"><Trash2 size={18} /></span>
+            <h2 id="delete-theme-title">{t("deleteThemeTitle")}</h2>
+            <p>{t("deleteThemeBody")}</p>
+            <strong>{pendingDelete.locales[locale]?.name ?? pendingDelete.metadata.name}</strong>
+            <div className="button-row">
+              <button className="secondary-button" onClick={() => setPendingDelete(null)}>
+                {t("cancel")}
+              </button>
+              <button className="danger-button" onClick={handleDeleteTheme}>
+                <Trash2 size={14} />{t("deleteTheme")}
+              </button>
+            </div>
+          </section>
+        </div>
       )}
 
       {toast && (
@@ -656,7 +732,12 @@ function ThemeRow({
     : undefined;
   return (
     <article className={"theme-row" + (active ? " theme-row--active" : "")}>
-      <button className="theme-row__preview" onClick={onSelect}>
+      <button
+        className="theme-row__select"
+        onClick={onSelect}
+        aria-label={`${t("selected")}: ${localized.name}`}
+      />
+      <div className="theme-row__preview" aria-hidden="true">
         <span
           style={{
             backgroundColor: theme.variants.dark.background.color,
@@ -664,7 +745,7 @@ function ThemeRow({
           }}
         />
         <small>{String(index).padStart(2, "0")}</small>
-      </button>
+      </div>
       <div className="theme-row__copy">
         <span>{theme.metadata.tags.slice(0, 3).join(" · ").toUpperCase()}</span>
         <h3>{localized.name}</h3>
@@ -985,11 +1066,13 @@ function LibraryView({
   t,
   onImport,
   onOpen,
+  onDelete,
   resolveAsset,
 }: SharedViewProps & {
   themes: ThemeDefinition[];
   onImport: () => void;
   onOpen: (theme: ThemeDefinition) => void;
+  onDelete: (theme: ThemeDefinition) => void;
 }) {
   return (
     <div className="page library-page">
@@ -1022,11 +1105,15 @@ function LibraryView({
               ? resolveAsset(theme, theme.metadata.preview)
               : undefined;
             return (
-              <button
+              <article
                 key={theme.id}
                 className="library-theme"
-                onClick={() => onOpen(theme)}
               >
+                <button
+                  className="library-theme__open"
+                  onClick={() => onOpen(theme)}
+                  aria-label={`${t("customize")}: ${localized.name}`}
+                />
                 <span
                   className="library-theme__visual"
                   style={{
@@ -1039,8 +1126,16 @@ function LibraryView({
                   <strong>{localized.name}</strong>
                   <span>{localized.description}</span>
                 </span>
-                <ChevronRight size={16} />
-              </button>
+                <button
+                  className="library-theme__delete"
+                  onClick={() => onDelete(theme)}
+                  aria-label={`${t("deleteTheme")}: ${localized.name}`}
+                  title={t("deleteTheme")}
+                >
+                  <Trash2 size={15} />
+                </button>
+                <ChevronRight className="library-theme__chevron" size={16} />
+              </article>
             );
           })}
         </div>
@@ -1075,14 +1170,19 @@ function SettingsView({
             <Languages size={17} />
             <div><h2>{t("language")}</h2><p>Interface and local theme metadata</p></div>
           </div>
-          <SegmentedControl
-            value={settings.locale}
-            options={[
-              { value: "en", label: "English" },
-              { value: "zh-CN", label: "简体中文" },
-            ]}
-            onChange={(value) => onChange({ locale: value as Locale })}
-          />
+          <label className="select-control">
+            <select
+              value={settings.locale}
+              onChange={(event) =>
+                onChange({ locale: event.target.value as LocalePreference })
+              }
+            >
+              <option value="system">{t("systemLanguage")}</option>
+              <option value="en">English</option>
+              <option value="zh-CN">简体中文</option>
+            </select>
+            <ChevronRight size={14} aria-hidden="true" />
+          </label>
         </section>
         <section className="settings-group">
           <div className="settings-group__title">
@@ -1100,6 +1200,41 @@ function SettingsView({
               onChange({ appearance: value as ManagerAppearance })
             }
           />
+        </section>
+        <section className="settings-group">
+          <div className="settings-group__title">
+            <ShieldCheck size={17} />
+            <div>
+              <h2>{t("runtimeStrategy")}</h2>
+              <p>{t("runtimeStrategyDescription")}</p>
+            </div>
+          </div>
+          <label className="select-control">
+            <select
+              value={settings.runtimeStrategy}
+              onChange={(event) =>
+                onChange({ runtimeStrategy: event.target.value as RuntimeStrategy })
+              }
+            >
+              <option value="auto">{t("automaticMode")}</option>
+              <option value="compatibility">{t("compatibilityMode")}</option>
+              <option value="developer">{t("developerMode")}</option>
+            </select>
+            <ChevronRight size={14} aria-hidden="true" />
+          </label>
+          <p
+            className={
+              settings.runtimeStrategy === "developer"
+                ? "settings-mode-note settings-mode-note--warning"
+                : "settings-mode-note"
+            }
+          >
+            {settings.runtimeStrategy === "auto"
+              ? t("automaticModeDescription")
+              : settings.runtimeStrategy === "compatibility"
+                ? t("compatibilityModeDescription")
+                : t("developerModeDescription")}
+          </p>
         </section>
         <SettingToggle
           icon={<Sparkles size={17} />}

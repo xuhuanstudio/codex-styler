@@ -19,8 +19,8 @@ const english = new URL(base + path, Astro.site);
 const chinese = new URL(base + "/zh-cn" + path, Astro.site);
 const socialImage = new URL(base + image, Astro.site);
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.1.0-alpha.1";
-const releaseAsset = "Codex-Styler_0.1.0-alpha.1_aarch64-unsigned.dmg";
+const releaseTag = "v0.1.0-alpha.2";
+const releaseAsset = "Codex-Styler_0.1.0-alpha.2_aarch64-unsigned.dmg";
 const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
 const isChinese = locale === "zh-CN";
 const structuredData = {
@@ -29,7 +29,7 @@ const structuredData = {
   name: "Codex Styler",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS 13 or later",
-  softwareVersion: "0.1.0-alpha.1",
+  softwareVersion: "0.1.0-alpha.2",
   description,
   url: canonical.toString(),
   downloadUrl,
@@ -49,8 +49,9 @@ const structuredData = {
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <meta name="description" content={description} />
-    <meta name="theme-color" content="#172019" />
-    <link rel="icon" type="image/png" href={base + "/media/codex-styler-icon.png"} />
+    <meta name="theme-color" content="#111216" />
+    <link rel="icon" type="image/png" media="(prefers-color-scheme: dark)" href={base + "/media/codex-styler-logo-dark.png"} />
+    <link rel="icon" type="image/png" media="(prefers-color-scheme: light)" href={base + "/media/codex-styler-logo-light.png"} />
     <meta name="robots" content="index,follow,max-image-preview:large" />
     <link rel="canonical" href={canonical} />
     <link rel="alternate" hreflang="en" href={english} />
@@ -73,7 +74,10 @@ const structuredData = {
   <body>
     <header class="site-header">
       <a class="site-brand" href={base + (isChinese ? "/zh-cn/" : "/")}>
-        <img src={base + "/media/codex-styler-icon.png"} alt="" width="34" height="34" />
+        <picture>
+          <source media="(prefers-color-scheme: dark)" srcset={base + "/media/codex-styler-logo-dark.png"} />
+          <img src={base + "/media/codex-styler-logo-light.png"} alt="" width="34" height="34" />
+        </picture>
         <span><strong>Codex Styler</strong><small>{isChinese ? "非官方开源项目" : "UNOFFICIAL OPEN SOURCE"}</small></span>
       </a>
       <nav aria-label={isChinese ? "主要导航" : "Primary navigation"}>

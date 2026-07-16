@@ -84,8 +84,10 @@ export function PreviewWorkspace({
   }
 
   const isChinese = locale === "zh-CN";
-  const frameX = direction % 8;
-  const frameY = Math.floor(direction / 8);
+  const columns = entity?.renderer.type === "sprite-atlas" ? entity.renderer.columns : 1;
+  const rows = entity?.renderer.type === "sprite-atlas" ? entity.renderer.rows : 1;
+  const frameX = direction % columns;
+  const frameY = Math.floor(direction / columns);
   const entityStyle = entity
     ? ({
         "--entity-image": entityImage ? "url(" + entityImage + ")" : "none",
@@ -99,8 +101,9 @@ export function PreviewWorkspace({
               "px"
             : entity.size + "px",
         "--entity-opacity": entity.opacity,
-        "--entity-frame-x": frameX,
-        "--entity-frame-y": frameY,
+        "--entity-background-size": `${columns * 100}% ${rows * 100}%`,
+        "--entity-background-x": `${columns > 1 ? (frameX / (columns - 1)) * 100 : 0}%`,
+        "--entity-background-y": `${rows > 1 ? (frameY / (rows - 1)) * 100 : 0}%`,
       } as CSSProperties)
     : undefined;
 
@@ -221,14 +224,17 @@ export function PreviewWorkspace({
             style={entityStyle}
             aria-label={entity.name}
           >
-            <div className="scene-entity__sprite" />
-            <div className="scene-entity__fallback">
-              <span className="scene-gecko__tail" />
-              <span className="scene-gecko__body">
-                <i />
-                <i />
-              </span>
-            </div>
+            {entityImage ? (
+              <div className="scene-entity__sprite" />
+            ) : (
+              <div className="scene-entity__fallback">
+                <span className="scene-gecko__tail" />
+                <span className="scene-gecko__body">
+                  <i />
+                  <i />
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { ThemeDefinition } from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
+import type { RuntimeStrategy } from "./storage";
 
 export interface CodexDetection {
   installed: boolean;
@@ -69,6 +70,7 @@ export async function launchCodex(): Promise<RuntimeStatus> {
 export async function applyTheme(
   theme: ThemeDefinition,
   variant: "light" | "dark",
+  runtimeStrategy: RuntimeStrategy,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
 ): Promise<RuntimeStatus> {
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
@@ -82,7 +84,11 @@ export async function applyTheme(
       message: "Theme applied in preview mode",
     };
   }
-  return invoke<RuntimeStatus>("apply_theme", { theme: payload, variant });
+  return invoke<RuntimeStatus>("apply_theme", {
+    theme: payload,
+    variant,
+    compatibilityMode: runtimeStrategy,
+  });
 }
 
 export async function pauseTheme(): Promise<RuntimeStatus> {

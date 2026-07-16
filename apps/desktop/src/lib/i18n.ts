@@ -1,4 +1,5 @@
 export type Locale = "en" | "zh-CN";
+export type LocalePreference = "system" | Locale;
 
 const messages = {
   en: {
@@ -29,7 +30,19 @@ const messages = {
     quitToContinue: "Quit Codex manually, then check again. Your work stays under your control.",
     checkAgain: "Check again",
     checking: "Checking…",
-    unknownCompatibility: "Safe mode",
+    unknownCompatibility: "Compatibility not verified",
+    compatible: "Semantic adapter ready",
+    runtimeStrategy: "Runtime compatibility",
+    runtimeStrategyDescription: "Controls how Styler adapts to the installed Codex interface.",
+    automaticMode: "Automatic (Recommended)",
+    automaticModeDescription:
+      "Tests the current Codex interface at runtime. If semantic styling cannot be verified, Styler automatically falls back without blocking the theme.",
+    compatibilityMode: "Compatibility mode",
+    compatibilityModeDescription:
+      "Uses isolated background and companion layers without changing Codex interface surfaces. Best for troubleshooting.",
+    developerMode: "Developer mode",
+    developerModeDescription:
+      "Forces semantic styling even when verification fails. The layout may be affected after a Codex update; Restore official remains available.",
     trustedRuntime: "Loopback-only runtime",
     appearance: "Appearance",
     background: "Background",
@@ -53,6 +66,7 @@ const messages = {
     duplicate: "Duplicate to library",
     localOnly: "Stored locally on this device",
     language: "Language",
+    systemLanguage: "Follow system language",
     managerAppearance: "Manager appearance",
     reduceMotion: "Reduce motion",
     updateChecks: "Check GitHub Releases manually",
@@ -61,7 +75,7 @@ const messages = {
       "No account, telemetry, cloud sync, remote theme code, or background network requests.",
     compatibilityTitle: "Compatibility policy",
     compatibilityBody:
-      "Unknown Codex versions start in safe mode. Full semantic styling is always an explicit choice.",
+      "Automatic mode verifies the live Codex interface and falls back only when the semantic adapter cannot be confirmed.",
     firstRunTitle: "Make Codex feel like your workspace.",
     firstRunBody:
       "Codex Styler uses a temporary loopback debugging session. It never edits the Codex app bundle or its signature.",
@@ -81,7 +95,12 @@ const messages = {
     invalidTheme: "This theme package did not pass validation.",
     exportReady: "Theme package exported",
     openOnboarding: "Open safety guide",
-    version: "Alpha 0.1",
+    deleteTheme: "Delete theme",
+    deleteThemeTitle: "Delete this local theme?",
+    deleteThemeBody: "The local theme package and its assets will be removed from this device.",
+    cancel: "Cancel",
+    themeDeleted: "Theme deleted",
+    version: "Alpha 0.2",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -110,7 +129,19 @@ const messages = {
     quitToContinue: "请先手动退出 Codex，然后重新检查；是否中断当前工作始终由你决定。",
     checkAgain: "重新检查",
     checking: "正在检查…",
-    unknownCompatibility: "安全模式",
+    unknownCompatibility: "兼容性尚未验证",
+    compatible: "语义适配器就绪",
+    runtimeStrategy: "运行时兼容策略",
+    runtimeStrategyDescription: "控制 Styler 如何适配当前安装的 Codex 界面。",
+    automaticMode: "自动（推荐）",
+    automaticModeDescription:
+      "运行时检测当前 Codex 界面；如果无法验证语义样式，会自动回退，但不会阻止主题应用。",
+    compatibilityMode: "兼容模式",
+    compatibilityModeDescription:
+      "只使用隔离的背景与互动伙伴层，不覆盖 Codex 界面表面，适合故障排查。",
+    developerMode: "开发者模式",
+    developerModeDescription:
+      "即使验证失败也强制应用语义样式。Codex 更新后可能影响布局，但仍可随时恢复官方界面。",
     trustedRuntime: "仅本机回环连接",
     appearance: "外观",
     background: "背景",
@@ -134,13 +165,14 @@ const messages = {
     duplicate: "复制到主题库",
     localOnly: "仅保存在这台设备",
     language: "语言",
+    systemLanguage: "跟随系统语言",
     managerAppearance: "管理器外观",
     reduceMotion: "减少动态",
     updateChecks: "手动检查 GitHub Releases",
     privacyTitle: "从设计上保护隐私",
     privacyBody: "无账号、无遥测、无云同步、无远程主题代码，也不在后台联网。",
     compatibilityTitle: "兼容性策略",
-    compatibilityBody: "未知 Codex 版本默认进入安全模式，完整语义样式始终需要明确开启。",
+    compatibilityBody: "自动模式会验证实时 Codex 界面，仅在无法确认语义适配器时回退。",
     firstRunTitle: "让 Codex 真正成为你的工作空间。",
     firstRunBody:
       "Codex Styler 使用临时的本机回环调试会话，绝不修改 Codex 应用包或其签名。",
@@ -160,7 +192,12 @@ const messages = {
     invalidTheme: "主题包未通过安全校验。",
     exportReady: "主题包已导出",
     openOnboarding: "查看安全说明",
-    version: "Alpha 0.1",
+    deleteTheme: "删除主题",
+    deleteThemeTitle: "删除这个本地主题？",
+    deleteThemeBody: "此主题包及其素材将从这台设备中移除。",
+    cancel: "取消",
+    themeDeleted: "主题已删除",
+    version: "Alpha 0.2",
   },
 } as const;
 
@@ -171,6 +208,10 @@ export function detectLocale(): Locale {
     return "zh-CN";
   }
   return "en";
+}
+
+export function resolveLocale(preference: LocalePreference): Locale {
+  return preference === "system" ? detectLocale() : preference;
 }
 
 export function translate(locale: Locale, key: MessageKey): string {

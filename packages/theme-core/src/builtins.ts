@@ -54,7 +54,10 @@ export const nativeRefined: ThemeDefinition = {
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
-    codex: { mode: "safe", testedVersions: [] },
+    codex: {
+      mode: "semantic",
+      testedVersions: ["26.707.72221", "26.707.91948"],
+    },
   },
   variants: {
     light: variant(
@@ -126,7 +129,10 @@ export const nocturneStudio: ThemeDefinition = {
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
-    codex: { mode: "semantic", testedVersions: [] },
+    codex: {
+      mode: "semantic",
+      testedVersions: ["26.707.72221", "26.707.91948"],
+    },
   },
   variants: {
     light: variant(
@@ -223,7 +229,10 @@ export const quietGarden: ThemeDefinition = {
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
-    codex: { mode: "safe", testedVersions: [] },
+    codex: {
+      mode: "semantic",
+      testedVersions: ["26.707.72221", "26.707.91948"],
+    },
   },
   variants: {
     light: {
@@ -295,16 +304,16 @@ export const quietGarden: ThemeDefinition = {
         name: "Moss",
         renderer: {
           type: "sprite-atlas",
-          asset: "assets/moss-gecko-atlas.webp",
-          columns: 8,
+          asset: "assets/moss-gecko-atlas-v2.png",
+          columns: 4,
           rows: 2,
-          frameWidth: 221,
+          frameWidth: 443,
           frameHeight: 443,
-          directions: 16,
+          directions: 8,
         },
         behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
-        anchor: { x: 84, y: 66 },
-        size: 112,
+        anchor: { x: 84, y: 70 },
+        size: 136,
         opacity: 0.96,
       },
     ],
@@ -318,7 +327,7 @@ export const quietGarden: ThemeDefinition = {
     },
     {
       id: "moss-gecko-atlas",
-      path: "assets/moss-gecko-atlas.webp",
+      path: "assets/moss-gecko-atlas-v2.png",
       type: "sprite-atlas",
       license: "CC-BY-4.0",
     },

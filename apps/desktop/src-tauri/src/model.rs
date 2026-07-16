@@ -10,7 +10,7 @@ pub struct CodexDetection {
     pub platform: String,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum RuntimeState {
     #[default]
@@ -22,7 +22,7 @@ pub enum RuntimeState {
     Error,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Default)]
+#[derive(Debug, Clone, Copy, Serialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 #[allow(dead_code)]
 pub enum Compatibility {
