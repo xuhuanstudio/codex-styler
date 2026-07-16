@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, isAbsolute, resolve } from "node:path";
 import { importThemePackage, validateTheme } from "./index";
 
 async function main(): Promise<void> {
@@ -10,7 +10,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  const bytes = await readFile(input);
+  const invocationDirectory = process.env.INIT_CWD ?? process.cwd();
+  const inputPath = isAbsolute(input) ? input : resolve(invocationDirectory, input);
+  const bytes = await readFile(inputPath);
   if (input.endsWith(".codex-styler-theme")) {
     const result = await importThemePackage(bytes);
     console.log("Valid theme package: " + result.theme.metadata.name);
@@ -32,4 +34,3 @@ main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 });
-
