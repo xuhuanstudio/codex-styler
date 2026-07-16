@@ -1,0 +1,31 @@
+{
+  "name": "codex-styler",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Unofficial, open-source theme and interactive scene editor for OpenAI Codex Desktop.",
+  "license": "Apache-2.0",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=11"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @codex-styler/desktop dev",
+    "dev:site": "pnpm --filter @codex-styler/site dev",
+    "tauri": "pnpm --filter @codex-styler/desktop tauri",
+    "build": "pnpm -r build",
+    "build:desktop": "pnpm --filter @codex-styler/desktop build",
+    "build:site": "pnpm --filter @codex-styler/site build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check:links": "node scripts/check-site-links.mjs",
+    "check:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",
+    "theme:validate": "pnpm --filter @codex-styler/theme-core theme:validate"
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^6.0.3"
+  }
+}

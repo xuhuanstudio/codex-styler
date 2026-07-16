@@ -1,0 +1,47 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { docs } from "../../data/docs";
+
+export function getStaticPaths() {
+  return docs.map((doc) => ({ params: { slug: doc.slug }, props: { doc } }));
+}
+
+const { doc } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout
+  title={doc.title.en + " — Codex Styler"}
+  description={doc.description.en}
+  locale="en"
+  path={"/docs/" + doc.slug + "/"}
+>
+  <main class="doc-shell">
+    <aside class="doc-nav">
+      <span>DOCUMENTATION</span>
+      {docs.map((item) => (
+        <a class={item.slug === doc.slug ? "active" : ""} href={base + "/docs/" + item.slug + "/"}>
+          {item.title.en}
+        </a>
+      ))}
+    </aside>
+    <article class="doc-content">
+      <span class="eyebrow">{doc.eyebrow.en}</span>
+      <h1>{doc.title.en}</h1>
+      <p class="doc-lead">{doc.description.en}</p>
+      {doc.body.en.map((section, index) => (
+        <section>
+          <span class="doc-index">{String(index + 1).padStart(2, "0")}</span>
+          <h2>{section.heading}</h2>
+          {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+        </section>
+      ))}
+      <div class="doc-next">
+        <span>OPEN SOURCE</span>
+        <strong>Inspect the implementation, not just the promise.</strong>
+        <a href="https://github.com/xuhuanstudio/codex-styler">View the GitHub repository →</a>
+      </div>
+    </article>
+  </main>
+</BaseLayout>
+

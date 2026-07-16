@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xuhuanstudio.github.io/codex-styler/sitemap-index.xml
+

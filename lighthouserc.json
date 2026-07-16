@@ -1,0 +1,28 @@
+{
+  "ci": {
+    "collect": {
+      "startServerCommand": "node scripts/serve-site.mjs",
+      "startServerReadyPattern": "Codex Styler site ready",
+      "url": [
+        "http://127.0.0.1:4174/codex-styler/",
+        "http://127.0.0.1:4174/codex-styler/themes/",
+        "http://127.0.0.1:4174/codex-styler/docs/getting-started/"
+      ],
+      "numberOfRuns": 1,
+      "settings": {
+        "chromeFlags": "--headless --no-sandbox --disable-gpu"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:accessibility": ["error", { "minScore": 0.95 }],
+        "categories:seo": ["error", { "minScore": 0.95 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }]
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": "./output/lighthouse"
+    }
+  }
+}

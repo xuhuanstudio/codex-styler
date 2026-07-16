@@ -1,0 +1,18 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout
+  title="Page not found — Codex Styler"
+  description="The requested Codex Styler page could not be found."
+  locale="en"
+  path="/404/"
+>
+  <main class="not-found">
+    <span>404 / OFF CANVAS</span>
+    <h1>This scene does not exist.</h1>
+    <p>The page may have moved, but your official Codex interface is still exactly where you left it.</p>
+    <a class="button button-primary" href={import.meta.env.BASE_URL}>Return home →</a>
+  </main>
+</BaseLayout>
+

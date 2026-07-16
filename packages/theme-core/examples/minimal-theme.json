@@ -1,0 +1,77 @@
+{
+  "format": "codex-styler-theme-v1",
+  "id": "example.minimal",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Minimal Example",
+    "description": "A data-only theme with no external assets.",
+    "author": "Theme author",
+    "license": "CC-BY-4.0",
+    "tags": ["minimal", "example"]
+  },
+  "compatibility": {
+    "styler": { "minimumVersion": "0.1.0" },
+    "codex": { "mode": "safe", "testedVersions": [] }
+  },
+  "variants": {
+    "light": {
+      "background": {
+        "color": "#E9E7E1",
+        "position": { "x": 50, "y": 50 },
+        "brightness": 1,
+        "blur": 0,
+        "overlay": "#E9E7E1",
+        "overlayOpacity": 0
+      },
+      "appearance": {
+        "accent": "#446F63",
+        "surface": "#F7F5EF",
+        "surfaceOpacity": 0.9,
+        "text": "#20201E",
+        "mutedText": "#6E6C66",
+        "border": "#C9C5BA",
+        "radius": 14,
+        "focusOpacity": 0.84,
+        "focusBlur": 12
+      },
+      "motion": { "intensity": 0, "parallax": 0, "targetFps": 30 }
+    },
+    "dark": {
+      "background": {
+        "color": "#151716",
+        "position": { "x": 50, "y": 50 },
+        "brightness": 1,
+        "blur": 0,
+        "overlay": "#0C0E0D",
+        "overlayOpacity": 0.18
+      },
+      "appearance": {
+        "accent": "#8DC9B3",
+        "surface": "#202321",
+        "surfaceOpacity": 0.9,
+        "text": "#F1EEE6",
+        "mutedText": "#A7AAA5",
+        "border": "#3A3E3B",
+        "radius": 14,
+        "focusOpacity": 0.84,
+        "focusBlur": 12
+      },
+      "motion": { "intensity": 0, "parallax": 0, "targetFps": 30 }
+    }
+  },
+  "scene": {
+    "layers": [],
+    "entities": []
+  },
+  "assets": [],
+  "locales": {
+    "en": {
+      "name": "Minimal Example",
+      "description": "A safe starting point for a custom theme."
+    },
+    "zh-CN": {
+      "name": "极简示例",
+      "description": "用于创建自定义主题的安全起点。"
+    }
+  }
+}

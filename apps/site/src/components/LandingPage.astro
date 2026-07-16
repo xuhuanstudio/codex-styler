@@ -1,0 +1,136 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import type { SiteLocale } from "../data/docs";
+
+const { locale } = Astro.props as { locale: SiteLocale };
+const zh = locale === "zh-CN";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const docsBase = base + (zh ? "/zh-cn/docs/" : "/docs/");
+const repo = "https://github.com/xuhuanstudio/codex-styler";
+const copy = zh
+  ? {
+      title: "Codex Styler — OpenAI Codex Desktop 主题与互动场景",
+      description:
+        "安全、可逆、设计品质优先的 OpenAI Codex Desktop 主题与 2D 互动场景编辑器。",
+      eyebrow: "为 OPENAI CODEX DESKTOP 打造 · 非官方",
+      headline: "让工作空间拥有自己的气候。",
+      lead: "自定义图片背景、克制的界面材质和会回应光标的 2D 伙伴；不修改应用包，并可一键恢复官方界面。",
+      source: "查看源码",
+      start: "阅读快速开始",
+      trust: "本地优先 · 无账号 · 无遥测 · 不修改 app.asar",
+    }
+  : {
+      title: "Codex Styler — Themes & Interactive Scenes for OpenAI Codex Desktop",
+      description:
+        "A safe, reversible, design-first theme and 2D interactive scene editor for OpenAI Codex Desktop.",
+      eyebrow: "FOR OPENAI CODEX DESKTOP · UNOFFICIAL",
+      headline: "Give your workspace its own climate.",
+      lead: "Shape image backgrounds, restrained interface materials, and a 2D companion that notices your pointer—without patching the app bundle.",
+      source: "View source",
+      start: "Read the quickstart",
+      trust: "Local-first · No account · No telemetry · No app.asar changes",
+    };
+---
+
+<BaseLayout
+  title={copy.title}
+  description={copy.description}
+  locale={locale}
+  path="/"
+  image="/media/quiet-garden.webp"
+>
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <span class="eyebrow"><i></i>{copy.eyebrow}</span>
+        <h1>{copy.headline}</h1>
+        <p>{copy.lead}</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href={repo}>{copy.source}<span>↗</span></a>
+          <a class="button button-secondary" href={docsBase + "getting-started/"}>{copy.start}<span>→</span></a>
+        </div>
+        <div class="trust-line"><span></span>{copy.trust}</div>
+      </div>
+      <div class="hero-visual" aria-label={zh ? "Codex Styler 界面预览" : "Codex Styler interface preview"}>
+        <div class="hero-orbit"></div>
+        <div class="app-frame">
+          <div class="app-frame-bar"><i></i><i></i><i></i><span>Codex Styler / Quiet Garden</span></div>
+          <div class="app-frame-body">
+            <aside>
+              <strong>Codex Styler</strong>
+              <span class="active">{zh ? "主题" : "Themes"}</span>
+              <span>{zh ? "创作" : "Create"}</span>
+              <span>{zh ? "我的主题" : "My Themes"}</span>
+              <span>{zh ? "设置" : "Settings"}</span>
+            </aside>
+            <div class="app-frame-preview">
+              <img src={base + "/media/quiet-garden.webp"} alt="" />
+              <div class="mock-panel mock-panel-a"></div>
+              <div class="mock-panel mock-panel-b"></div>
+              <div class="mock-composer"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="proof-strip">
+      <span>{zh ? "临时本机回环会话" : "TEMPORARY LOOPBACK SESSION"}</span>
+      <span>{zh ? "纯数据主题包" : "DATA-ONLY THEME PACKAGES"}</span>
+      <span>{zh ? "一键恢复" : "ONE-CLICK RESTORE"}</span>
+      <span>MACOS + WINDOWS</span>
+    </section>
+
+    <section class="statement">
+      <span class="section-number">01 / POSITION</span>
+      <h2>{zh ? "不是另一套颜色选择器。" : "Not another color picker."}</h2>
+      <p>
+        {zh
+          ? "官方能力负责基础外观，Codex Styler 专注于它尚未覆盖的部分：有深度的图片场景、可读的材质系统和可替换的互动实体。"
+          : "Official controls own the basics. Codex Styler focuses on the missing layer: image-led scenes with depth, readable materials, and replaceable interactive entities."}
+      </p>
+    </section>
+
+    <section class="theme-showcase" id="themes">
+      <div class="section-heading">
+        <span class="section-number">02 / THEMES</span>
+        <h2>{zh ? "三个主题，证明一个通用框架。" : "Three themes. One open system."}</h2>
+      </div>
+      <article class="theme-feature theme-feature-native">
+        <div class="theme-copy"><span>01</span><h3>Native Refined</h3><p>{zh ? "把原生工作区重新校准得更安静、更清晰。" : "A quieter, more deliberate calibration of the native workspace."}</p></div>
+        <div class="native-canvas"><i></i><i></i><i></i></div>
+      </article>
+      <article class="theme-feature">
+        <img src={base + "/media/nocturne-studio.webp"} alt={zh ? "夜曲工作室主题背景" : "Nocturne Studio theme background"} />
+        <div class="theme-copy"><span>02</span><h3>Nocturne Studio</h3><p>{zh ? "墨色空间、克制玻璃与一线琥珀光。" : "Ink-dark space, quiet glass, and one controlled amber horizon."}</p></div>
+      </article>
+      <article class="theme-feature">
+        <img src={base + "/media/quiet-garden.webp"} alt={zh ? "静谧花园主题背景" : "Quiet Garden theme background"} />
+        <div class="theme-copy"><span>03</span><h3>Quiet Garden Companion</h3><p>{zh ? "绿色场景与会注视光标方向的小壁虎 Moss。" : "A living green scene watched by Moss, a pointer-aware gecko."}</p></div>
+      </article>
+    </section>
+
+    <section class="architecture">
+      <div class="section-heading">
+        <span class="section-number">03 / SYSTEM</span>
+        <h2>{zh ? "风格可以变化，安全边界保持不变。" : "Styles change. The safety boundary does not."}</h2>
+      </div>
+      <div class="architecture-grid">
+        <article><span>01</span><h3>{zh ? "可视化创作" : "Guided creation"}</h3><p>{zh ? "调整背景、表面、光影、动态和互动伙伴，无需编写 CSS。" : "Tune background, surfaces, light, motion, and a companion without authoring CSS."}</p></article>
+        <article><span>02</span><h3>{zh ? "声明式场景" : "Declarative scenes"}</h3><p>{zh ? "图层、实体、渲染器和行为都是可验证数据。" : "Layers, entities, renderers, and behaviors remain inspectable data."}</p></article>
+        <article><span>03</span><h3>{zh ? "可逆运行时" : "Reversible runtime"}</h3><p>{zh ? "隔离注入、幂等应用和明确恢复，不碰应用签名。" : "Isolated injection, idempotent apply, and explicit restore—without touching signatures."}</p></article>
+      </div>
+    </section>
+
+    <section class="docs-callout">
+      <span class="section-number">04 / BUILD WITH IT</span>
+      <h2>{zh ? "从一个主题开始，扩展成自己的场景语言。" : "Start with a theme. Extend the scene language."}</h2>
+      <div class="docs-links">
+        <a href={docsBase + "create-theme/"}><span>theme.json</span>{zh ? "创建主题" : "Create a theme"}<b>→</b></a>
+        <a href={docsBase + "interactive-scenes/"}><span>scene.entities[]</span>{zh ? "互动场景" : "Interactive scenes"}<b>→</b></a>
+        <a href={docsBase + "safety-and-restore/"}><span>127.0.0.1</span>{zh ? "安全与恢复" : "Safety & restore"}<b>→</b></a>
+      </div>
+    </section>
+  </main>
+</BaseLayout>
+

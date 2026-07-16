@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  esbuild: true
+
+sharedWorkspaceLockfile: true
+strictPeerDependencies: false

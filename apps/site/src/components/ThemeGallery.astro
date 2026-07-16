@@ -1,0 +1,86 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import type { SiteLocale } from "../data/docs";
+
+const { locale } = Astro.props as { locale: SiteLocale };
+const zh = locale === "zh-CN";
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const repo = "https://github.com/xuhuanstudio/codex-styler";
+const themes = [
+  {
+    number: "01",
+    name: "Native Refined",
+    image: null,
+    tags: zh ? "低干扰 · 明暗双版本 · 安全模式" : "LOW-DISTRACTION · LIGHT/DARK · SAFE MODE",
+    description: zh
+      ? "保留 Codex 原生秩序，重新校准表面对比、边界和阅读节奏。"
+      : "Preserves the native order while recalibrating surface contrast, boundaries, and reading rhythm.",
+  },
+  {
+    number: "02",
+    name: "Nocturne Studio",
+    image: "/media/nocturne-studio.webp",
+    tags: zh ? "电影感 · 图片背景 · 轻微视差" : "CINEMATIC · IMAGE SCENE · PARALLAX",
+    description: zh
+      ? "以墨色建筑、烟熏表面与克制的琥珀光构成深夜工作空间。"
+      : "An after-dark workspace built from ink architecture, smoked surfaces, and restrained amber light.",
+  },
+  {
+    number: "03",
+    name: "Quiet Garden Companion",
+    image: "/media/quiet-garden.webp",
+    tags: zh ? "自然 · 16 方向实体 · 减少动态" : "NATURE · 16-DIRECTION ENTITY · REDUCED MOTION",
+    description: zh
+      ? "有自然景深的绿色场景，以及会根据光标方向转头的原创壁虎 Moss。"
+      : "A green scene with natural depth and Moss, an original gecko that turns toward the pointer.",
+  },
+];
+---
+
+<BaseLayout
+  title={zh ? "主题画廊 — Codex Styler" : "Codex Desktop Theme Gallery — Codex Styler"}
+  description={zh
+    ? "浏览 Codex Styler 的原创 OpenAI Codex Desktop 主题：原生精修、夜曲工作室和带 2D 互动壁虎的静谧花园。"
+    : "Explore original Codex Desktop themes from Codex Styler: Native Refined, Nocturne Studio, and Quiet Garden with a 2D interactive gecko."}
+  locale={locale}
+  path="/themes/"
+  image="/media/nocturne-studio.webp"
+>
+  <main class="gallery-page">
+    <header class="gallery-hero">
+      <span class="eyebrow"><i></i>{zh ? "原创主题 · 可替换场景系统" : "ORIGINAL THEMES · REPLACEABLE SCENE SYSTEM"}</span>
+      <h1>{zh ? "三种气候，同一套开放语法。" : "Three climates. One open grammar."}</h1>
+      <p>{zh
+        ? "这些不是写死的皮肤，而是用相同的背景、表面、图层、实体、渲染器和行为模型构成的三个证明。"
+        : "These are not hard-coded skins. They are three proofs built from the same background, surface, layer, entity, renderer, and behavior model."}</p>
+    </header>
+
+    <section class="gallery-list">
+      {themes.map((theme) => (
+        <article class:list={["gallery-item", !theme.image && "gallery-item--native"]}>
+          <div class="gallery-item__visual">
+            {theme.image ? (
+              <img src={base + theme.image} alt={theme.name + (zh ? " 主题背景" : " theme background")} />
+            ) : (
+              <div class="gallery-native-preview"><i></i><i></i><i></i><b></b></div>
+            )}
+            <span>{theme.number}</span>
+          </div>
+          <div class="gallery-item__copy">
+            <small>{theme.tags}</small>
+            <h2>{theme.name}</h2>
+            <p>{theme.description}</p>
+          </div>
+        </article>
+      ))}
+    </section>
+
+    <section class="gallery-cta">
+      <div>
+        <span>theme.json / codex-styler-theme-v1</span>
+        <h2>{zh ? "把你的风格做成可验证、可分享的数据。" : "Turn your visual language into validated, shareable data."}</h2>
+      </div>
+      <a class="button button-primary" href={repo + "/blob/main/docs/theme-format.md"}>{zh ? "阅读主题协议" : "Read the theme format"}<span>↗</span></a>
+    </section>
+  </main>
+</BaseLayout>

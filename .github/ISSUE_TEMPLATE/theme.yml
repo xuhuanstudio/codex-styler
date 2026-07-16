@@ -1,0 +1,36 @@
+name: Theme or scene proposal
+description: Propose an original, reusable visual direction
+title: "theme: "
+labels: ["theme", "needs-triage"]
+body:
+  - type: input
+    id: concept
+    attributes:
+      label: Concept name
+    validations:
+      required: true
+  - type: textarea
+    id: direction
+    attributes:
+      label: Visual direction
+      description: Describe mood, palette, material, contrast, and intended working context.
+    validations:
+      required: true
+  - type: textarea
+    id: interaction
+    attributes:
+      label: Interaction and reduced-motion fallback
+  - type: textarea
+    id: assets
+    attributes:
+      label: Asset provenance
+      description: State whether assets are original and which license can be granted.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rights
+    attributes:
+      label: Rights
+      options:
+        - label: I have the right to contribute every referenced asset under the stated license.
+          required: true

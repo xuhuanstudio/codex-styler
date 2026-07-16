@@ -1,0 +1,94 @@
+---
+import "../styles/global.css";
+import type { SiteLocale } from "../data/docs";
+
+interface Props {
+  title: string;
+  description: string;
+  locale: SiteLocale;
+  path: string;
+  image?: string;
+}
+
+const { title, description, locale, path, image = "/media/quiet-garden.webp" } =
+  Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const localizedPath = locale === "zh-CN" ? "/zh-cn" + path : path;
+const canonical = new URL(base + localizedPath, Astro.site);
+const english = new URL(base + path, Astro.site);
+const chinese = new URL(base + "/zh-cn" + path, Astro.site);
+const socialImage = new URL(base + image, Astro.site);
+const repo = "https://github.com/xuhuanstudio/codex-styler";
+const isChinese = locale === "zh-CN";
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Codex Styler",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Windows",
+  softwareVersion: "0.1.0-alpha.1",
+  description,
+  url: canonical.toString(),
+  downloadUrl: repo + "/releases",
+  codeRepository: repo,
+  license: repo + "/blob/main/LICENSE",
+  isAccessibleForFree: true,
+};
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#172019" />
+    <link rel="icon" type="image/png" href={base + "/media/codex-styler-icon.png"} />
+    <meta name="robots" content="index,follow,max-image-preview:large" />
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="en" href={english} />
+    <link rel="alternate" hreflang="zh-CN" href={chinese} />
+    <link rel="alternate" hreflang="x-default" href={english} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Codex Styler" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:locale" content={isChinese ? "zh_CN" : "en_US"} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="site-brand" href={base + (isChinese ? "/zh-cn/" : "/")}>
+        <img src={base + "/media/codex-styler-icon.png"} alt="" width="34" height="34" />
+        <span><strong>Codex Styler</strong><small>{isChinese ? "非官方开源项目" : "UNOFFICIAL OPEN SOURCE"}</small></span>
+      </a>
+      <nav aria-label={isChinese ? "主要导航" : "Primary navigation"}>
+        <a href={base + (isChinese ? "/zh-cn/themes/" : "/themes/")}>{isChinese ? "主题" : "Themes"}</a>
+        <a href={base + (isChinese ? "/zh-cn/docs/getting-started/" : "/docs/getting-started/")}>{isChinese ? "文档" : "Docs"}</a>
+        <a href={repo}>GitHub</a>
+        <a class="language-link" href={isChinese ? english : chinese}>{isChinese ? "EN" : "中文"}</a>
+      </nav>
+    </header>
+    <slot />
+    <footer class="site-footer">
+      <div>
+        <strong>Codex Styler</strong>
+        <p>{isChinese ? "为 OpenAI Codex Desktop 构建的非官方主题与互动场景编辑器。" : "An unofficial theme and interactive scene editor for OpenAI Codex Desktop."}</p>
+      </div>
+      <div class="footer-links">
+        <a href={repo + "/blob/main/SECURITY.md"}>{isChinese ? "安全" : "Security"}</a>
+        <a href={repo + "/blob/main/LICENSE"}>Apache-2.0</a>
+        <a href={repo + "/issues"}>{isChinese ? "问题" : "Issues"}</a>
+      </div>
+      <small>Not affiliated with, endorsed by, or sponsored by OpenAI.</small>
+    </footer>
+  </body>
+</html>

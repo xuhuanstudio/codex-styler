@@ -1,0 +1,26 @@
+[package]
+name = "codex-styler"
+version = "0.1.0-alpha.1"
+description = "Unofficial local-first theme and interactive scene editor for OpenAI Codex Desktop"
+authors = ["Codex Styler contributors"]
+license = "Apache-2.0"
+edition = "2024"
+rust-version = "1.88"
+
+[lib]
+name = "codex_styler_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6.3", features = [] }
+
+[dependencies]
+futures-util = "0.3.32"
+reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sysinfo = "0.39.6"
+tauri = { version = "2.11.5", features = [] }
+thiserror = "2.0"
+tokio = { version = "1.48", features = ["time", "net", "process", "sync"] }
+tokio-tungstenite = "0.30.0"

@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose an outcome grounded in a real workflow
+title: "feature: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and workflow
+      description: Who encounters this, what are they trying to do, and what happens today?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe the result, not only one proposed implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Area
+      options:
+        - Theme editor
+        - Scene runtime
+        - Import or export
+        - Compatibility and recovery
+        - Documentation
+        - Accessibility or localization
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Project boundaries
+      options:
+        - label: This can remain local-first and reversible.
+          required: true
+        - label: This does not require arbitrary theme scripts or remote assets.
+          required: true

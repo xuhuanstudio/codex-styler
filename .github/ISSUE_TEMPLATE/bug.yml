@@ -1,0 +1,53 @@
+name: Bug report
+description: Report a reproducible Codex Styler problem
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping make recovery and compatibility reliable. Remove private project paths and content from logs.
+  - type: input
+    id: styler-version
+    attributes:
+      label: Codex Styler version
+      placeholder: 0.1.0-alpha.1
+    validations:
+      required: true
+  - type: input
+    id: codex-version
+    attributes:
+      label: Codex version
+      description: Find this in Codex About or the Styler diagnostics panel.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS Apple Silicon
+        - Windows 11 x64
+        - Other / unverified
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction
+      description: Numbered steps, expected result, and actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Redacted diagnostics
+      render: shell
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety check
+      options:
+        - label: I removed project content, usernames, and local paths.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

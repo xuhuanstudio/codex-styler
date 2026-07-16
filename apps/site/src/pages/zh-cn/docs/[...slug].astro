@@ -1,0 +1,47 @@
+---
+import BaseLayout from "../../../layouts/BaseLayout.astro";
+import { docs } from "../../../data/docs";
+
+export function getStaticPaths() {
+  return docs.map((doc) => ({ params: { slug: doc.slug }, props: { doc } }));
+}
+
+const { doc } = Astro.props;
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+---
+
+<BaseLayout
+  title={doc.title["zh-CN"] + " — Codex Styler"}
+  description={doc.description["zh-CN"]}
+  locale="zh-CN"
+  path={"/docs/" + doc.slug + "/"}
+>
+  <main class="doc-shell">
+    <aside class="doc-nav">
+      <span>文档</span>
+      {docs.map((item) => (
+        <a class={item.slug === doc.slug ? "active" : ""} href={base + "/zh-cn/docs/" + item.slug + "/"}>
+          {item.title["zh-CN"]}
+        </a>
+      ))}
+    </aside>
+    <article class="doc-content">
+      <span class="eyebrow">{doc.eyebrow["zh-CN"]}</span>
+      <h1>{doc.title["zh-CN"]}</h1>
+      <p class="doc-lead">{doc.description["zh-CN"]}</p>
+      {doc.body["zh-CN"].map((section, index) => (
+        <section>
+          <span class="doc-index">{String(index + 1).padStart(2, "0")}</span>
+          <h2>{section.heading}</h2>
+          {section.paragraphs.map((paragraph) => <p>{paragraph}</p>)}
+        </section>
+      ))}
+      <div class="doc-next">
+        <span>开源项目</span>
+        <strong>检查真实实现，而不只是产品承诺。</strong>
+        <a href="https://github.com/xuhuanstudio/codex-styler">查看 GitHub 仓库 →</a>
+      </div>
+    </article>
+  </main>
+</BaseLayout>
+
