@@ -10,8 +10,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json",
-    "lint": "tsc -p tsconfig.json --noEmit",
+    "lint": "node scripts/generate-validator.mjs --check && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
+    "generate:validator": "node scripts/generate-validator.mjs",
     "theme:validate": "tsx src/cli.ts"
   },
   "dependencies": {

@@ -1,21 +1,12 @@
-import Ajv2020, { type ErrorObject } from "ajv/dist/2020.js";
-import addFormats from "ajv-formats";
-import schema from "../schema/theme.schema.json";
+import type { ErrorObject, ValidateFunction } from "ajv";
+import generatedThemeValidator from "./generated/theme-validator";
 import type {
   ThemeDefinition,
   ThemeValidationIssue,
   ThemeValidationResult,
 } from "./types";
 
-const ajv = new Ajv2020({
-  allErrors: true,
-  strict: true,
-  allowUnionTypes: true,
-});
-
-addFormats(ajv);
-
-const validateThemeSchema = ajv.compile<ThemeDefinition>(schema);
+const validateThemeSchema = generatedThemeValidator as ValidateFunction<ThemeDefinition>;
 
 function issueFromAjv(error: ErrorObject): ThemeValidationIssue {
   return {
@@ -85,4 +76,3 @@ export function assertTheme(input: unknown): asserts input is ThemeDefinition {
     );
   }
 }
-

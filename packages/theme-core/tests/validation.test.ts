@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import {
@@ -16,6 +17,14 @@ describe("built-in themes", () => {
     for (const theme of builtinThemes) {
       expect(validateTheme(theme), theme.id).toEqual({ ok: true, issues: [] });
     }
+  });
+
+  it("uses a CSP-safe precompiled schema validator", async () => {
+    const source = await readFile(
+      new URL("../src/generated/theme-validator.ts", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toMatch(/\brequire\s*\(|\bnew Function\b|\beval\s*\(/u);
   });
 });
 
