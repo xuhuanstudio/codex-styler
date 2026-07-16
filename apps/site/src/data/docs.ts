@@ -17,7 +17,8 @@ export const docs: DocPage[] = [
     },
     description: {
       en: "Install Codex Styler, connect to OpenAI Codex Desktop through a temporary loopback session, and apply your first reversible theme.",
-      "zh-CN": "安装 Codex Styler，通过临时本机回环会话连接 OpenAI Codex Desktop，并应用第一个可恢复主题。",
+      "zh-CN":
+        "安装 Codex Styler，通过临时本机回环会话连接 OpenAI Codex Desktop，并应用第一个可恢复主题。",
     },
     eyebrow: { en: "QUICKSTART / 3 MINUTES", "zh-CN": "快速开始 / 3 分钟" },
     body: {
@@ -77,7 +78,8 @@ export const docs: DocPage[] = [
     },
     description: {
       en: "Use the guided editor or the public codex-styler-theme-v1 schema to build a local, data-only Codex Desktop theme.",
-      "zh-CN": "使用引导式编辑器或公开的 codex-styler-theme-v1 协议，制作纯数据的本地 Codex Desktop 主题。",
+      "zh-CN":
+        "使用引导式编辑器或公开的 codex-styler-theme-v1 协议，制作纯数据的本地 Codex Desktop 主题。",
     },
     eyebrow: { en: "THEME FORMAT / V1", "zh-CN": "主题格式 / V1" },
     body: {
@@ -85,7 +87,7 @@ export const docs: DocPage[] = [
         {
           heading: "Start visually",
           paragraphs: [
-            "Duplicate one of the three built-in themes, then tune background focus, brightness, overlay, semantic surfaces, radius, motion, and companion size in the live preview.",
+            "Import a local image to generate four curated visual directions from its luminance, dominant color, accent, and contrast. Then refine layout, icon treatment, details, surfaces, radius, motion, and companion placement in the live preview.",
           ],
         },
         {
@@ -106,7 +108,7 @@ export const docs: DocPage[] = [
         {
           heading: "从可视化开始",
           paragraphs: [
-            "复制三套内置主题中的任意一套，在实时预览中调整背景焦点、亮度、遮罩、语义表面、圆角、动态和伙伴尺寸。",
+            "导入本地图片后，根据明暗、主色、强调色和对比度生成四套经过设计的视觉方向，再在实时预览中调整布局、图标处理、细节、表面、圆角、动态和伙伴位置。",
           ],
         },
         {
@@ -133,7 +135,8 @@ export const docs: DocPage[] = [
     },
     description: {
       en: "Learn how Codex Styler separates scene layers, entities, renderers, and pointer-aware behaviors without capturing interface clicks.",
-      "zh-CN": "了解 Codex Styler 如何拆分场景层、实体、渲染器和光标行为，同时不接管界面点击。",
+      "zh-CN":
+        "了解 Codex Styler 如何拆分场景层、实体、渲染器和光标行为，同时不接管界面点击。",
     },
     eyebrow: { en: "SCENE ENGINE / 2D", "zh-CN": "场景引擎 / 2D" },
     body: {
@@ -141,13 +144,13 @@ export const docs: DocPage[] = [
         {
           heading: "One abstraction, many characters",
           paragraphs: [
-            "The scene model uses layers, entities, a renderer, and behavior declarations. Quiet Garden ships with a 16-direction original gecko atlas, but the same data model can host another animal, object, illustration style, or future built-in renderer.",
+            "The scene model uses layers, entities, a renderer, and behavior declarations. Themes and companions are independent: Quiet Garden can recommend the original Moss gecko, but users can replace or disable it without changing the theme. The same model can host another animal, object, illustration style, or future built-in renderer.",
           ],
         },
         {
           heading: "Pointer awareness without interception",
           paragraphs: [
-            "The injected scene has pointer-events disabled. A passive window listener measures the cursor angle relative to the entity anchor and maps it to a sprite frame. The entity never blocks a Codex control.",
+            "The injected scene background has pointer-events disabled. The companion accepts drag gestures without capturing surrounding Codex controls, can snap to a semantic surface, and follows that surface through size changes. Sprite frames use one shared alpha-aware scale and ground line so transparent padding cannot make the character float or jitter.",
           ],
         },
         {
@@ -161,13 +164,13 @@ export const docs: DocPage[] = [
         {
           heading: "一种抽象，替换任意角色",
           paragraphs: [
-            "场景模型由图层、实体、渲染器和行为声明组成。静谧花园内置原创的 16 方向壁虎图集，但相同数据模型可以承载其他动物、物体、插画风格以及未来的内置渲染器。",
+            "场景模型由图层、实体、渲染器和行为声明组成。主题和伙伴相互独立：静谧花园可以推荐原创壁虎 Moss，但用户无需修改主题即可替换或关闭它；相同模型还可以承载其他动物、物体、插画风格以及未来的内置渲染器。",
           ],
         },
         {
           heading: "感知光标，但不拦截点击",
           paragraphs: [
-            "注入场景禁用 pointer-events。被动监听器计算光标相对实体锚点的角度，再映射到方向帧；互动实体不会遮挡任何 Codex 控件。",
+            "注入场景的背景禁用 pointer-events；伙伴本身可以接收拖拽手势，但不会遮挡周围的 Codex 控件。伙伴可贴合语义表面并跟随其尺寸变化；所有序列帧共享一套透明像素缩放和落脚线，避免角色悬浮或跳动。",
           ],
         },
         {
@@ -187,7 +190,8 @@ export const docs: DocPage[] = [
     },
     description: {
       en: "How Codex Styler avoids app bundle patching, restricts theme packages, and restores the official Codex Desktop interface.",
-      "zh-CN": "Codex Styler 如何避免修改应用包、限制主题包能力并恢复官方 Codex Desktop 界面。",
+      "zh-CN":
+        "Codex Styler 如何避免修改应用包、限制主题包能力并恢复官方 Codex Desktop 界面。",
     },
     eyebrow: { en: "TRUST MODEL", "zh-CN": "信任模型" },
     body: {
@@ -205,9 +209,9 @@ export const docs: DocPage[] = [
           ],
         },
         {
-          heading: "Automatic verification and fallback",
+          heading: "Runtime verification and fallback",
           paragraphs: [
-            "Automatic mode first applies semantic styling, verifies live anchors and computed surface styles, and falls back to the isolated background and scene layer only when the health check fails. Compatibility mode stays isolated; Developer mode bypasses automatic fallback.",
+            "Enhanced mode applies the complete semantic treatment and verifies live anchors and computed styles. A different Codex version is informational; only a real runtime health failure triggers fallback to the isolated scene layer. Conservative mode always stays isolated.",
           ],
         },
       ],
@@ -225,9 +229,9 @@ export const docs: DocPage[] = [
           ],
         },
         {
-          heading: "自动验证与异常回退",
+          heading: "运行时验证与异常回退",
           paragraphs: [
-            "自动模式会先应用语义样式、检查实时锚点与最终表面样式，只有健康检查失败时才回退到隔离的背景与场景层。兼容模式始终隔离，开发者模式则跳过自动回退。",
+            "增强模式会应用完整语义样式并检查实时锚点与最终样式。Codex 版本不同只作为信息提示；只有真实的运行时健康检查失败才回退到隔离场景层。保守模式始终保持隔离。",
           ],
         },
       ],
@@ -291,7 +295,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex is already running",
           paragraphs: [
-            "Close Codex normally, then select Apply again. Styler never force-quits a process it did not start.",
+            "Select Apply and confirm the restart request. Styler sends a normal quit request and continues only after Codex has closed; it never force-quits the process.",
           ],
         },
         {
@@ -303,7 +307,7 @@ export const docs: DocPage[] = [
         {
           heading: "The interface changed after a Codex update",
           paragraphs: [
-            "Restore the official interface, then switch to Compatibility mode if Automatic mode did not already fall back. Include the Codex and Styler versions in a GitHub issue, but do not attach personal workspace content or raw diagnostic logs without reviewing them.",
+            "Restore the official interface, then switch to Conservative mode if Enhanced mode did not already fall back. Include the Codex and Styler versions in a GitHub issue, but do not attach personal workspace content or raw diagnostic logs without reviewing them.",
           ],
         },
       ],
@@ -311,7 +315,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex 已经在运行",
           paragraphs: [
-            "正常关闭 Codex，然后再次点击应用。Styler 不会强制退出并非由它启动的进程。",
+            "点击应用并确认重新启动。Styler 会发送正常退出请求，并且只在 Codex 已关闭后继续；它不会强制终止进程。",
           ],
         },
         {
@@ -323,7 +327,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex 更新后界面变化",
           paragraphs: [
-            "先恢复官方界面；如果自动模式尚未自行回退，再切换到兼容模式。提交 GitHub Issue 时附上 Codex 和 Styler 版本，但不要在未检查前上传个人工作区内容或原始诊断日志。",
+            "先恢复官方界面；如果增强模式尚未自行回退，再切换到保守模式。提交 GitHub Issue 时附上 Codex 和 Styler 版本，但不要在未检查前上传个人工作区内容或原始诊断日志。",
           ],
         },
       ],

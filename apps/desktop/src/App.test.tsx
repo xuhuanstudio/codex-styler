@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { builtinThemes } from "@codex-styler/theme-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
@@ -41,14 +47,28 @@ describe("Codex Styler shell", () => {
     render(<App />);
     expect(screen.getAllByText("Codex Styler").length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "Themes" })).toBeInTheDocument();
-    expect(screen.getAllByText("Compatibility not verified").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("Compatibility not verified").length,
+    ).toBeGreaterThan(0);
   });
 
-  it("does not offer to launch over an existing Codex session", async () => {
+  it("asks before quitting an existing Codex session", async () => {
     render(<App />);
-    expect(await screen.findByText("Codex is already running")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Check again" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Apply to Codex" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Codex is already running"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Restart and apply" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+    expect(
+      screen.getByRole("dialog", {
+        name: "Restart Codex to apply this theme?",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Quit Codex and continue" }),
+    ).toBeInTheDocument();
   });
 
   it("uses a language dropdown with system language first", () => {
@@ -59,21 +79,22 @@ describe("Codex Styler shell", () => {
     expect(language.options[0]?.textContent).toBe("Follow system language");
   });
 
-  it("offers automatic, compatibility, and developer runtime strategies", () => {
+  it("offers enhanced and conservative runtime strategies", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const strategy = screen.getAllByRole("combobox")[1] as HTMLSelectElement;
     expect([...strategy.options].map((option) => option.value)).toEqual([
-      "auto",
-      "compatibility",
-      "developer",
+      "enhanced",
+      "conservative",
     ]);
-    expect(strategy.value).toBe("auto");
+    expect(strategy.value).toBe("enhanced");
   });
 
   it("exposes a native window drag region", () => {
     const { container } = render(<App />);
-    expect(container.querySelector("[data-tauri-drag-region]")).toBeInTheDocument();
+    expect(
+      container.querySelector("[data-tauri-drag-region]"),
+    ).toBeInTheDocument();
   });
 
   it("selects a theme from the entire theme row", () => {
@@ -82,6 +103,28 @@ describe("Codex Styler shell", () => {
       screen.getByRole("button", { name: "Selected: Nocturne Studio" }),
     );
     expect(screen.getAllByText("Nocturne Studio").length).toBeGreaterThan(0);
+  });
+
+  it("keeps companions independent and exposes draggable placement", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    fireEvent.click(screen.getByRole("button", { name: /Moss/ }));
+    expect(
+      screen.getByText("Drag the companion to place it"),
+    ).toBeInTheDocument();
+    expect(
+      document.querySelector('.scene-entity[data-draggable="true"]'),
+    ).toBeInTheDocument();
+  });
+
+  it("makes editor layers and reset controls actionable", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Create" }));
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    expect(screen.getByText("Contrast protected")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add layer" }));
+    expect(screen.getByRole("menuitem", { name: /Moss/ })).toBeInTheDocument();
   });
 
   it("deletes a local theme after confirmation", async () => {
@@ -100,6 +143,8 @@ describe("Codex Styler shell", () => {
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete theme" }));
-    await waitFor(() => expect(screen.queryByText("Theme to delete")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText("Theme to delete")).not.toBeInTheDocument(),
+    );
   });
 });

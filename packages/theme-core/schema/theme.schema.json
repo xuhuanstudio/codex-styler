@@ -186,7 +186,10 @@
             "border": { "$ref": "#/$defs/color" },
             "radius": { "type": "number", "minimum": 0, "maximum": 32 },
             "focusOpacity": { "type": "number", "minimum": 0, "maximum": 1 },
-            "focusBlur": { "type": "number", "minimum": 0, "maximum": 32 }
+            "focusBlur": { "type": "number", "minimum": 0, "maximum": 32 },
+            "layout": { "enum": ["native", "editorial", "immersive"] },
+            "iconStyle": { "enum": ["native", "contained", "themed"] },
+            "decorations": { "enum": ["none", "subtle", "expressive"] }
           }
         },
         "motion": {
@@ -245,7 +248,13 @@
               "required": ["type", "asset"],
               "properties": {
                 "type": { "const": "image" },
-                "asset": { "$ref": "#/$defs/assetPath" }
+                "asset": { "$ref": "#/$defs/assetPath" },
+                "normalization": { "enum": ["preserve", "grounded"] },
+                "alphaThreshold": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
               }
             },
             {
@@ -265,9 +274,23 @@
                 "asset": { "$ref": "#/$defs/assetPath" },
                 "columns": { "type": "integer", "minimum": 1, "maximum": 16 },
                 "rows": { "type": "integer", "minimum": 1, "maximum": 16 },
-                "frameWidth": { "type": "integer", "minimum": 16, "maximum": 1024 },
-                "frameHeight": { "type": "integer", "minimum": 16, "maximum": 1024 },
-                "directions": { "type": "integer", "enum": [4, 8, 16] }
+                "frameWidth": {
+                  "type": "integer",
+                  "minimum": 16,
+                  "maximum": 1024
+                },
+                "frameHeight": {
+                  "type": "integer",
+                  "minimum": 16,
+                  "maximum": 1024
+                },
+                "directions": { "type": "integer", "enum": [4, 8, 16] },
+                "normalization": { "enum": ["preserve", "grounded"] },
+                "alphaThreshold": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
               }
             }
           ]
@@ -293,6 +316,27 @@
             "y": { "type": "number", "minimum": 0, "maximum": 100 }
           }
         },
+        "attachment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "edge", "align", "offset"],
+          "properties": {
+            "target": {
+              "enum": ["composer", "main-surface", "thread-summary"]
+            },
+            "edge": { "enum": ["top", "bottom"] },
+            "align": { "type": "number", "minimum": 0, "maximum": 1 },
+            "offset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["x", "y"],
+              "properties": {
+                "x": { "type": "number", "minimum": -512, "maximum": 512 },
+                "y": { "type": "number", "minimum": -512, "maximum": 512 }
+              }
+            }
+          }
+        },
         "size": { "type": "number", "minimum": 24, "maximum": 512 },
         "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
       }
@@ -313,4 +357,3 @@
     }
   }
 }
-

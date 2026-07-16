@@ -2,6 +2,8 @@
 
 <!-- Describe the user-visible outcome and why it belongs in scope. -->
 
+<!-- Use English for the PR title, description, commit subjects, and release note. -->
+
 ## Evidence
 
 - [ ] `pnpm check`

@@ -4,6 +4,53 @@ use sysinfo::{ProcessesToUpdate, System};
 
 use crate::{error::StylerError, model::CodexDetection};
 
+pub async fn quit_codex() -> Result<CodexDetection, StylerError> {
+    #[cfg(target_os = "macos")]
+    {
+        let status = tokio::process::Command::new("/usr/bin/osascript")
+            .args(["-e", "tell application id \"com.openai.codex\" to quit"])
+            .status()
+            .await
+            .map_err(|error| StylerError::Launch(error.to_string()))?;
+        if !status.success() {
+            return Err(StylerError::Launch(
+                "Codex did not accept the standard quit request".into(),
+            ));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let status = tokio::process::Command::new("powershell.exe")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "$p = Get-Process Codex,ChatGPT -ErrorAction SilentlyContinue; if ($p) { $p.CloseMainWindow() | Out-Null }",
+            ])
+            .status()
+            .await
+            .map_err(|error| StylerError::Launch(error.to_string()))?;
+        if !status.success() {
+            return Err(StylerError::Launch(
+                "Codex did not accept the standard close request".into(),
+            ));
+        }
+    }
+
+    for _ in 0..32 {
+        let detection = detect_codex()?;
+        if !detection.running {
+            return Ok(detection);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+
+    Err(StylerError::Launch(
+        "Codex is still running. Save any work and close it manually, then try again".into(),
+    ))
+}
+
 pub fn detect_codex() -> Result<CodexDetection, StylerError> {
     let path = locate_codex();
     let mut system = System::new();

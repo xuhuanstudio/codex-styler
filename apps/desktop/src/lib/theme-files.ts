@@ -23,7 +23,8 @@ function openDatabase(): Promise<IDBDatabase | null> {
       }
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error("Could not open theme storage"));
+    request.onerror = () =>
+      reject(request.error ?? new Error("Could not open theme storage"));
   });
 }
 
@@ -48,7 +49,8 @@ async function loadArchive(themeId: string): Promise<Blob | null> {
   const archive = await new Promise<Blob | null>((resolve, reject) => {
     const transaction = database.transaction(archiveStore, "readonly");
     const request = transaction.objectStore(archiveStore).get(themeId);
-    request.onsuccess = () => resolve((request.result as Blob | undefined) ?? null);
+    request.onsuccess = () =>
+      resolve((request.result as Blob | undefined) ?? null);
     request.onerror = () =>
       reject(request.error ?? new Error("Could not load theme package"));
   });
@@ -99,7 +101,10 @@ async function fetchBytes(url: string): Promise<Uint8Array> {
 
 export async function exportTheme(
   theme: ThemeDefinition,
-  resolveAsset: (theme: ThemeDefinition, path: string) => string = themeAssetUrl,
+  resolveAsset: (
+    theme: ThemeDefinition,
+    path: string,
+  ) => string = themeAssetUrl,
 ): Promise<void> {
   const blob = await exportThemePackage(theme, (path) =>
     fetchBytes(resolveAsset(theme, path)),
@@ -127,6 +132,19 @@ export async function persistThemeCopy(
   const archive = await exportThemePackage(theme, (path) =>
     fetchBytes(resolveAsset(theme, path)),
   );
+  await saveArchive(theme.id, archive);
+  return createThemeAssetMap(await importThemePackage(archive));
+}
+
+export async function persistGeneratedTheme(
+  theme: ThemeDefinition,
+  files: Map<string, Uint8Array>,
+): Promise<ThemeAssetMap> {
+  const archive = await exportThemePackage(theme, async (path) => {
+    const bytes = files.get(path);
+    if (!bytes) throw new Error("Missing generated theme asset: " + path);
+    return bytes;
+  });
   await saveArchive(theme.id, archive);
   return createThemeAssetMap(await importThemePackage(archive));
 }

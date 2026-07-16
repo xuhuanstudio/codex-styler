@@ -19,8 +19,8 @@ const english = new URL(base + path, Astro.site);
 const chinese = new URL(base + "/zh-cn" + path, Astro.site);
 const socialImage = new URL(base + image, Astro.site);
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.1.0-alpha.2";
-const releaseAsset = "Codex-Styler_0.1.0-alpha.2_aarch64-unsigned.dmg";
+const releaseTag = "v0.1.0-alpha.3";
+const releaseAsset = "Codex-Styler_0.1.0-alpha.3_aarch64-unsigned.dmg";
 const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
 const isChinese = locale === "zh-CN";
 const structuredData = {
@@ -29,7 +29,7 @@ const structuredData = {
   name: "Codex Styler",
   applicationCategory: "DeveloperApplication",
   operatingSystem: "macOS 13 or later",
-  softwareVersion: "0.1.0-alpha.2",
+  softwareVersion: "0.1.0-alpha.3",
   description,
   url: canonical.toString(),
   downloadUrl,
