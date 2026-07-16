@@ -18,6 +18,7 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCw,
   RotateCcw,
   Settings,
   ShieldCheck,
@@ -154,7 +155,13 @@ export function App() {
     return settings.appearance;
   }, [settings.appearance]);
 
+  const needsManualRestart = detection?.running === true && !runtime.connected;
+
   async function handleApply() {
+    if (needsManualRestart) {
+      setToast(t("quitToContinue"));
+      return;
+    }
     setBusy(true);
     try {
       let next = runtime;
@@ -172,6 +179,26 @@ export function App() {
         state: "error",
         message: error instanceof Error ? error.message : String(error),
       });
+      setToast(t("connectionError"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleRefreshDetection() {
+    setBusy(true);
+    try {
+      const detected = await detectCodex();
+      setDetection(detected);
+      setToast(
+        detected.running
+          ? t("quitToContinue")
+          : detected.installed
+            ? t("ready")
+            : t("disconnected"),
+      );
+    } catch (error) {
+      console.error(error);
       setToast(t("connectionError"));
     } finally {
       setBusy(false);
@@ -334,11 +361,19 @@ export function App() {
                 (runtime.connected ? " connection-indicator--online" : "")
               }
             />
-            <strong>{runtime.connected ? t("connected") : t("ready")}</strong>
+            <strong>
+              {runtime.connected
+                ? t("connected")
+                : needsManualRestart
+                  ? t("codexRunning")
+                  : t("ready")}
+            </strong>
           </div>
           <span>
             {runtime.connected
               ? t("trustedRuntime")
+              : needsManualRestart
+                ? t("quitToContinue")
               : detection?.installed === false
                 ? t("disconnected")
                 : t("unknownCompatibility")}
@@ -348,6 +383,11 @@ export function App() {
               <button onClick={handlePause}>
                 <Pause size={13} />
                 {t("pause")}
+              </button>
+            ) : needsManualRestart ? (
+              <button onClick={handleRefreshDetection} disabled={busy}>
+                <RefreshCw size={13} />
+                {busy ? t("checking") : t("checkAgain")}
               </button>
             ) : (
               <button onClick={handleApply} disabled={busy}>
