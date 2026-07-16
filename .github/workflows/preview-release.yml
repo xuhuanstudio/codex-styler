@@ -84,9 +84,8 @@ jobs:
           set -euo pipefail
           source_dmg="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Codex Styler_${RELEASE_VERSION}_aarch64.dmg"
           release_dir="$GITHUB_WORKSPACE/release"
-          scan_dir="$GITHUB_WORKSPACE/release-scan"
           mount_dir="$RUNNER_TEMP/codex-styler-dmg"
-          mkdir -p "$release_dir" "$scan_dir" "$mount_dir"
+          mkdir -p "$release_dir" "$mount_dir"
           cp "$source_dmg" "$release_dir/$DMG_NAME"
 
           hdiutil verify "$release_dir/$DMG_NAME"
@@ -100,21 +99,22 @@ jobs:
           test "$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")" = "studio.xuhuan.codexstyler"
           codesign --verify --deep --strict --verbose=2 "$app"
           codesign -dvvv "$app" 2>&1 | grep -q "Signature=adhoc"
-          cp -R "$app" "$scan_dir/Codex Styler.app"
 
           hdiutil detach "$mount_dir"
           trap - EXIT
           (cd "$release_dir" && shasum -a 256 "$DMG_NAME" > SHA256SUMS.txt)
 
-      - name: Generate SPDX SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          path: ./release-scan/Codex Styler.app
-          format: spdx-json
-          artifact-name: ${{ env.SBOM_NAME }}
-          output-file: ./release/${{ env.SBOM_NAME }}
-          upload-artifact: false
-          upload-release-assets: false
+      - name: Export and validate SPDX dependency SBOM
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" \
+            --jq '.sbom' > "release/$SBOM_NAME"
+          jq -e \
+            '.spdxVersion == "SPDX-2.3" and (.packages | length) > 0 and (.relationships | length) > 0' \
+            "release/$SBOM_NAME" >/dev/null
 
       - name: Attest build provenance
         uses: actions/attest@v4
@@ -128,7 +128,7 @@ jobs:
           sbom-path: ./release/${{ env.SBOM_NAME }}
 
       - name: Retain reviewed release assets
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: codex-styler-${{ env.RELEASE_VERSION }}-macos-aarch64
           path: release/*

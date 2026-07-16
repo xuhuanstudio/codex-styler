@@ -9,7 +9,7 @@ Preview releases are started by a deliberate version-tag push, not by every merg
 1. synchronize all versions and add `.github/release-notes/v<version>.md`;
 2. run `pnpm check:release-version <version>` and the normal test/audit suite;
 3. create and push an annotated `v<version>` tag that matches `v*-alpha.*`;
-4. let `preview-release.yml` produce an ad-hoc signed Apple Silicon DMG, SHA-256 checksums, SPDX SBOM, and GitHub attestations;
+4. let `preview-release.yml` produce an ad-hoc signed Apple Silicon DMG, SHA-256 checksums, an SPDX 2.3 export of GitHub's dependency graph, and GitHub attestations;
 5. inspect the generated draft release and download the assets to verify the published checksum;
 6. only then publish the draft as a GitHub Pre-release.
 
