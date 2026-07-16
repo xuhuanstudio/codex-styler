@@ -96,14 +96,16 @@ fn locate_codex() -> Option<PathBuf> {
     {
         let mut candidates = Vec::new();
         if let Some(local) = std::env::var_os("LOCALAPPDATA") {
-            candidates.push(PathBuf::from(local).join("Programs/Codex/Codex.exe"));
-            candidates.push(PathBuf::from(local).join("Codex/Codex.exe"));
-            candidates.push(PathBuf::from(local).join("Programs/ChatGPT/ChatGPT.exe"));
-            candidates.push(PathBuf::from(local).join("ChatGPT/ChatGPT.exe"));
+            let local = PathBuf::from(local);
+            candidates.push(local.join("Programs/Codex/Codex.exe"));
+            candidates.push(local.join("Codex/Codex.exe"));
+            candidates.push(local.join("Programs/ChatGPT/ChatGPT.exe"));
+            candidates.push(local.join("ChatGPT/ChatGPT.exe"));
         }
         if let Some(program_files) = std::env::var_os("ProgramFiles") {
-            candidates.push(PathBuf::from(program_files).join("Codex/Codex.exe"));
-            candidates.push(PathBuf::from(program_files).join("ChatGPT/ChatGPT.exe"));
+            let program_files = PathBuf::from(program_files);
+            candidates.push(program_files.join("Codex/Codex.exe"));
+            candidates.push(program_files.join("ChatGPT/ChatGPT.exe"));
         }
         candidates.into_iter().find(|path| path.exists())
     }
