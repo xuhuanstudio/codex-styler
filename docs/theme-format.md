@@ -41,6 +41,12 @@ The optional appearance fields `layout`, `iconStyle`, and `decorations` control 
 
 These values style stable semantic adapter slots such as navigation, the home hero, suggestions, project rail, composer, messages, dialogs, and thread summary. Themes never receive selectors or arbitrary CSS, so a package cannot reach outside the adapter boundary.
 
+## Semantic color palette
+
+The required appearance colors (`accent`, `surface`, `text`, `mutedText`, and `border`) are the compact source palette. Styler derives a complete accessible component palette from them for surfaces, controls, interaction states, code, diffs, terminals, charts, and status feedback.
+
+Advanced themes may refine individual roles through the optional `appearance.palette` object, including `canvas`, raised/overlay/sunken surfaces, control states, tertiary text, focus and border levels, and semantic success/warning/danger colors. These names are stable Codex Styler roles—not Codex CSS variables. The versioned compatibility adapter maps them onto the current Codex token system, so themes remain portable when Codex changes its internal DOM or styles.
+
 ## Archive layout
 
 ```text

@@ -11,7 +11,7 @@ const deepEqual = deepEqualRuntime.default ?? deepEqualRuntime;
 "use strict";
 export const validate = validate20;
 export default validate20;
-const schema31 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://xuhuanstudio.github.io/codex-styler/schema/theme-v1.json","title":"Codex Styler Theme v1","type":"object","additionalProperties":false,"required":["format","id","version","metadata","compatibility","variants","scene","assets","locales"],"properties":{"format":{"const":"codex-styler-theme-v1"},"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9.-]{2,63}$"},"version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},"metadata":{"type":"object","additionalProperties":false,"required":["name","description","author","license","tags"],"properties":{"name":{"type":"string","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":240},"author":{"type":"string","minLength":1,"maxLength":80},"license":{"type":"string","minLength":1,"maxLength":64},"tags":{"type":"array","maxItems":12,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":32}},"homepage":{"type":"string","format":"uri","maxLength":240},"preview":{"$ref":"#/$defs/assetPath"}}},"compatibility":{"type":"object","additionalProperties":false,"required":["styler","codex"],"properties":{"styler":{"type":"object","additionalProperties":false,"required":["minimumVersion"],"properties":{"minimumVersion":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+"}}},"codex":{"type":"object","additionalProperties":false,"required":["mode","testedVersions"],"properties":{"mode":{"enum":["safe","semantic"]},"testedVersions":{"type":"array","maxItems":32,"items":{"type":"string","minLength":1,"maxLength":40}}}}}},"variants":{"type":"object","additionalProperties":false,"required":["light","dark"],"properties":{"light":{"$ref":"#/$defs/variant"},"dark":{"$ref":"#/$defs/variant"}}},"scene":{"type":"object","additionalProperties":false,"required":["layers","entities"],"properties":{"layers":{"type":"array","maxItems":8,"items":{"$ref":"#/$defs/layer"}},"entities":{"type":"array","maxItems":1,"items":{"$ref":"#/$defs/entity"}}}},"assets":{"type":"array","maxItems":32,"items":{"$ref":"#/$defs/asset"}},"locales":{"type":"object","additionalProperties":{"type":"object","additionalProperties":false,"required":["name","description"],"properties":{"name":{"type":"string","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":240}}}}},"$defs":{"assetPath":{"type":"string","pattern":"^(assets|previews)/[A-Za-z0-9._/-]+$","maxLength":180},"color":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"},"variant":{"type":"object","additionalProperties":false,"required":["background","appearance","motion"],"properties":{"background":{"type":"object","additionalProperties":false,"required":["color","position","brightness","blur","overlay","overlayOpacity"],"properties":{"color":{"$ref":"#/$defs/color"},"image":{"$ref":"#/$defs/assetPath"},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"brightness":{"type":"number","minimum":0.2,"maximum":2},"blur":{"type":"number","minimum":0,"maximum":40},"overlay":{"$ref":"#/$defs/color"},"overlayOpacity":{"type":"number","minimum":0,"maximum":1}}},"appearance":{"type":"object","additionalProperties":false,"required":["accent","surface","surfaceOpacity","text","mutedText","border","radius","focusOpacity","focusBlur"],"properties":{"accent":{"$ref":"#/$defs/color"},"surface":{"$ref":"#/$defs/color"},"surfaceOpacity":{"type":"number","minimum":0,"maximum":1},"text":{"$ref":"#/$defs/color"},"mutedText":{"$ref":"#/$defs/color"},"border":{"$ref":"#/$defs/color"},"radius":{"type":"number","minimum":0,"maximum":32},"focusOpacity":{"type":"number","minimum":0,"maximum":1},"focusBlur":{"type":"number","minimum":0,"maximum":32},"layout":{"enum":["native","editorial","immersive"]},"iconStyle":{"enum":["native","contained","themed"]},"decorations":{"enum":["none","subtle","expressive"]}}},"motion":{"type":"object","additionalProperties":false,"required":["intensity","parallax","targetFps"],"properties":{"intensity":{"type":"number","minimum":0,"maximum":1},"parallax":{"type":"number","minimum":0,"maximum":30},"targetFps":{"enum":[24,30,60]}}}}},"layer":{"type":"object","additionalProperties":false,"required":["id","type","opacity","blendMode","parallax"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"type":{"enum":["image","gradient","vignette"]},"asset":{"$ref":"#/$defs/assetPath"},"opacity":{"type":"number","minimum":0,"maximum":1},"blendMode":{"enum":["normal","multiply","screen","overlay","soft-light"]},"parallax":{"type":"number","minimum":-30,"maximum":30}}},"entity":{"type":"object","additionalProperties":false,"required":["id","name","renderer","behaviors","anchor","size","opacity"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"name":{"type":"string","minLength":1,"maxLength":64},"renderer":{"oneOf":[{"type":"object","additionalProperties":false,"required":["type","asset"],"properties":{"type":{"const":"image"},"asset":{"$ref":"#/$defs/assetPath"},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}},{"type":"object","additionalProperties":false,"required":["type","asset","columns","rows","frameWidth","frameHeight","directions"],"properties":{"type":{"const":"sprite-atlas"},"asset":{"$ref":"#/$defs/assetPath"},"columns":{"type":"integer","minimum":1,"maximum":16},"rows":{"type":"integer","minimum":1,"maximum":16},"frameWidth":{"type":"integer","minimum":16,"maximum":1024},"frameHeight":{"type":"integer","minimum":16,"maximum":1024},"directions":{"type":"integer","enum":[4,8,16]},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}}]},"behaviors":{"type":"array","uniqueItems":true,"items":{"enum":["idle","parallax","look-at-pointer","reduce-motion-fallback"]}},"anchor":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"attachment":{"type":"object","additionalProperties":false,"required":["target","edge","align","offset"],"properties":{"target":{"enum":["composer","main-surface","thread-summary"]},"edge":{"enum":["top","bottom"]},"align":{"type":"number","minimum":0,"maximum":1},"offset":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":-512,"maximum":512},"y":{"type":"number","minimum":-512,"maximum":512}}}}},"size":{"type":"number","minimum":24,"maximum":512},"opacity":{"type":"number","minimum":0,"maximum":1}}},"asset":{"type":"object","additionalProperties":false,"required":["id","path","type","license"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"path":{"$ref":"#/$defs/assetPath"},"type":{"enum":["background","sprite-atlas","preview"]},"license":{"type":"string","minLength":1,"maxLength":64}}}}};
+const schema31 = {"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://xuhuanstudio.github.io/codex-styler/schema/theme-v1.json","title":"Codex Styler Theme v1","type":"object","additionalProperties":false,"required":["format","id","version","metadata","compatibility","variants","scene","assets","locales"],"properties":{"format":{"const":"codex-styler-theme-v1"},"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9.-]{2,63}$"},"version":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"},"metadata":{"type":"object","additionalProperties":false,"required":["name","description","author","license","tags"],"properties":{"name":{"type":"string","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":240},"author":{"type":"string","minLength":1,"maxLength":80},"license":{"type":"string","minLength":1,"maxLength":64},"tags":{"type":"array","maxItems":12,"uniqueItems":true,"items":{"type":"string","minLength":1,"maxLength":32}},"homepage":{"type":"string","format":"uri","maxLength":240},"preview":{"$ref":"#/$defs/assetPath"}}},"compatibility":{"type":"object","additionalProperties":false,"required":["styler","codex"],"properties":{"styler":{"type":"object","additionalProperties":false,"required":["minimumVersion"],"properties":{"minimumVersion":{"type":"string","pattern":"^[0-9]+\\.[0-9]+\\.[0-9]+"}}},"codex":{"type":"object","additionalProperties":false,"required":["mode","testedVersions"],"properties":{"mode":{"enum":["safe","semantic"]},"testedVersions":{"type":"array","maxItems":32,"items":{"type":"string","minLength":1,"maxLength":40}}}}}},"variants":{"type":"object","additionalProperties":false,"required":["light","dark"],"properties":{"light":{"$ref":"#/$defs/variant"},"dark":{"$ref":"#/$defs/variant"}}},"scene":{"type":"object","additionalProperties":false,"required":["layers","entities"],"properties":{"layers":{"type":"array","maxItems":8,"items":{"$ref":"#/$defs/layer"}},"entities":{"type":"array","maxItems":1,"items":{"$ref":"#/$defs/entity"}}}},"assets":{"type":"array","maxItems":32,"items":{"$ref":"#/$defs/asset"}},"locales":{"type":"object","additionalProperties":{"type":"object","additionalProperties":false,"required":["name","description"],"properties":{"name":{"type":"string","minLength":1,"maxLength":64},"description":{"type":"string","minLength":1,"maxLength":240}}}}},"$defs":{"assetPath":{"type":"string","pattern":"^(assets|previews)/[A-Za-z0-9._/-]+$","maxLength":180},"color":{"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"},"variant":{"type":"object","additionalProperties":false,"required":["background","appearance","motion"],"properties":{"background":{"type":"object","additionalProperties":false,"required":["color","position","brightness","blur","overlay","overlayOpacity"],"properties":{"color":{"$ref":"#/$defs/color"},"image":{"$ref":"#/$defs/assetPath"},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"brightness":{"type":"number","minimum":0.2,"maximum":2},"blur":{"type":"number","minimum":0,"maximum":40},"overlay":{"$ref":"#/$defs/color"},"overlayOpacity":{"type":"number","minimum":0,"maximum":1}}},"appearance":{"type":"object","additionalProperties":false,"required":["accent","surface","surfaceOpacity","text","mutedText","border","radius","focusOpacity","focusBlur"],"properties":{"accent":{"$ref":"#/$defs/color"},"surface":{"$ref":"#/$defs/color"},"surfaceOpacity":{"type":"number","minimum":0,"maximum":1},"text":{"$ref":"#/$defs/color"},"mutedText":{"$ref":"#/$defs/color"},"border":{"$ref":"#/$defs/color"},"radius":{"type":"number","minimum":0,"maximum":32},"focusOpacity":{"type":"number","minimum":0,"maximum":1},"focusBlur":{"type":"number","minimum":0,"maximum":32},"layout":{"enum":["native","editorial","immersive"]},"iconStyle":{"enum":["native","contained","themed"]},"decorations":{"enum":["none","subtle","expressive"]},"palette":{"type":"object","additionalProperties":false,"properties":{"canvas":{"$ref":"#/$defs/color"},"surfaceRaised":{"$ref":"#/$defs/color"},"surfaceOverlay":{"$ref":"#/$defs/color"},"surfaceSunken":{"$ref":"#/$defs/color"},"control":{"$ref":"#/$defs/color"},"controlHover":{"$ref":"#/$defs/color"},"controlActive":{"$ref":"#/$defs/color"},"textTertiary":{"$ref":"#/$defs/color"},"onAccent":{"$ref":"#/$defs/color"},"borderSubtle":{"$ref":"#/$defs/color"},"borderStrong":{"$ref":"#/$defs/color"},"focus":{"$ref":"#/$defs/color"},"success":{"$ref":"#/$defs/color"},"warning":{"$ref":"#/$defs/color"},"danger":{"$ref":"#/$defs/color"},"info":{"$ref":"#/$defs/color"},"added":{"$ref":"#/$defs/color"},"modified":{"$ref":"#/$defs/color"},"deleted":{"$ref":"#/$defs/color"}}}}},"motion":{"type":"object","additionalProperties":false,"required":["intensity","parallax","targetFps"],"properties":{"intensity":{"type":"number","minimum":0,"maximum":1},"parallax":{"type":"number","minimum":0,"maximum":30},"targetFps":{"enum":[24,30,60]}}}}},"layer":{"type":"object","additionalProperties":false,"required":["id","type","opacity","blendMode","parallax"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"type":{"enum":["image","gradient","vignette"]},"asset":{"$ref":"#/$defs/assetPath"},"opacity":{"type":"number","minimum":0,"maximum":1},"blendMode":{"enum":["normal","multiply","screen","overlay","soft-light"]},"parallax":{"type":"number","minimum":-30,"maximum":30}}},"entity":{"type":"object","additionalProperties":false,"required":["id","name","renderer","behaviors","anchor","size","opacity"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"name":{"type":"string","minLength":1,"maxLength":64},"renderer":{"oneOf":[{"type":"object","additionalProperties":false,"required":["type","asset"],"properties":{"type":{"const":"image"},"asset":{"$ref":"#/$defs/assetPath"},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}},{"type":"object","additionalProperties":false,"required":["type","asset","columns","rows","frameWidth","frameHeight","directions"],"properties":{"type":{"const":"sprite-atlas"},"asset":{"$ref":"#/$defs/assetPath"},"columns":{"type":"integer","minimum":1,"maximum":16},"rows":{"type":"integer","minimum":1,"maximum":16},"frameWidth":{"type":"integer","minimum":16,"maximum":1024},"frameHeight":{"type":"integer","minimum":16,"maximum":1024},"directions":{"type":"integer","enum":[4,8,16]},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}}]},"behaviors":{"type":"array","uniqueItems":true,"items":{"enum":["idle","parallax","look-at-pointer","reduce-motion-fallback"]}},"anchor":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"attachment":{"type":"object","additionalProperties":false,"required":["target","edge","align","offset"],"properties":{"target":{"enum":["composer","main-surface","thread-summary"]},"edge":{"enum":["top","bottom"]},"align":{"type":"number","minimum":0,"maximum":1},"offset":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":-512,"maximum":512},"y":{"type":"number","minimum":-512,"maximum":512}}}}},"size":{"type":"number","minimum":24,"maximum":512},"opacity":{"type":"number","minimum":0,"maximum":1}}},"asset":{"type":"object","additionalProperties":false,"required":["id","path","type","license"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"path":{"$ref":"#/$defs/assetPath"},"type":{"enum":["background","sprite-atlas","preview"]},"license":{"type":"string","minLength":1,"maxLength":64}}}}};
 const schema32 = {"type":"string","pattern":"^(assets|previews)/[A-Za-z0-9._/-]+$","maxLength":180};
 const func1 = Object.prototype.hasOwnProperty;
 const func2 = ucs2Length;
@@ -20,7 +20,7 @@ const pattern5 = new RegExp("^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$", "u
 const pattern6 = new RegExp("^(assets|previews)/[A-Za-z0-9._/-]+$", "u");
 const pattern7 = new RegExp("^[0-9]+\\.[0-9]+\\.[0-9]+", "u");
 const formats0 = fullFormats.uri;
-const schema33 = {"type":"object","additionalProperties":false,"required":["background","appearance","motion"],"properties":{"background":{"type":"object","additionalProperties":false,"required":["color","position","brightness","blur","overlay","overlayOpacity"],"properties":{"color":{"$ref":"#/$defs/color"},"image":{"$ref":"#/$defs/assetPath"},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"brightness":{"type":"number","minimum":0.2,"maximum":2},"blur":{"type":"number","minimum":0,"maximum":40},"overlay":{"$ref":"#/$defs/color"},"overlayOpacity":{"type":"number","minimum":0,"maximum":1}}},"appearance":{"type":"object","additionalProperties":false,"required":["accent","surface","surfaceOpacity","text","mutedText","border","radius","focusOpacity","focusBlur"],"properties":{"accent":{"$ref":"#/$defs/color"},"surface":{"$ref":"#/$defs/color"},"surfaceOpacity":{"type":"number","minimum":0,"maximum":1},"text":{"$ref":"#/$defs/color"},"mutedText":{"$ref":"#/$defs/color"},"border":{"$ref":"#/$defs/color"},"radius":{"type":"number","minimum":0,"maximum":32},"focusOpacity":{"type":"number","minimum":0,"maximum":1},"focusBlur":{"type":"number","minimum":0,"maximum":32},"layout":{"enum":["native","editorial","immersive"]},"iconStyle":{"enum":["native","contained","themed"]},"decorations":{"enum":["none","subtle","expressive"]}}},"motion":{"type":"object","additionalProperties":false,"required":["intensity","parallax","targetFps"],"properties":{"intensity":{"type":"number","minimum":0,"maximum":1},"parallax":{"type":"number","minimum":0,"maximum":30},"targetFps":{"enum":[24,30,60]}}}}};
+const schema33 = {"type":"object","additionalProperties":false,"required":["background","appearance","motion"],"properties":{"background":{"type":"object","additionalProperties":false,"required":["color","position","brightness","blur","overlay","overlayOpacity"],"properties":{"color":{"$ref":"#/$defs/color"},"image":{"$ref":"#/$defs/assetPath"},"position":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"brightness":{"type":"number","minimum":0.2,"maximum":2},"blur":{"type":"number","minimum":0,"maximum":40},"overlay":{"$ref":"#/$defs/color"},"overlayOpacity":{"type":"number","minimum":0,"maximum":1}}},"appearance":{"type":"object","additionalProperties":false,"required":["accent","surface","surfaceOpacity","text","mutedText","border","radius","focusOpacity","focusBlur"],"properties":{"accent":{"$ref":"#/$defs/color"},"surface":{"$ref":"#/$defs/color"},"surfaceOpacity":{"type":"number","minimum":0,"maximum":1},"text":{"$ref":"#/$defs/color"},"mutedText":{"$ref":"#/$defs/color"},"border":{"$ref":"#/$defs/color"},"radius":{"type":"number","minimum":0,"maximum":32},"focusOpacity":{"type":"number","minimum":0,"maximum":1},"focusBlur":{"type":"number","minimum":0,"maximum":32},"layout":{"enum":["native","editorial","immersive"]},"iconStyle":{"enum":["native","contained","themed"]},"decorations":{"enum":["none","subtle","expressive"]},"palette":{"type":"object","additionalProperties":false,"properties":{"canvas":{"$ref":"#/$defs/color"},"surfaceRaised":{"$ref":"#/$defs/color"},"surfaceOverlay":{"$ref":"#/$defs/color"},"surfaceSunken":{"$ref":"#/$defs/color"},"control":{"$ref":"#/$defs/color"},"controlHover":{"$ref":"#/$defs/color"},"controlActive":{"$ref":"#/$defs/color"},"textTertiary":{"$ref":"#/$defs/color"},"onAccent":{"$ref":"#/$defs/color"},"borderSubtle":{"$ref":"#/$defs/color"},"borderStrong":{"$ref":"#/$defs/color"},"focus":{"$ref":"#/$defs/color"},"success":{"$ref":"#/$defs/color"},"warning":{"$ref":"#/$defs/color"},"danger":{"$ref":"#/$defs/color"},"info":{"$ref":"#/$defs/color"},"added":{"$ref":"#/$defs/color"},"modified":{"$ref":"#/$defs/color"},"deleted":{"$ref":"#/$defs/color"}}}}},"motion":{"type":"object","additionalProperties":false,"required":["intensity","parallax","targetFps"],"properties":{"intensity":{"type":"number","minimum":0,"maximum":1},"parallax":{"type":"number","minimum":0,"maximum":30},"targetFps":{"enum":[24,30,60]}}}}};
 const schema34 = {"type":"string","pattern":"^#[0-9A-Fa-f]{6}$"};
 const pattern8 = new RegExp("^#[0-9A-Fa-f]{6}$", "u");
 
@@ -880,9 +880,12 @@ vErrors.push(err72);
 errors++;
 }
 }
-}
-else {
-const err73 = {instancePath:instancePath+"/appearance",schemaPath:"#/properties/appearance/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(data10.palette !== undefined){
+let data23 = data10.palette;
+if(data23 && typeof data23 == "object" && !Array.isArray(data23)){
+for(const key4 in data23){
+if(!(func1.call(schema33.properties.appearance.properties.palette.properties, key4))){
+const err73 = {instancePath:instancePath+"/appearance/palette",schemaPath:"#/properties/appearance/properties/palette/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err73];
 }
@@ -892,11 +895,11 @@ vErrors.push(err73);
 errors++;
 }
 }
-if(data.motion !== undefined){
-let data23 = data.motion;
-if(data23 && typeof data23 == "object" && !Array.isArray(data23)){
-if(data23.intensity === undefined){
-const err74 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "intensity"},message:"must have required property '"+"intensity"+"'"};
+if(data23.canvas !== undefined){
+let data24 = data23.canvas;
+if(typeof data24 === "string"){
+if(!pattern8.test(data24)){
+const err74 = {instancePath:instancePath+"/appearance/palette/canvas",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err74];
 }
@@ -905,8 +908,9 @@ vErrors.push(err74);
 }
 errors++;
 }
-if(data23.parallax === undefined){
-const err75 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "parallax"},message:"must have required property '"+"parallax"+"'"};
+}
+else {
+const err75 = {instancePath:instancePath+"/appearance/palette/canvas",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err75];
 }
@@ -915,8 +919,12 @@ vErrors.push(err75);
 }
 errors++;
 }
-if(data23.targetFps === undefined){
-const err76 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "targetFps"},message:"must have required property '"+"targetFps"+"'"};
+}
+if(data23.surfaceRaised !== undefined){
+let data25 = data23.surfaceRaised;
+if(typeof data25 === "string"){
+if(!pattern8.test(data25)){
+const err76 = {instancePath:instancePath+"/appearance/palette/surfaceRaised",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err76];
 }
@@ -925,9 +933,9 @@ vErrors.push(err76);
 }
 errors++;
 }
-for(const key4 in data23){
-if(!(((key4 === "intensity") || (key4 === "parallax")) || (key4 === "targetFps"))){
-const err77 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key4},message:"must NOT have additional properties"};
+}
+else {
+const err77 = {instancePath:instancePath+"/appearance/palette/surfaceRaised",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err77];
 }
@@ -937,11 +945,11 @@ vErrors.push(err77);
 errors++;
 }
 }
-if(data23.intensity !== undefined){
-let data24 = data23.intensity;
-if((typeof data24 == "number") && (isFinite(data24))){
-if(data24 > 1 || isNaN(data24)){
-const err78 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/maximum",keyword:"maximum",params:{comparison: "<=", limit: 1},message:"must be <= 1"};
+if(data23.surfaceOverlay !== undefined){
+let data26 = data23.surfaceOverlay;
+if(typeof data26 === "string"){
+if(!pattern8.test(data26)){
+const err78 = {instancePath:instancePath+"/appearance/palette/surfaceOverlay",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err78];
 }
@@ -950,8 +958,9 @@ vErrors.push(err78);
 }
 errors++;
 }
-if(data24 < 0 || isNaN(data24)){
-const err79 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+}
+else {
+const err79 = {instancePath:instancePath+"/appearance/palette/surfaceOverlay",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err79];
 }
@@ -961,8 +970,11 @@ vErrors.push(err79);
 errors++;
 }
 }
-else {
-const err80 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/type",keyword:"type",params:{type: "number"},message:"must be number"};
+if(data23.surfaceSunken !== undefined){
+let data27 = data23.surfaceSunken;
+if(typeof data27 === "string"){
+if(!pattern8.test(data27)){
+const err80 = {instancePath:instancePath+"/appearance/palette/surfaceSunken",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err80];
 }
@@ -972,11 +984,8 @@ vErrors.push(err80);
 errors++;
 }
 }
-if(data23.parallax !== undefined){
-let data25 = data23.parallax;
-if((typeof data25 == "number") && (isFinite(data25))){
-if(data25 > 30 || isNaN(data25)){
-const err81 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/maximum",keyword:"maximum",params:{comparison: "<=", limit: 30},message:"must be <= 30"};
+else {
+const err81 = {instancePath:instancePath+"/appearance/palette/surfaceSunken",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err81];
 }
@@ -985,8 +994,12 @@ vErrors.push(err81);
 }
 errors++;
 }
-if(data25 < 0 || isNaN(data25)){
-const err82 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+}
+if(data23.control !== undefined){
+let data28 = data23.control;
+if(typeof data28 === "string"){
+if(!pattern8.test(data28)){
+const err82 = {instancePath:instancePath+"/appearance/palette/control",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err82];
 }
@@ -997,7 +1010,7 @@ errors++;
 }
 }
 else {
-const err83 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/type",keyword:"type",params:{type: "number"},message:"must be number"};
+const err83 = {instancePath:instancePath+"/appearance/palette/control",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err83];
 }
@@ -1007,10 +1020,11 @@ vErrors.push(err83);
 errors++;
 }
 }
-if(data23.targetFps !== undefined){
-let data26 = data23.targetFps;
-if(!(((data26 === 24) || (data26 === 30)) || (data26 === 60))){
-const err84 = {instancePath:instancePath+"/motion/targetFps",schemaPath:"#/properties/motion/properties/targetFps/enum",keyword:"enum",params:{allowedValues: schema33.properties.motion.properties.targetFps.enum},message:"must be equal to one of the allowed values"};
+if(data23.controlHover !== undefined){
+let data29 = data23.controlHover;
+if(typeof data29 === "string"){
+if(!pattern8.test(data29)){
+const err84 = {instancePath:instancePath+"/appearance/palette/controlHover",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err84];
 }
@@ -1020,9 +1034,8 @@ vErrors.push(err84);
 errors++;
 }
 }
-}
 else {
-const err85 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/type",keyword:"type",params:{type: "object"},message:"must be object"};
+const err85 = {instancePath:instancePath+"/appearance/palette/controlHover",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
 if(vErrors === null){
 vErrors = [err85];
 }
@@ -1032,9 +1045,11 @@ vErrors.push(err85);
 errors++;
 }
 }
-}
-else {
-const err86 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(data23.controlActive !== undefined){
+let data30 = data23.controlActive;
+if(typeof data30 === "string"){
+if(!pattern8.test(data30)){
+const err86 = {instancePath:instancePath+"/appearance/palette/controlActive",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
 if(vErrors === null){
 vErrors = [err86];
 }
@@ -1043,13 +1058,500 @@ vErrors.push(err86);
 }
 errors++;
 }
+}
+else {
+const err87 = {instancePath:instancePath+"/appearance/palette/controlActive",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err87];
+}
+else {
+vErrors.push(err87);
+}
+errors++;
+}
+}
+if(data23.textTertiary !== undefined){
+let data31 = data23.textTertiary;
+if(typeof data31 === "string"){
+if(!pattern8.test(data31)){
+const err88 = {instancePath:instancePath+"/appearance/palette/textTertiary",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err88];
+}
+else {
+vErrors.push(err88);
+}
+errors++;
+}
+}
+else {
+const err89 = {instancePath:instancePath+"/appearance/palette/textTertiary",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err89];
+}
+else {
+vErrors.push(err89);
+}
+errors++;
+}
+}
+if(data23.onAccent !== undefined){
+let data32 = data23.onAccent;
+if(typeof data32 === "string"){
+if(!pattern8.test(data32)){
+const err90 = {instancePath:instancePath+"/appearance/palette/onAccent",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err90];
+}
+else {
+vErrors.push(err90);
+}
+errors++;
+}
+}
+else {
+const err91 = {instancePath:instancePath+"/appearance/palette/onAccent",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err91];
+}
+else {
+vErrors.push(err91);
+}
+errors++;
+}
+}
+if(data23.borderSubtle !== undefined){
+let data33 = data23.borderSubtle;
+if(typeof data33 === "string"){
+if(!pattern8.test(data33)){
+const err92 = {instancePath:instancePath+"/appearance/palette/borderSubtle",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err92];
+}
+else {
+vErrors.push(err92);
+}
+errors++;
+}
+}
+else {
+const err93 = {instancePath:instancePath+"/appearance/palette/borderSubtle",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err93];
+}
+else {
+vErrors.push(err93);
+}
+errors++;
+}
+}
+if(data23.borderStrong !== undefined){
+let data34 = data23.borderStrong;
+if(typeof data34 === "string"){
+if(!pattern8.test(data34)){
+const err94 = {instancePath:instancePath+"/appearance/palette/borderStrong",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err94];
+}
+else {
+vErrors.push(err94);
+}
+errors++;
+}
+}
+else {
+const err95 = {instancePath:instancePath+"/appearance/palette/borderStrong",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err95];
+}
+else {
+vErrors.push(err95);
+}
+errors++;
+}
+}
+if(data23.focus !== undefined){
+let data35 = data23.focus;
+if(typeof data35 === "string"){
+if(!pattern8.test(data35)){
+const err96 = {instancePath:instancePath+"/appearance/palette/focus",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err96];
+}
+else {
+vErrors.push(err96);
+}
+errors++;
+}
+}
+else {
+const err97 = {instancePath:instancePath+"/appearance/palette/focus",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err97];
+}
+else {
+vErrors.push(err97);
+}
+errors++;
+}
+}
+if(data23.success !== undefined){
+let data36 = data23.success;
+if(typeof data36 === "string"){
+if(!pattern8.test(data36)){
+const err98 = {instancePath:instancePath+"/appearance/palette/success",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err98];
+}
+else {
+vErrors.push(err98);
+}
+errors++;
+}
+}
+else {
+const err99 = {instancePath:instancePath+"/appearance/palette/success",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err99];
+}
+else {
+vErrors.push(err99);
+}
+errors++;
+}
+}
+if(data23.warning !== undefined){
+let data37 = data23.warning;
+if(typeof data37 === "string"){
+if(!pattern8.test(data37)){
+const err100 = {instancePath:instancePath+"/appearance/palette/warning",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err100];
+}
+else {
+vErrors.push(err100);
+}
+errors++;
+}
+}
+else {
+const err101 = {instancePath:instancePath+"/appearance/palette/warning",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err101];
+}
+else {
+vErrors.push(err101);
+}
+errors++;
+}
+}
+if(data23.danger !== undefined){
+let data38 = data23.danger;
+if(typeof data38 === "string"){
+if(!pattern8.test(data38)){
+const err102 = {instancePath:instancePath+"/appearance/palette/danger",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err102];
+}
+else {
+vErrors.push(err102);
+}
+errors++;
+}
+}
+else {
+const err103 = {instancePath:instancePath+"/appearance/palette/danger",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err103];
+}
+else {
+vErrors.push(err103);
+}
+errors++;
+}
+}
+if(data23.info !== undefined){
+let data39 = data23.info;
+if(typeof data39 === "string"){
+if(!pattern8.test(data39)){
+const err104 = {instancePath:instancePath+"/appearance/palette/info",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err104];
+}
+else {
+vErrors.push(err104);
+}
+errors++;
+}
+}
+else {
+const err105 = {instancePath:instancePath+"/appearance/palette/info",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err105];
+}
+else {
+vErrors.push(err105);
+}
+errors++;
+}
+}
+if(data23.added !== undefined){
+let data40 = data23.added;
+if(typeof data40 === "string"){
+if(!pattern8.test(data40)){
+const err106 = {instancePath:instancePath+"/appearance/palette/added",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err106];
+}
+else {
+vErrors.push(err106);
+}
+errors++;
+}
+}
+else {
+const err107 = {instancePath:instancePath+"/appearance/palette/added",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err107];
+}
+else {
+vErrors.push(err107);
+}
+errors++;
+}
+}
+if(data23.modified !== undefined){
+let data41 = data23.modified;
+if(typeof data41 === "string"){
+if(!pattern8.test(data41)){
+const err108 = {instancePath:instancePath+"/appearance/palette/modified",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err108];
+}
+else {
+vErrors.push(err108);
+}
+errors++;
+}
+}
+else {
+const err109 = {instancePath:instancePath+"/appearance/palette/modified",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err109];
+}
+else {
+vErrors.push(err109);
+}
+errors++;
+}
+}
+if(data23.deleted !== undefined){
+let data42 = data23.deleted;
+if(typeof data42 === "string"){
+if(!pattern8.test(data42)){
+const err110 = {instancePath:instancePath+"/appearance/palette/deleted",schemaPath:"#/$defs/color/pattern",keyword:"pattern",params:{pattern: "^#[0-9A-Fa-f]{6}$"},message:"must match pattern \""+"^#[0-9A-Fa-f]{6}$"+"\""};
+if(vErrors === null){
+vErrors = [err110];
+}
+else {
+vErrors.push(err110);
+}
+errors++;
+}
+}
+else {
+const err111 = {instancePath:instancePath+"/appearance/palette/deleted",schemaPath:"#/$defs/color/type",keyword:"type",params:{type: "string"},message:"must be string"};
+if(vErrors === null){
+vErrors = [err111];
+}
+else {
+vErrors.push(err111);
+}
+errors++;
+}
+}
+}
+else {
+const err112 = {instancePath:instancePath+"/appearance/palette",schemaPath:"#/properties/appearance/properties/palette/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err112];
+}
+else {
+vErrors.push(err112);
+}
+errors++;
+}
+}
+}
+else {
+const err113 = {instancePath:instancePath+"/appearance",schemaPath:"#/properties/appearance/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err113];
+}
+else {
+vErrors.push(err113);
+}
+errors++;
+}
+}
+if(data.motion !== undefined){
+let data43 = data.motion;
+if(data43 && typeof data43 == "object" && !Array.isArray(data43)){
+if(data43.intensity === undefined){
+const err114 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "intensity"},message:"must have required property '"+"intensity"+"'"};
+if(vErrors === null){
+vErrors = [err114];
+}
+else {
+vErrors.push(err114);
+}
+errors++;
+}
+if(data43.parallax === undefined){
+const err115 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "parallax"},message:"must have required property '"+"parallax"+"'"};
+if(vErrors === null){
+vErrors = [err115];
+}
+else {
+vErrors.push(err115);
+}
+errors++;
+}
+if(data43.targetFps === undefined){
+const err116 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/required",keyword:"required",params:{missingProperty: "targetFps"},message:"must have required property '"+"targetFps"+"'"};
+if(vErrors === null){
+vErrors = [err116];
+}
+else {
+vErrors.push(err116);
+}
+errors++;
+}
+for(const key5 in data43){
+if(!(((key5 === "intensity") || (key5 === "parallax")) || (key5 === "targetFps"))){
+const err117 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key5},message:"must NOT have additional properties"};
+if(vErrors === null){
+vErrors = [err117];
+}
+else {
+vErrors.push(err117);
+}
+errors++;
+}
+}
+if(data43.intensity !== undefined){
+let data44 = data43.intensity;
+if((typeof data44 == "number") && (isFinite(data44))){
+if(data44 > 1 || isNaN(data44)){
+const err118 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/maximum",keyword:"maximum",params:{comparison: "<=", limit: 1},message:"must be <= 1"};
+if(vErrors === null){
+vErrors = [err118];
+}
+else {
+vErrors.push(err118);
+}
+errors++;
+}
+if(data44 < 0 || isNaN(data44)){
+const err119 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err119];
+}
+else {
+vErrors.push(err119);
+}
+errors++;
+}
+}
+else {
+const err120 = {instancePath:instancePath+"/motion/intensity",schemaPath:"#/properties/motion/properties/intensity/type",keyword:"type",params:{type: "number"},message:"must be number"};
+if(vErrors === null){
+vErrors = [err120];
+}
+else {
+vErrors.push(err120);
+}
+errors++;
+}
+}
+if(data43.parallax !== undefined){
+let data45 = data43.parallax;
+if((typeof data45 == "number") && (isFinite(data45))){
+if(data45 > 30 || isNaN(data45)){
+const err121 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/maximum",keyword:"maximum",params:{comparison: "<=", limit: 30},message:"must be <= 30"};
+if(vErrors === null){
+vErrors = [err121];
+}
+else {
+vErrors.push(err121);
+}
+errors++;
+}
+if(data45 < 0 || isNaN(data45)){
+const err122 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/minimum",keyword:"minimum",params:{comparison: ">=", limit: 0},message:"must be >= 0"};
+if(vErrors === null){
+vErrors = [err122];
+}
+else {
+vErrors.push(err122);
+}
+errors++;
+}
+}
+else {
+const err123 = {instancePath:instancePath+"/motion/parallax",schemaPath:"#/properties/motion/properties/parallax/type",keyword:"type",params:{type: "number"},message:"must be number"};
+if(vErrors === null){
+vErrors = [err123];
+}
+else {
+vErrors.push(err123);
+}
+errors++;
+}
+}
+if(data43.targetFps !== undefined){
+let data46 = data43.targetFps;
+if(!(((data46 === 24) || (data46 === 30)) || (data46 === 60))){
+const err124 = {instancePath:instancePath+"/motion/targetFps",schemaPath:"#/properties/motion/properties/targetFps/enum",keyword:"enum",params:{allowedValues: schema33.properties.motion.properties.targetFps.enum},message:"must be equal to one of the allowed values"};
+if(vErrors === null){
+vErrors = [err124];
+}
+else {
+vErrors.push(err124);
+}
+errors++;
+}
+}
+}
+else {
+const err125 = {instancePath:instancePath+"/motion",schemaPath:"#/properties/motion/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err125];
+}
+else {
+vErrors.push(err125);
+}
+errors++;
+}
+}
+}
+else {
+const err126 = {instancePath,schemaPath:"#/type",keyword:"type",params:{type: "object"},message:"must be object"};
+if(vErrors === null){
+vErrors = [err126];
+}
+else {
+vErrors.push(err126);
+}
+errors++;
+}
 validate21.errors = vErrors;
 return errors === 0;
 }
 validate21.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema42 = {"type":"object","additionalProperties":false,"required":["id","type","opacity","blendMode","parallax"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"type":{"enum":["image","gradient","vignette"]},"asset":{"$ref":"#/$defs/assetPath"},"opacity":{"type":"number","minimum":0,"maximum":1},"blendMode":{"enum":["normal","multiply","screen","overlay","soft-light"]},"parallax":{"type":"number","minimum":-30,"maximum":30}}};
-const pattern16 = new RegExp("^[a-z0-9][a-z0-9-]{1,39}$", "u");
+const schema61 = {"type":"object","additionalProperties":false,"required":["id","type","opacity","blendMode","parallax"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"type":{"enum":["image","gradient","vignette"]},"asset":{"$ref":"#/$defs/assetPath"},"opacity":{"type":"number","minimum":0,"maximum":1},"blendMode":{"enum":["normal","multiply","screen","overlay","soft-light"]},"parallax":{"type":"number","minimum":-30,"maximum":30}}};
+const pattern35 = new RegExp("^[a-z0-9][a-z0-9-]{1,39}$", "u");
 
 function validate24(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -1127,7 +1629,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern16.test(data0)){
+if(!pattern35.test(data0)){
 const err6 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{1,39}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{1,39}$"+"\""};
 if(vErrors === null){
 vErrors = [err6];
@@ -1152,7 +1654,7 @@ errors++;
 if(data.type !== undefined){
 let data1 = data.type;
 if(!(((data1 === "image") || (data1 === "gradient")) || (data1 === "vignette"))){
-const err8 = {instancePath:instancePath+"/type",schemaPath:"#/properties/type/enum",keyword:"enum",params:{allowedValues: schema42.properties.type.enum},message:"must be equal to one of the allowed values"};
+const err8 = {instancePath:instancePath+"/type",schemaPath:"#/properties/type/enum",keyword:"enum",params:{allowedValues: schema61.properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err8];
 }
@@ -1235,7 +1737,7 @@ errors++;
 if(data.blendMode !== undefined){
 let data4 = data.blendMode;
 if(!(((((data4 === "normal") || (data4 === "multiply")) || (data4 === "screen")) || (data4 === "overlay")) || (data4 === "soft-light"))){
-const err15 = {instancePath:instancePath+"/blendMode",schemaPath:"#/properties/blendMode/enum",keyword:"enum",params:{allowedValues: schema42.properties.blendMode.enum},message:"must be equal to one of the allowed values"};
+const err15 = {instancePath:instancePath+"/blendMode",schemaPath:"#/properties/blendMode/enum",keyword:"enum",params:{allowedValues: schema61.properties.blendMode.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err15];
 }
@@ -1296,7 +1798,7 @@ return errors === 0;
 }
 validate24.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema44 = {"type":"object","additionalProperties":false,"required":["id","name","renderer","behaviors","anchor","size","opacity"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"name":{"type":"string","minLength":1,"maxLength":64},"renderer":{"oneOf":[{"type":"object","additionalProperties":false,"required":["type","asset"],"properties":{"type":{"const":"image"},"asset":{"$ref":"#/$defs/assetPath"},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}},{"type":"object","additionalProperties":false,"required":["type","asset","columns","rows","frameWidth","frameHeight","directions"],"properties":{"type":{"const":"sprite-atlas"},"asset":{"$ref":"#/$defs/assetPath"},"columns":{"type":"integer","minimum":1,"maximum":16},"rows":{"type":"integer","minimum":1,"maximum":16},"frameWidth":{"type":"integer","minimum":16,"maximum":1024},"frameHeight":{"type":"integer","minimum":16,"maximum":1024},"directions":{"type":"integer","enum":[4,8,16]},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}}]},"behaviors":{"type":"array","uniqueItems":true,"items":{"enum":["idle","parallax","look-at-pointer","reduce-motion-fallback"]}},"anchor":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"attachment":{"type":"object","additionalProperties":false,"required":["target","edge","align","offset"],"properties":{"target":{"enum":["composer","main-surface","thread-summary"]},"edge":{"enum":["top","bottom"]},"align":{"type":"number","minimum":0,"maximum":1},"offset":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":-512,"maximum":512},"y":{"type":"number","minimum":-512,"maximum":512}}}}},"size":{"type":"number","minimum":24,"maximum":512},"opacity":{"type":"number","minimum":0,"maximum":1}}};
+const schema63 = {"type":"object","additionalProperties":false,"required":["id","name","renderer","behaviors","anchor","size","opacity"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"name":{"type":"string","minLength":1,"maxLength":64},"renderer":{"oneOf":[{"type":"object","additionalProperties":false,"required":["type","asset"],"properties":{"type":{"const":"image"},"asset":{"$ref":"#/$defs/assetPath"},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}},{"type":"object","additionalProperties":false,"required":["type","asset","columns","rows","frameWidth","frameHeight","directions"],"properties":{"type":{"const":"sprite-atlas"},"asset":{"$ref":"#/$defs/assetPath"},"columns":{"type":"integer","minimum":1,"maximum":16},"rows":{"type":"integer","minimum":1,"maximum":16},"frameWidth":{"type":"integer","minimum":16,"maximum":1024},"frameHeight":{"type":"integer","minimum":16,"maximum":1024},"directions":{"type":"integer","enum":[4,8,16]},"normalization":{"enum":["preserve","grounded"]},"alphaThreshold":{"type":"integer","minimum":0,"maximum":255}}}]},"behaviors":{"type":"array","uniqueItems":true,"items":{"enum":["idle","parallax","look-at-pointer","reduce-motion-fallback"]}},"anchor":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":0,"maximum":100},"y":{"type":"number","minimum":0,"maximum":100}}},"attachment":{"type":"object","additionalProperties":false,"required":["target","edge","align","offset"],"properties":{"target":{"enum":["composer","main-surface","thread-summary"]},"edge":{"enum":["top","bottom"]},"align":{"type":"number","minimum":0,"maximum":1},"offset":{"type":"object","additionalProperties":false,"required":["x","y"],"properties":{"x":{"type":"number","minimum":-512,"maximum":512},"y":{"type":"number","minimum":-512,"maximum":512}}}}},"size":{"type":"number","minimum":24,"maximum":512},"opacity":{"type":"number","minimum":0,"maximum":1}}};
 const func0 = deepEqual;
 
 function validate26(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
@@ -1395,7 +1897,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern16.test(data0)){
+if(!pattern35.test(data0)){
 const err8 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{1,39}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{1,39}$"+"\""};
 if(vErrors === null){
 vErrors = [err8];
@@ -1541,7 +2043,7 @@ errors++;
 if(data2.normalization !== undefined){
 let data5 = data2.normalization;
 if(!((data5 === "preserve") || (data5 === "grounded"))){
-const err20 = {instancePath:instancePath+"/renderer/normalization",schemaPath:"#/properties/renderer/oneOf/0/properties/normalization/enum",keyword:"enum",params:{allowedValues: schema44.properties.renderer.oneOf[0].properties.normalization.enum},message:"must be equal to one of the allowed values"};
+const err20 = {instancePath:instancePath+"/renderer/normalization",schemaPath:"#/properties/renderer/oneOf/0/properties/normalization/enum",keyword:"enum",params:{allowedValues: schema63.properties.renderer.oneOf[0].properties.normalization.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err20];
 }
@@ -1676,7 +2178,7 @@ vErrors.push(err31);
 errors++;
 }
 for(const key2 in data2){
-if(!(func1.call(schema44.properties.renderer.oneOf[1].properties, key2))){
+if(!(func1.call(schema63.properties.renderer.oneOf[1].properties, key2))){
 const err32 = {instancePath:instancePath+"/renderer",schemaPath:"#/properties/renderer/oneOf/1/additionalProperties",keyword:"additionalProperties",params:{additionalProperty: key2},message:"must NOT have additional properties"};
 if(vErrors === null){
 vErrors = [err32];
@@ -1887,7 +2389,7 @@ vErrors.push(err49);
 errors++;
 }
 if(!(((data13 === 4) || (data13 === 8)) || (data13 === 16))){
-const err50 = {instancePath:instancePath+"/renderer/directions",schemaPath:"#/properties/renderer/oneOf/1/properties/directions/enum",keyword:"enum",params:{allowedValues: schema44.properties.renderer.oneOf[1].properties.directions.enum},message:"must be equal to one of the allowed values"};
+const err50 = {instancePath:instancePath+"/renderer/directions",schemaPath:"#/properties/renderer/oneOf/1/properties/directions/enum",keyword:"enum",params:{allowedValues: schema63.properties.renderer.oneOf[1].properties.directions.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err50];
 }
@@ -1900,7 +2402,7 @@ errors++;
 if(data2.normalization !== undefined){
 let data14 = data2.normalization;
 if(!((data14 === "preserve") || (data14 === "grounded"))){
-const err51 = {instancePath:instancePath+"/renderer/normalization",schemaPath:"#/properties/renderer/oneOf/1/properties/normalization/enum",keyword:"enum",params:{allowedValues: schema44.properties.renderer.oneOf[1].properties.normalization.enum},message:"must be equal to one of the allowed values"};
+const err51 = {instancePath:instancePath+"/renderer/normalization",schemaPath:"#/properties/renderer/oneOf/1/properties/normalization/enum",keyword:"enum",params:{allowedValues: schema63.properties.renderer.oneOf[1].properties.normalization.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err51];
 }
@@ -1999,7 +2501,7 @@ const len0 = data16.length;
 for(let i0=0; i0<len0; i0++){
 let data17 = data16[i0];
 if(!((((data17 === "idle") || (data17 === "parallax")) || (data17 === "look-at-pointer")) || (data17 === "reduce-motion-fallback"))){
-const err57 = {instancePath:instancePath+"/behaviors/" + i0,schemaPath:"#/properties/behaviors/items/enum",keyword:"enum",params:{allowedValues: schema44.properties.behaviors.items.enum},message:"must be equal to one of the allowed values"};
+const err57 = {instancePath:instancePath+"/behaviors/" + i0,schemaPath:"#/properties/behaviors/items/enum",keyword:"enum",params:{allowedValues: schema63.properties.behaviors.items.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err57];
 }
@@ -2216,7 +2718,7 @@ errors++;
 if(data21.target !== undefined){
 let data22 = data21.target;
 if(!(((data22 === "composer") || (data22 === "main-surface")) || (data22 === "thread-summary"))){
-const err75 = {instancePath:instancePath+"/attachment/target",schemaPath:"#/properties/attachment/properties/target/enum",keyword:"enum",params:{allowedValues: schema44.properties.attachment.properties.target.enum},message:"must be equal to one of the allowed values"};
+const err75 = {instancePath:instancePath+"/attachment/target",schemaPath:"#/properties/attachment/properties/target/enum",keyword:"enum",params:{allowedValues: schema63.properties.attachment.properties.target.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err75];
 }
@@ -2229,7 +2731,7 @@ errors++;
 if(data21.edge !== undefined){
 let data23 = data21.edge;
 if(!((data23 === "top") || (data23 === "bottom"))){
-const err76 = {instancePath:instancePath+"/attachment/edge",schemaPath:"#/properties/attachment/properties/edge/enum",keyword:"enum",params:{allowedValues: schema44.properties.attachment.properties.edge.enum},message:"must be equal to one of the allowed values"};
+const err76 = {instancePath:instancePath+"/attachment/edge",schemaPath:"#/properties/attachment/properties/edge/enum",keyword:"enum",params:{allowedValues: schema63.properties.attachment.properties.edge.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err76];
 }
@@ -2489,7 +2991,7 @@ return errors === 0;
 }
 validate26.evaluated = {"props":true,"dynamicProps":false,"dynamicItems":false};
 
-const schema47 = {"type":"object","additionalProperties":false,"required":["id","path","type","license"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"path":{"$ref":"#/$defs/assetPath"},"type":{"enum":["background","sprite-atlas","preview"]},"license":{"type":"string","minLength":1,"maxLength":64}}};
+const schema66 = {"type":"object","additionalProperties":false,"required":["id","path","type","license"],"properties":{"id":{"type":"string","pattern":"^[a-z0-9][a-z0-9-]{1,39}$"},"path":{"$ref":"#/$defs/assetPath"},"type":{"enum":["background","sprite-atlas","preview"]},"license":{"type":"string","minLength":1,"maxLength":64}}};
 
 function validate28(data, {instancePath="", parentData, parentDataProperty, rootData=data, dynamicAnchors={}}={}){
 let vErrors = null;
@@ -2557,7 +3059,7 @@ errors++;
 if(data.id !== undefined){
 let data0 = data.id;
 if(typeof data0 === "string"){
-if(!pattern16.test(data0)){
+if(!pattern35.test(data0)){
 const err5 = {instancePath:instancePath+"/id",schemaPath:"#/properties/id/pattern",keyword:"pattern",params:{pattern: "^[a-z0-9][a-z0-9-]{1,39}$"},message:"must match pattern \""+"^[a-z0-9][a-z0-9-]{1,39}$"+"\""};
 if(vErrors === null){
 vErrors = [err5];
@@ -2617,7 +3119,7 @@ errors++;
 if(data.type !== undefined){
 let data2 = data.type;
 if(!(((data2 === "background") || (data2 === "sprite-atlas")) || (data2 === "preview"))){
-const err10 = {instancePath:instancePath+"/type",schemaPath:"#/properties/type/enum",keyword:"enum",params:{allowedValues: schema47.properties.type.enum},message:"must be equal to one of the allowed values"};
+const err10 = {instancePath:instancePath+"/type",schemaPath:"#/properties/type/enum",keyword:"enum",params:{allowedValues: schema66.properties.type.enum},message:"must be equal to one of the allowed values"};
 if(vErrors === null){
 vErrors = [err10];
 }

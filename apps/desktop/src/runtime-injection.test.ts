@@ -46,16 +46,33 @@ describe("injected compatibility runtime", () => {
     );
   });
 
+  it("restores and replaces an older injected runtime", () => {
+    runtime().restore();
+    const restore = vi.fn();
+    (
+      window as typeof window & {
+        __CODEX_STYLER_RUNTIME__: { version: number; restore: () => void };
+      }
+    ).__CODEX_STYLER_RUNTIME__ = { version: 8, restore };
+
+    Function(runtimeSource)();
+
+    expect(restore).toHaveBeenCalledOnce();
+    expect(runtime().version).toBe(11);
+  });
+
   it("uses semantic styling when live adapter verification succeeds", async () => {
     document.body.innerHTML = `
-      <aside class="app-shell-left-panel"></aside>
-      <main class="main-surface">
-        <div role="main">
-          <div data-testid="home-icon"></div>
-          <article></article>
-          <div class="composer-surface-chrome"></div>
-        </div>
-      </main>
+      <div id="codex-app-root">
+        <aside class="app-shell-left-panel"></aside>
+        <main class="main-surface">
+          <div role="main">
+            <div data-testid="home-icon"></div>
+            <article></article>
+            <div class="composer-surface-chrome"></div>
+          </div>
+        </main>
+      </div>
     `;
     vi.stubGlobal(
       "getComputedStyle",
@@ -74,12 +91,168 @@ describe("injected compatibility runtime", () => {
     const stylesheet = document.getElementById("codex-styler-runtime-style");
     expect(stylesheet?.textContent).toContain("main.main-surface article");
     expect(stylesheet?.textContent).toContain(
+      "--color-background-button-primary: var(--codex-styler-accent)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-token-menu-background:",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-token-diff-editor-inserted-line-background:",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-token-terminal-background:",
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-mode="semantic"] body > [data-codex-styler-app-root]',
+    );
+    expect(stylesheet?.textContent).toContain(
       '[data-pip-obstacle="thread-summary-panel"]',
     );
     expect(stylesheet?.textContent).toContain("pointer-events: auto");
     expect(stylesheet?.textContent).toContain("background-image:");
     expect(stylesheet?.textContent).toContain("group\\/home-suggestions");
+    expect(stylesheet?.textContent).toContain(
+      "padding: clamp(26px, 4cqh, 32px) 10px 27px",
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-density="compact"',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "data-codex-styler-collision-guard",
+    );
+    expect(stylesheet?.textContent).not.toContain(
+      "padding: 32px 10px 10px",
+    );
     expect(stylesheet?.textContent).toContain('[data-testid="home-icon"]');
+    expect(stylesheet?.textContent).not.toContain(
+      "aside.app-shell-left-panel button svg",
+    );
+    expect(stylesheet?.textContent).not.toContain("main.main-surface::after");
+    expect(stylesheet?.textContent).not.toContain("width: 27px !important");
+    expect(stylesheet?.textContent).not.toContain('thread-summary-panel"] svg');
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-layout="editorial"] main.main-surface',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-layout="immersive"] main.main-surface',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-icons="contained"] aside.app-shell-left-panel button > svg:first-child',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-decorations="subtle"] main.main-surface',
+    );
+    const iconTreatments = stylesheet?.textContent
+      ?.split("/* Icon treatments preserve")[1]
+      ?.split("/* Full home composition")[0];
+    expect(iconTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:width|height|padding|background)\s*:/,
+    );
+    expect(stylesheet?.textContent).not.toContain("body > div:first-child");
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root]",
+    );
+    expect(document.getElementById("codex-app-root")).toHaveAttribute(
+      "data-codex-styler-app-root",
+    );
+
+    const transientPortal = document.createElement("div");
+    transientPortal.id = "transient-sidebar-portal";
+    document.body.prepend(transientPortal);
+    await vi.waitFor(() => {
+      expect(document.getElementById("codex-app-root")).toHaveAttribute(
+        "data-codex-styler-app-root",
+      );
+    });
+    expect(transientPortal).not.toHaveAttribute("data-codex-styler-app-root");
+  });
+
+  it("maps optional semantic palette roles to Codex component tokens", async () => {
+    document.body.innerHTML = `
+      <div id="codex-app-root">
+        <aside class="app-shell-left-panel"></aside>
+        <main class="main-surface"><div role="main"></div></main>
+      </div>
+    `;
+    vi.stubGlobal(
+      "getComputedStyle",
+      vi.fn(() => ({
+        backgroundColor: "rgba(20, 24, 28, 0.72)",
+        backgroundImage: "none",
+      })),
+    );
+    const theme = structuredClone(nativeRefined);
+    theme.variants.dark.appearance.palette = {
+      canvas: "#101318",
+      surfaceRaised: "#252A31",
+      controlHover: "#303741",
+      success: "#52C982",
+    };
+
+    await runtime().apply(theme, "dark", "developer");
+
+    const stylesheet = document.getElementById("codex-styler-runtime-style");
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-canvas: #101318",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-surface-raised: #252A31",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-control-hover: #303741",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-success: #52C982",
+    );
+  });
+
+  it("compacts short home layouts and guards the composer safe area", async () => {
+    document.body.innerHTML = `
+      <div id="codex-app-root">
+        <aside class="app-shell-left-panel"></aside>
+        <main class="main-surface">
+          <div role="main">
+            <div data-feature="game-source"></div>
+            <section class="group/home-suggestions"></section>
+            <div class="horizontal-scroll-fade-mask">
+              <div class="group/project-selector"></div>
+            </div>
+            <div class="composer-surface-chrome"></div>
+          </div>
+        </main>
+      </div>
+    `;
+    const homeMain = document.querySelector('[role="main"]') as HTMLElement;
+    const project = document.querySelector(
+      ".group\\/project-selector",
+    ) as HTMLElement;
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    Object.defineProperties(homeMain, {
+      clientHeight: { value: 620, configurable: true },
+      clientWidth: { value: 680, configurable: true },
+    });
+    project.getBoundingClientRect = () =>
+      ({ top: 680, bottom: 720 } as DOMRect);
+    composer.getBoundingClientRect = () =>
+      ({ top: 700, bottom: 798 } as DOMRect);
+    vi.stubGlobal(
+      "getComputedStyle",
+      vi.fn(() => ({
+        backgroundColor: "rgba(20, 24, 28, 0.72)",
+        backgroundImage: "none",
+      })),
+    );
+
+    await runtime().apply(nativeRefined, "dark", "developer");
+
+    expect(document.documentElement.dataset.codexStylerDensity).toBe(
+      "compact",
+    );
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-collision-guard",
+    );
   });
 
   it("allows developer mode to force semantic styling", async () => {

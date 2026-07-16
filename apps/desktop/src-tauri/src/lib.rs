@@ -30,8 +30,15 @@ fn detect_codex() -> Result<model::CodexDetection, String> {
 }
 
 #[tauri::command]
-async fn quit_codex() -> Result<model::CodexDetection, String> {
-    codex::quit_codex().await.map_err(|error| error.to_string())
+async fn quit_codex(state: State<'_, Mutex<AppRuntime>>) -> Result<model::CodexDetection, String> {
+    let detection = codex::quit_codex()
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut runtime = state
+        .lock()
+        .map_err(|_| "Runtime state is unavailable".to_string())?;
+    *runtime = AppRuntime::default();
+    Ok(detection)
 }
 
 #[tauri::command]

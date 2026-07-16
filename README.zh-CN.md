@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="README.md">English</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.3/Codex-Styler_0.1.0-alpha.3_aarch64-unsigned.dmg">下载 Alpha</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.4/Codex-Styler_0.1.0-alpha.4_aarch64-unsigned.dmg">下载 Alpha</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/zh-cn/">项目网站</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/zh-cn/docs/getting-started/">使用文档</a>
 </p>
@@ -50,11 +50,11 @@ OpenAI Codex Desktop 已经提供基础外观设置和 Pets。Codex Styler 专�
 
 ## 下载 macOS Alpha
 
-**[下载适用于 macOS Apple Silicon 的 Codex Styler 0.1.0-alpha.3（DMG）](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.3/Codex-Styler_0.1.0-alpha.3_aarch64-unsigned.dmg)**
+**[下载适用于 macOS Apple Silicon 的 Codex Styler 0.1.0-alpha.4（DMG）](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.4/Codex-Styler_0.1.0-alpha.4_aarch64-unsigned.dmg)**
 
 需要 macOS 13 或更高版本以及 Apple Silicon Mac。打开 DMG，把 Codex Styler 拖入“应用程序”；首次启动时按住 Control 点击应用，选择“打开”。不要全局关闭 Gatekeeper。
 
-[预发布页面](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.3)同时提供 SHA-256 校验文件、SPDX SBOM、构建证明、已验证范围和已知限制。本次 Alpha 暂不提供 Windows 与 Intel Mac 安装包。
+[预发布页面](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.4)同时提供 SHA-256 校验文件、SPDX SBOM、构建证明、已验证范围和已知限制。本次 Alpha 暂不提供 Windows 与 Intel Mac 安装包。
 
 ## 从源码运行
 
