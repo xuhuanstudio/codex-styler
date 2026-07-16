@@ -38,9 +38,13 @@ if (/\brequire\s*\(|\bnew Function\b|\beval\s*\(/u.test(generated)) {
 
 const output = `// Generated from schema/theme.schema.json. Do not edit by hand.
 // @ts-nocheck -- Ajv emits optimized JavaScript without TypeScript annotations.
-import ucs2Length from "ajv/dist/runtime/ucs2length.js";
-import deepEqual from "ajv/dist/runtime/equal.js";
+import ucs2LengthRuntime from "ajv/dist/runtime/ucs2length.js";
+import deepEqualRuntime from "ajv/dist/runtime/equal.js";
 import { fullFormats } from "ajv-formats/dist/formats.js";
+
+// Node ESM exposes these CommonJS helpers as { default }, while Vite unwraps them.
+const ucs2Length = ucs2LengthRuntime.default ?? ucs2LengthRuntime;
+const deepEqual = deepEqualRuntime.default ?? deepEqualRuntime;
 
 ${generated}`;
 
