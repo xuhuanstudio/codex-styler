@@ -25,11 +25,22 @@ const siteLayout = await readFile(
   new URL("../apps/site/src/layouts/BaseLayout.astro", import.meta.url),
   "utf8",
 );
+const desktopMessages = await readFile(
+  new URL("../apps/desktop/src/lib/i18n.ts", import.meta.url),
+  "utf8",
+);
 
 const cargoVersion = cargoManifest.match(
   /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/mu,
 )?.[1];
 const siteVersion = siteLayout.match(/softwareVersion:\s*"([^"]+)"/u)?.[1];
+const alphaMatch = expected.match(/^\d+\.\d+\.\d+-alpha\.(\d+)$/u);
+const expectedDisplayVersion = alphaMatch
+  ? `Alpha 0.${alphaMatch[1]}`
+  : expected;
+const displayVersions = [
+  ...desktopMessages.matchAll(/version:\s*"([^"]+)"/gu),
+].map((match) => match[1]);
 
 const versions = new Map([
   ["package.json", rootPackage.version],
@@ -50,6 +61,16 @@ if (mismatches.length > 0) {
   process.exit(1);
 }
 
+if (
+  displayVersions.length !== 2 ||
+  displayVersions.some((version) => version !== expectedDisplayVersion)
+) {
+  console.error(
+    `Desktop display version is not synchronized: expected ${expectedDisplayVersion}, found ${displayVersions.join(", ") || "missing"}.`,
+  );
+  process.exit(1);
+}
+
 console.log(
-  `Release version ${expected} is synchronized across ${versions.size} files.`,
+  `Release version ${expected} is synchronized across ${versions.size} files and the desktop display.`,
 );
