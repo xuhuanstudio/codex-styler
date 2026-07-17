@@ -134,7 +134,7 @@ export async function restoreOfficial(): Promise<RuntimeStatus> {
 
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.1.0-alpha.7", update: null };
+    return { currentVersion: "0.1.0-alpha.8", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates");
 }

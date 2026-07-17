@@ -49,7 +49,7 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     }),
     applyTheme: vi.fn(),
     checkForUpdates: vi.fn().mockResolvedValue({
-      currentVersion: "0.1.0-alpha.7",
+      currentVersion: "0.1.0-alpha.8",
       update: null,
     }),
     downloadAndInstallUpdate: vi.fn(),
@@ -68,7 +68,7 @@ describe("Codex Styler shell", () => {
     vi.mocked(applyTheme).mockReset();
     vi.mocked(checkForUpdates).mockReset();
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.1.0-alpha.7",
+      currentVersion: "0.1.0-alpha.8",
       update: null,
     });
     vi.mocked(downloadAndInstallUpdate).mockReset();
@@ -172,7 +172,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.1.0-alpha.7")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.1.0-alpha.8")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce());
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -180,9 +180,9 @@ describe("Codex Styler shell", () => {
 
   it("downloads, installs, and restarts from the update dialog", async () => {
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.1.0-alpha.7",
+      currentVersion: "0.1.0-alpha.8",
       update: {
-        version: "0.1.0-alpha.7",
+        version: "0.1.0-alpha.8",
         notes: "A safer updater and corrected companion thumbnails.",
         publishedAt: "2026-07-17T08:00:00Z",
         prerelease: true,
@@ -198,7 +198,7 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     expect(
       await screen.findByRole("dialog", {
-        name: "Codex Styler 0.1.0-alpha.7",
+        name: "Codex Styler 0.1.0-alpha.8",
       }),
     ).toBeInTheDocument();
     fireEvent.click(
