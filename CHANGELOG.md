@@ -4,7 +4,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
-## [0.1.0-alpha.6] - 2026-07-17
+## [0.1.0-alpha.7] - 2026-07-17
 
 ### Added
 
@@ -14,9 +14,11 @@ All notable changes will be documented here. The project follows Semantic Versio
 ### Changed
 
 - Updated the website, READMEs, release metadata, and in-app version display for the first dual-platform Alpha.
+- Updated `serde_with` to 3.21.0 to incorporate its patched `KeyValueMap` serialization behavior.
 
 ### Fixed
 
+- Generated theme validation now normalizes line endings, so Windows CRLF checkouts do not produce false stale-file failures.
 - Settings and other full-page Codex routes remain above the injected background after application-root transitions.
 - Native Portal and Toast layers keep their own stacking order instead of inheriting the application-root layer.
 - Docked right-panel tabs remain visible above the fixed title bar while semantic header tinting stays intact.

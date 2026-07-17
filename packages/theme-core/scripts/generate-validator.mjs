@@ -6,7 +6,10 @@ import addFormats from "ajv-formats";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url));
 const schemaPath = new URL("../schema/theme.schema.json", import.meta.url);
-const outputPath = new URL("../src/generated/theme-validator.ts", import.meta.url);
+const outputPath = new URL(
+  "../src/generated/theme-validator.ts",
+  import.meta.url,
+);
 const schema = JSON.parse(await readFile(schemaPath, "utf8"));
 
 const ajv = new Ajv2020({
@@ -33,7 +36,9 @@ generated = generated
   );
 
 if (/\brequire\s*\(|\bnew Function\b|\beval\s*\(/u.test(generated)) {
-  throw new Error("Generated validator contains a runtime code-generation primitive");
+  throw new Error(
+    "Generated validator contains a runtime code-generation primitive",
+  );
 }
 
 const output = `// Generated from schema/theme.schema.json. Do not edit by hand.
@@ -48,16 +53,24 @@ const deepEqual = deepEqualRuntime.default ?? deepEqualRuntime;
 
 ${generated}`;
 
+function normalizeLineEndings(value) {
+  return value.replace(/\r\n?/gu, "\n");
+}
+
 if (process.argv.includes("--check")) {
   const current = await readFile(outputPath, "utf8").catch(() => "");
-  if (current !== output) {
+  if (normalizeLineEndings(current) !== normalizeLineEndings(output)) {
     console.error(
       "Generated theme validator is stale. Run: pnpm --filter @codex-styler/theme-core generate:validator",
     );
     process.exitCode = 1;
   }
 } else {
-  await mkdir(new URL("../src/generated/", import.meta.url), { recursive: true });
+  await mkdir(new URL("../src/generated/", import.meta.url), {
+    recursive: true,
+  });
   await writeFile(outputPath, output);
-  console.log(`Generated ${fileURLToPath(outputPath).replace(packageRoot, "")}`);
+  console.log(
+    `Generated ${fileURLToPath(outputPath).replace(packageRoot, "")}`,
+  );
 }
