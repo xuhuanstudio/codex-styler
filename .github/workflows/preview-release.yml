@@ -54,6 +54,8 @@ jobs:
           test -f "$notes"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
           echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
+          echo "UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
+          echo "UPDATER_SIG_NAME=Codex-Styler_${version}_aarch64.app.tar.gz.sig" >> "$GITHUB_ENV"
           echo "SBOM_NAME=Codex-Styler_${version}_aarch64.spdx.json" >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
@@ -73,20 +75,27 @@ jobs:
         working-directory: apps/desktop/src-tauri
 
       - name: Build ad-hoc signed Apple Silicon DMG
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
         run: >-
           pnpm --filter @codex-styler/desktop tauri build
           --target aarch64-apple-darwin
-          --bundles dmg
+          --bundles app,dmg
 
-      - name: Stage and verify DMG
+      - name: Stage and verify install and update artifacts
         shell: bash
         run: |
           set -euo pipefail
           source_dmg="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Codex Styler_${RELEASE_VERSION}_aarch64.dmg"
+          source_updater="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Codex Styler.app.tar.gz"
+          source_updater_sig="${source_updater}.sig"
           release_dir="$GITHUB_WORKSPACE/release"
           mount_dir="$RUNNER_TEMP/codex-styler-dmg"
           mkdir -p "$release_dir" "$mount_dir"
           cp "$source_dmg" "$release_dir/$DMG_NAME"
+          cp "$source_updater" "$release_dir/$UPDATER_NAME"
+          cp "$source_updater_sig" "$release_dir/$UPDATER_SIG_NAME"
 
           hdiutil verify "$release_dir/$DMG_NAME"
           hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$release_dir/$DMG_NAME"
@@ -102,7 +111,21 @@ jobs:
 
           hdiutil detach "$mount_dir"
           trap - EXIT
-          (cd "$release_dir" && shasum -a 256 "$DMG_NAME" > SHA256SUMS.txt)
+          update_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${UPDATER_NAME}"
+          signature="$(cat "$release_dir/$UPDATER_SIG_NAME")"
+          notes="$(cat ".github/release-notes/${GITHUB_REF_NAME}.md")"
+          jq -n \
+            --arg version "$RELEASE_VERSION" \
+            --arg notes "$notes" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg signature "$signature" \
+            --arg url "$update_url" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $signature, url: $url}}}' \
+            > "$release_dir/latest.json"
+          jq -e \
+            '.version != "" and .platforms["darwin-aarch64"].signature != "" and (.platforms["darwin-aarch64"].url | startswith("https://github.com/xuhuanstudio/codex-styler/releases/download/"))' \
+            "$release_dir/latest.json" >/dev/null
+          (cd "$release_dir" && shasum -a 256 "$DMG_NAME" "$UPDATER_NAME" > SHA256SUMS.txt)
 
       - name: Export and validate SPDX dependency SBOM
         env:
@@ -119,7 +142,9 @@ jobs:
       - name: Attest build provenance
         uses: actions/attest@v4
         with:
-          subject-path: ./release/${{ env.DMG_NAME }}
+          subject-path: |
+            ./release/${{ env.DMG_NAME }}
+            ./release/${{ env.UPDATER_NAME }}
 
       - name: Attest SBOM
         uses: actions/attest@v4

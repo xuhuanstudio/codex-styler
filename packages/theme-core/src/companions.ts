@@ -1,52 +1,100 @@
 import type { SceneEntity, ThemeAsset, ThemeDefinition } from "./types";
+import chameleonAtlas from "./moss-chameleon-atlas.json";
+import catAtlas from "./mochi-cat-atlas.json";
+import parrotAtlas from "./pico-parrot-atlas.json";
+import frogAtlas from "./puddle-frog-atlas.json";
+import resetGodAtlas from "./reset-god-atlas.json";
+import tokenThiefAtlas from "./token-thief-atlas.json";
 
 export interface CompanionDefinition {
   id: string;
   name: string;
   description: string;
   entity: SceneEntity;
-  asset: ThemeAsset;
+  assets: ThemeAsset[];
   defaultThemeIds: string[];
   locales: Record<string, { name: string; description: string }>;
 }
 
-export const mossCompanion: CompanionDefinition = {
+interface CalibratedAtlas {
+  renderer: {
+    pages: string[];
+    columns: number;
+    rows: number;
+    framesPerPage: number;
+    frameWidth: number;
+    frameHeight: number;
+    directions: number;
+    frameAngles: number[];
+  };
+}
+
+function calibratedCompanion(config: {
+  id: string;
+  name: string;
+  description: string;
+  atlas: CalibratedAtlas;
+  size: number;
+  defaultThemeIds?: string[];
+  locales: CompanionDefinition["locales"];
+}): CompanionDefinition {
+  const renderer = config.atlas.renderer;
+  return {
+    id: config.id,
+    name: config.name,
+    description: config.description,
+    entity: {
+      id: config.id,
+      name: config.name,
+      renderer: {
+        type: "sprite-atlas",
+        asset: `assets/companions/${renderer.pages[0]}`,
+        pages: renderer.pages.map((page) => `assets/companions/${page}`),
+        columns: renderer.columns,
+        rows: renderer.rows,
+        framesPerPage: renderer.framesPerPage,
+        frameWidth: renderer.frameWidth,
+        frameHeight: renderer.frameHeight,
+        directions: renderer.directions,
+        frameAngles: renderer.frameAngles,
+        transitionFps: 60,
+        normalization: "preserve",
+        alphaThreshold: 12,
+      },
+      behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
+      anchor: { x: 84, y: 70 },
+      attachment: {
+        target: "composer",
+        edge: "top",
+        align: 0.82,
+        offset: { x: 0, y: 3 },
+      },
+      size: config.size,
+      opacity: 0.96,
+    },
+    assets: renderer.pages.map((page, index) => ({
+      id: `companion-${config.id}-atlas-${index + 1}`,
+      path: `assets/companions/${page}`,
+      type: "sprite-atlas" as const,
+      license: "CC-BY-4.0",
+    })),
+    defaultThemeIds: config.defaultThemeIds ?? [],
+    locales: config.locales,
+  };
+}
+
+export const mossCompanion = calibratedCompanion({
   id: "moss-gecko",
   name: "Moss",
   description:
-    "An original eight-direction gecko that watches the pointer and can be dragged.",
-  entity: {
-    id: "moss-gecko",
-    name: "Moss",
-    renderer: {
-      type: "sprite-atlas",
-      asset: "assets/companions/moss-gecko-atlas-v2.png",
-      columns: 4,
-      rows: 2,
-      frameWidth: 443,
-      frameHeight: 443,
-      directions: 8,
-      normalization: "grounded",
-      alphaThreshold: 24,
-    },
-    behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
-    anchor: { x: 84, y: 70 },
-    attachment: {
-      target: "composer",
-      edge: "top",
-      align: 0.82,
-      offset: { x: 0, y: 3 },
-    },
-    size: 136,
-    opacity: 0.96,
-  },
-  asset: {
-    id: "companion-moss-atlas",
-    path: "assets/companions/moss-gecko-atlas-v2.png",
-    type: "sprite-atlas",
-    license: "CC-BY-4.0",
-  },
-  defaultThemeIds: ["codex-styler.quiet-garden"],
+    "A calibrated 181-frame chameleon that follows the pointer smoothly and can be dragged.",
+  atlas: chameleonAtlas,
+  size: 136,
+  defaultThemeIds: [
+    "codex-styler.native-refined",
+    "codex-styler.nocturne-studio",
+    "codex-styler.quiet-garden",
+  ],
   locales: {
     en: {
       name: "Moss",
@@ -57,9 +105,113 @@ export const mossCompanion: CompanionDefinition = {
       description: "会看向光标、可以拖拽，并且独立于主题搭配。",
     },
   },
-};
+});
 
-export const builtinCompanions = [mossCompanion] as const;
+export const picoCompanion = calibratedCompanion({
+  id: "pico-parrot",
+  name: "Pico",
+  description: "A lively scarlet parrot with a naturally expressive gaze.",
+  atlas: parrotAtlas,
+  size: 94,
+  locales: {
+    en: {
+      name: "Pico",
+      description:
+        "A lively parrot with natural blinks and pointer-aware poses.",
+    },
+    "zh-CN": {
+      name: "皮可",
+      description: "会自然眨眼、随光标转头的灵动鹦鹉。",
+    },
+  },
+});
+
+export const puddleCompanion = calibratedCompanion({
+  id: "puddle-frog",
+  name: "Puddle",
+  description: "A vivid blue frog with a grounded, pointer-aware stance.",
+  atlas: frogAtlas,
+  size: 142,
+  locales: {
+    en: {
+      name: "Puddle",
+      description: "A bright blue frog that tracks the pointer from the frame.",
+    },
+    "zh-CN": {
+      name: "泡泡",
+      description: "稳稳站在边框上、会追随光标的蓝色青蛙。",
+    },
+  },
+});
+
+export const mochiCompanion = calibratedCompanion({
+  id: "mochi-cat",
+  name: "Mochi",
+  description: "A warm orange cat with a soft, continuous look-around loop.",
+  atlas: catAtlas,
+  size: 120,
+  locales: {
+    en: {
+      name: "Mochi",
+      description: "A soft orange cat with smooth pointer-aware head movement.",
+    },
+    "zh-CN": {
+      name: "糯米",
+      description: "会平滑转头看向光标的温暖橘猫。",
+    },
+  },
+});
+
+export const tokenThiefCompanion = calibratedCompanion({
+  id: "token-thief",
+  name: "Token Thief",
+  description:
+    "A theatrical clown with expressive, pointer-aware head movement.",
+  atlas: tokenThiefAtlas,
+  size: 124,
+  defaultThemeIds: ["codex-styler.merry-big-top"],
+  locales: {
+    en: {
+      name: "Token Thief",
+      description:
+        "A theatrical clown who follows the pointer with comic suspicion.",
+    },
+    "zh-CN": {
+      name: "Token Thief",
+      description: "会带着滑稽又多疑的表情追随光标的小丑。",
+    },
+  },
+});
+
+export const resetGodCompanion = calibratedCompanion({
+  id: "reset-god",
+  name: "Reset God",
+  description:
+    "A gilded reset deity with calm, pointer-aware ceremonial poses.",
+  atlas: resetGodAtlas,
+  size: 122,
+  defaultThemeIds: ["codex-styler.gilded-grandeur"],
+  locales: {
+    en: {
+      name: "Reset God",
+      description:
+        "A gilded deity who watches the pointer from a ceremonial throne.",
+    },
+    "zh-CN": {
+      name: "Reset God",
+      description: "端坐鎏金王座、会平静注视光标方向的重置之神。",
+    },
+  },
+});
+
+export const builtinCompanions = [
+  mossCompanion,
+  resetGodCompanion,
+  tokenThiefCompanion,
+  picoCompanion,
+  puddleCompanion,
+  mochiCompanion,
+] as const;
 
 export function defaultCompanionForTheme(
   themeId: string,
@@ -97,6 +249,6 @@ export function composeThemeWithCompanion(
   }
   if (overrides?.size) entity.size = overrides.size;
   composed.scene.entities = [entity];
-  composed.assets.push(structuredClone(companion.asset));
+  composed.assets.push(...structuredClone(companion.assets));
   return composed;
 }

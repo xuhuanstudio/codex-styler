@@ -168,14 +168,40 @@
     }
     if (
       renderer.type === "sprite-atlas" &&
-      (![4, 8, 16].includes(renderer.directions) ||
+      (!Number.isInteger(renderer.directions) ||
+        renderer.directions < 4 ||
+        renderer.directions > 512 ||
         !Number.isInteger(renderer.columns) ||
         !Number.isInteger(renderer.rows) ||
         !Number.isInteger(renderer.frameWidth) ||
         !Number.isInteger(renderer.frameHeight) ||
         renderer.columns < 1 ||
         renderer.rows < 1 ||
-        renderer.directions > renderer.columns * renderer.rows)
+        renderer.columns > 16 ||
+        renderer.rows > 16 ||
+        (renderer.framesPerPage !== undefined &&
+          (!Number.isInteger(renderer.framesPerPage) ||
+            renderer.framesPerPage < 1 ||
+            renderer.framesPerPage > renderer.columns * renderer.rows)) ||
+        (renderer.pages !== undefined &&
+          (!Array.isArray(renderer.pages) ||
+            renderer.pages.length < 1 ||
+            renderer.pages.length > 8)) ||
+        renderer.directions >
+          (renderer.framesPerPage ?? renderer.columns * renderer.rows) *
+            (renderer.pages?.length ?? 1) ||
+        (renderer.frameAngles !== undefined &&
+          (!Array.isArray(renderer.frameAngles) ||
+            renderer.frameAngles.length !== renderer.directions ||
+            renderer.frameAngles.some(
+              (angle, index) =>
+                !finiteBetween(angle, 0, 360) ||
+                (index > 0 && angle < renderer.frameAngles[index - 1]),
+            ))) ||
+        (renderer.transitionFps !== undefined &&
+          (!Number.isInteger(renderer.transitionFps) ||
+            renderer.transitionFps < 12 ||
+            renderer.transitionFps > 60)))
     ) {
       throw new Error("Codex Styler rejected invalid sprite atlas data");
     }
@@ -203,6 +229,7 @@
       throw new Error("Codex Styler rejected invalid entity attachment");
     }
     assertSafeImage(renderer.asset);
+    renderer.pages?.forEach(assertSafeImage);
   };
 
   const remove = () => {
@@ -1194,20 +1221,39 @@
     canvas.addEventListener("pointerup", onUp);
     canvas.addEventListener("pointercancel", onUp);
 
-    const image = new Image();
-    image.src = renderer.asset;
+    const pageSources =
+      renderer.type === "sprite-atlas" && renderer.pages?.length
+        ? renderer.pages
+        : [renderer.asset];
+    const images = pageSources.map((source) => {
+      const page = new Image();
+      page.decoding = "async";
+      page.src = source;
+      return page;
+    });
     const context = canvas.getContext("2d");
     const targetFps = Math.min(
       60,
-      Math.max(12, theme.variants[variant].motion?.targetFps || 30),
+      Math.max(
+        12,
+        renderer.transitionFps ||
+          theme.variants[variant].motion?.targetFps ||
+          30,
+      ),
     );
     const frameInterval = 1000 / targetFps;
-    let analysis = null;
+    const analyses = new Map();
     let frame = 0;
     let pendingFrame = 0;
     let lastDraw = 0;
 
     const draw = (timestamp = performance.now()) => {
+      const framesPerPage =
+        renderer.type === "sprite-atlas"
+          ? renderer.framesPerPage ?? renderer.columns * renderer.rows
+          : 1;
+      const pageIndex = Math.floor(pendingFrame / framesPerPage);
+      const image = images[pageIndex] ?? images[0];
       if (!context || !image.complete || !image.naturalWidth) {
         animationFrame = null;
         return;
@@ -1217,11 +1263,14 @@
         return;
       }
       frame = pendingFrame;
+      const localFrame = frame % framesPerPage;
       const column =
-        renderer.type === "sprite-atlas" ? frame % renderer.columns : 0;
+        renderer.type === "sprite-atlas"
+          ? localFrame % renderer.columns
+          : 0;
       const row =
         renderer.type === "sprite-atlas"
-          ? Math.floor(frame / renderer.columns)
+          ? Math.floor(localFrame / renderer.columns)
           : 0;
       const frameWidth =
         renderer.type === "sprite-atlas"
@@ -1233,10 +1282,13 @@
           : image.naturalHeight;
       context.clearRect(0, 0, canvas.width, canvas.height);
       if (renderer.normalization === "grounded") {
-        analysis ||= analyzeOpaqueFrames(image, renderer);
+        if (!analyses.has(pageIndex)) {
+          analyses.set(pageIndex, analyzeOpaqueFrames(image, renderer));
+        }
       }
+      const analysis = analyses.get(pageIndex) ?? null;
       if (analysis && renderer.normalization === "grounded") {
-        const opaque = analysis.bounds[frame] ?? analysis.bounds[0];
+        const opaque = analysis.bounds[localFrame] ?? analysis.bounds[0];
         const sidePadding = canvas.width * 0.06;
         const topPadding = canvas.height * 0.04;
         const bottomPadding = canvas.height * 0.015;
@@ -1276,21 +1328,10 @@
     const scheduleDraw = () => {
       if (animationFrame === null) animationFrame = requestAnimationFrame(draw);
     };
-    image.addEventListener(
-      "load",
-      () => {
-        if (renderer.normalization === "grounded") {
-          try {
-            analysis = analyzeOpaqueFrames(image, renderer);
-          } catch {
-            analysis = null;
-          }
-        }
-        scheduleDraw();
-      },
-      { once: true },
-    );
-    if (image.complete) scheduleDraw();
+    images.forEach((image) => {
+      image.addEventListener("load", scheduleDraw, { once: true });
+    });
+    if (images[0]?.complete) scheduleDraw();
 
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -1308,9 +1349,24 @@
           event.clientX - (bounds.left + bounds.width / 2),
         );
         const normalized = (angle + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
-        pendingFrame =
-          Math.round(normalized / ((Math.PI * 2) / renderer.directions)) %
-          renderer.directions;
+        if (renderer.frameAngles?.length === renderer.directions) {
+          const degrees = (normalized * 180) / Math.PI;
+          let closest = 0;
+          let closestDistance = Number.POSITIVE_INFINITY;
+          renderer.frameAngles.forEach((frameAngle, index) => {
+            const rawDistance = Math.abs(frameAngle - degrees);
+            const distance = Math.min(rawDistance, 360 - rawDistance);
+            if (distance < closestDistance) {
+              closest = index;
+              closestDistance = distance;
+            }
+          });
+          pendingFrame = closest;
+        } else {
+          pendingFrame =
+            Math.round(normalized / ((Math.PI * 2) / renderer.directions)) %
+            renderer.directions;
+        }
         scheduleDraw();
       };
       window.addEventListener("pointermove", pointerHandler, { passive: true });

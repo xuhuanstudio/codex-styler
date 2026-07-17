@@ -6,18 +6,22 @@ import type { LocalePreference } from "./i18n";
 
 export type ManagerAppearance = "system" | "light" | "dark";
 export type RuntimeStrategy = "enhanced" | "conservative";
+export type CompanionMode = "theme-default" | "custom" | "disabled";
 
 export interface UserSettings {
   locale: LocalePreference;
   appearance: ManagerAppearance;
   runtimeStrategy: RuntimeStrategy;
   appliedThemeId: string | null;
+  companionMode: CompanionMode;
   companionId: string | null;
   companionAnchors: Record<string, { x: number; y: number }>;
   companionSizes: Record<string, number>;
   companionAttachments: Record<string, EntityAttachment | null>;
   reduceMotion: boolean;
-  manualUpdateChecks: boolean;
+  automaticUpdateChecks: boolean;
+  skippedUpdateVersion: string | null;
+  lastUpdateCheckAt: string | null;
   onboardingComplete: boolean;
 }
 
@@ -34,12 +38,28 @@ export function loadSettings(): UserSettings {
       > & {
         runtimeStrategy?:
           RuntimeStrategy | "auto" | "compatibility" | "developer";
+        manualUpdateChecks?: boolean;
       };
       const runtimeStrategy =
         parsed.runtimeStrategy === "compatibility"
           ? "conservative"
           : "enhanced";
-      return { ...defaultSettings(), ...parsed, runtimeStrategy };
+      const companionMode = parsed.companionMode
+        ? parsed.companionMode
+        : parsed.companionId
+          ? "custom"
+          : "theme-default";
+      const automaticUpdateChecks =
+        parsed.automaticUpdateChecks ?? parsed.manualUpdateChecks ?? true;
+      const currentSettings = { ...parsed };
+      delete currentSettings.manualUpdateChecks;
+      return {
+        ...defaultSettings(),
+        ...currentSettings,
+        runtimeStrategy,
+        companionMode,
+        automaticUpdateChecks,
+      };
     }
   } catch {
     // Corrupt local settings fall back to safe defaults.
@@ -53,12 +73,15 @@ function defaultSettings(): UserSettings {
     appearance: "system",
     runtimeStrategy: "enhanced",
     appliedThemeId: null,
+    companionMode: "theme-default",
     companionId: null,
     companionAnchors: {},
     companionSizes: {},
     companionAttachments: {},
     reduceMotion: false,
-    manualUpdateChecks: true,
+    automaticUpdateChecks: true,
+    skippedUpdateVersion: null,
+    lastUpdateCheckAt: null,
     onboardingComplete: false,
   };
 }

@@ -146,7 +146,7 @@ export const docs: DocPage[] = [
         {
           heading: "One abstraction, many characters",
           paragraphs: [
-            "The scene model uses layers, entities, a renderer, and behavior declarations. Themes and companions are independent: Quiet Garden can recommend the original Moss gecko, but users can replace or disable it without changing the theme. The same model can host another animal, object, illustration style, or future built-in renderer.",
+            "The scene model uses layers, entities, a renderer, and behavior declarations. Themes and companions are independent: the five built-in themes recommend Moss, Reset God, or Token Thief as intentional defaults, while Pico, Puddle, and Mochi remain independent choices. An explicit replacement or No companion preference persists across theme changes, and the same model can host another animal, object, illustration style, or future built-in renderer.",
           ],
         },
         {
@@ -166,7 +166,7 @@ export const docs: DocPage[] = [
         {
           heading: "一种抽象，替换任意角色",
           paragraphs: [
-            "场景模型由图层、实体、渲染器和行为声明组成。主题和伙伴相互独立：静谧花园可以推荐原创壁虎 Moss，但用户无需修改主题即可替换或关闭它；相同模型还可以承载其他动物、物体、插画风格以及未来的内置渲染器。",
+            "场景模型由图层、实体、渲染器和行为声明组成。主题和伙伴相互独立：五个内置主题分别提供 Moss、Reset God 或 Token Thief 的默认搭配，同时仍可独立选择 Pico、Puddle 和 Mochi。用户明确选择其他伙伴或“不使用伙伴”后，该偏好会在切换主题时继续保留；相同模型还可以承载其他动物、物体、插画风格以及未来的内置渲染器。",
           ],
         },
         {

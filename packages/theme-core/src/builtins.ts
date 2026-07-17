@@ -49,6 +49,19 @@ function variant(
   };
 }
 
+function detailedVariant(
+  base: ThemeVariant,
+  palette: NonNullable<ThemeVariant["appearance"]["palette"]>,
+  motion: Partial<ThemeVariant["motion"]>,
+  radius = base.appearance.radius,
+): ThemeVariant {
+  return {
+    ...base,
+    appearance: { ...base.appearance, palette, radius },
+    motion: { ...base.motion, ...motion },
+  };
+}
+
 export const nativeRefined: ThemeDefinition = {
   format: THEME_FORMAT,
   id: "codex-styler.native-refined",
@@ -347,4 +360,356 @@ export const quietGarden: ThemeDefinition = {
   },
 };
 
-export const builtinThemes = [nativeRefined, nocturneStudio, quietGarden];
+export const gildedGrandeur: ThemeDefinition = {
+  format: THEME_FORMAT,
+  id: "codex-styler.gilded-grandeur",
+  version: "1.0.0",
+  metadata: {
+    name: "Gilded Grandeur",
+    description:
+      "An obsidian-and-gold workspace with architectural depth and precise luminous accents.",
+    author: "Codex Styler contributors",
+    license: "CC-BY-4.0",
+    tags: ["gold", "luxury", "image", "editorial", "light", "dark"],
+    preview: "previews/gilded-grandeur.webp",
+  },
+  compatibility: {
+    styler: { minimumVersion: "0.1.0" },
+    codex: {
+      mode: "semantic",
+      testedVersions: ["26.707.72221", "26.707.91948"],
+    },
+  },
+  variants: {
+    light: {
+      ...detailedVariant(
+        variant(
+          "#d6bd80",
+          "#f7edcf",
+          "#2d210f",
+          "#6e5b3a",
+          "#aa8c4e",
+          "#87560b",
+          "#f1e2bb",
+          0.38,
+          0.88,
+          {
+            layout: "editorial",
+            iconStyle: "themed",
+            decorations: "expressive",
+          },
+        ),
+        {
+          canvas: "#dfc98f",
+          surfaceRaised: "#fff6dc",
+          surfaceOverlay: "#f5e5bc",
+          surfaceSunken: "#e8d39e",
+          control: "#f0dfb5",
+          controlHover: "#e7cf93",
+          controlActive: "#dbc17c",
+          textTertiary: "#77613d",
+          onAccent: "#fff9e8",
+          borderSubtle: "#cdb271",
+          borderStrong: "#8f6d28",
+          focus: "#87560b",
+          success: "#236b43",
+          warning: "#81500d",
+          danger: "#a7352e",
+          info: "#245d8a",
+          added: "#236b43",
+          modified: "#81500d",
+          deleted: "#a7352e",
+        },
+        { intensity: 0.42, parallax: 6, targetFps: 30 },
+        10,
+      ),
+      background: {
+        color: "#d6bd80",
+        image: "assets/gilded-grandeur.webp",
+        position: { x: 54, y: 48 },
+        brightness: 1.04,
+        blur: 0,
+        overlay: "#f0dfb5",
+        overlayOpacity: 0.38,
+      },
+    },
+    dark: {
+      ...detailedVariant(
+        variant(
+          "#090704",
+          "#18130b",
+          "#fff2cd",
+          "#c0a875",
+          "#5b4721",
+          "#e8bd55",
+          "#080602",
+          0.34,
+          0.76,
+          {
+            layout: "editorial",
+            iconStyle: "themed",
+            decorations: "expressive",
+          },
+        ),
+        {
+          canvas: "#0b0804",
+          surfaceRaised: "#21190c",
+          surfaceOverlay: "#2a1e0d",
+          surfaceSunken: "#100c06",
+          control: "#2b210f",
+          controlHover: "#3a2b12",
+          controlActive: "#4b3714",
+          textTertiary: "#a98c59",
+          onAccent: "#211400",
+          borderSubtle: "#46381f",
+          borderStrong: "#80652d",
+          focus: "#f2c75b",
+          success: "#72b881",
+          warning: "#f0bf4a",
+          danger: "#e9786e",
+          info: "#85b9e6",
+          added: "#72b881",
+          modified: "#f0bf4a",
+          deleted: "#e9786e",
+        },
+        { intensity: 0.48, parallax: 7, targetFps: 30 },
+        10,
+      ),
+      background: {
+        color: "#090704",
+        image: "assets/gilded-grandeur.webp",
+        position: { x: 54, y: 48 },
+        brightness: 0.82,
+        blur: 0,
+        overlay: "#080602",
+        overlayOpacity: 0.34,
+      },
+    },
+  },
+  scene: {
+    layers: [
+      {
+        id: "gilded-background",
+        type: "image",
+        asset: "assets/gilded-grandeur.webp",
+        opacity: 1,
+        blendMode: "normal",
+        parallax: 7,
+      },
+      {
+        id: "gilded-vignette",
+        type: "vignette",
+        opacity: 0.4,
+        blendMode: "multiply",
+        parallax: 0,
+      },
+    ],
+    entities: [],
+  },
+  assets: [
+    {
+      id: "gilded-background",
+      path: "assets/gilded-grandeur.webp",
+      type: "background",
+      license: "CC-BY-4.0",
+    },
+    {
+      id: "gilded-preview",
+      path: "previews/gilded-grandeur.webp",
+      type: "preview",
+      license: "CC-BY-4.0",
+    },
+  ],
+  locales: {
+    en: {
+      name: "Gilded Grandeur",
+      description:
+        "Obsidian architecture, warm gold light, and deeply polished workspace surfaces.",
+    },
+    "zh-CN": {
+      name: "金辉盛境",
+      description: "黑曜石建筑、鎏金暖光与层次分明的华丽工作区表面。",
+    },
+  },
+};
+
+export const merryBigTop: ThemeDefinition = {
+  format: THEME_FORMAT,
+  id: "codex-styler.merry-big-top",
+  version: "1.0.0",
+  metadata: {
+    name: "Merry Big Top",
+    description:
+      "A playful theatrical workspace with tactile circus color and buoyant motion.",
+    author: "Codex Styler contributors",
+    license: "CC-BY-4.0",
+    tags: ["circus", "playful", "image", "colorful", "light", "dark"],
+    preview: "previews/merry-big-top.webp",
+  },
+  compatibility: {
+    styler: { minimumVersion: "0.1.0" },
+    codex: {
+      mode: "semantic",
+      testedVersions: ["26.707.72221", "26.707.91948"],
+    },
+  },
+  variants: {
+    light: {
+      ...detailedVariant(
+        variant(
+          "#d99a61",
+          "#fff1d9",
+          "#2b1b19",
+          "#715a54",
+          "#c58a70",
+          "#b72f2d",
+          "#ffe7c2",
+          0.28,
+          0.88,
+          {
+            layout: "immersive",
+            iconStyle: "themed",
+            decorations: "expressive",
+          },
+        ),
+        {
+          canvas: "#efbd83",
+          surfaceRaised: "#fff8e8",
+          surfaceOverlay: "#ffe7c8",
+          surfaceSunken: "#f2cba4",
+          control: "#f9dcc0",
+          controlHover: "#efc7a7",
+          controlActive: "#e6b38f",
+          textTertiary: "#76574e",
+          onAccent: "#fff8e8",
+          borderSubtle: "#d7a188",
+          borderStrong: "#9f554c",
+          focus: "#9f2928",
+          success: "#17705d",
+          warning: "#85520b",
+          danger: "#a72f3b",
+          info: "#176785",
+          added: "#17705d",
+          modified: "#85520b",
+          deleted: "#a72f3b",
+        },
+        { intensity: 0.72, parallax: 11, targetFps: 60 },
+        18,
+      ),
+      background: {
+        color: "#d99a61",
+        image: "assets/merry-big-top.webp",
+        position: { x: 55, y: 48 },
+        brightness: 1.04,
+        blur: 0,
+        overlay: "#ffe3bd",
+        overlayOpacity: 0.28,
+      },
+    },
+    dark: {
+      ...detailedVariant(
+        variant(
+          "#100b14",
+          "#241923",
+          "#fff2dc",
+          "#cdb9ac",
+          "#5a3d4b",
+          "#ff755e",
+          "#0b0b13",
+          0.34,
+          0.74,
+          {
+            layout: "immersive",
+            iconStyle: "themed",
+            decorations: "expressive",
+          },
+        ),
+        {
+          canvas: "#100b14",
+          surfaceRaised: "#30202c",
+          surfaceOverlay: "#3a2433",
+          surfaceSunken: "#171018",
+          control: "#352431",
+          controlHover: "#463044",
+          controlActive: "#5a354d",
+          textTertiary: "#b798a9",
+          onAccent: "#2c1010",
+          borderSubtle: "#5a3d4b",
+          borderStrong: "#9a5a6d",
+          focus: "#ff8b73",
+          success: "#61c8a3",
+          warning: "#f4bd55",
+          danger: "#ff7e86",
+          info: "#68c7df",
+          added: "#61c8a3",
+          modified: "#f4bd55",
+          deleted: "#ff7e86",
+        },
+        { intensity: 0.78, parallax: 13, targetFps: 60 },
+        18,
+      ),
+      background: {
+        color: "#100b14",
+        image: "assets/merry-big-top.webp",
+        position: { x: 55, y: 48 },
+        brightness: 0.82,
+        blur: 0,
+        overlay: "#0b0b13",
+        overlayOpacity: 0.34,
+      },
+    },
+  },
+  scene: {
+    layers: [
+      {
+        id: "big-top-background",
+        type: "image",
+        asset: "assets/merry-big-top.webp",
+        opacity: 1,
+        blendMode: "normal",
+        parallax: 13,
+      },
+      {
+        id: "big-top-vignette",
+        type: "vignette",
+        opacity: 0.28,
+        blendMode: "multiply",
+        parallax: 0,
+      },
+    ],
+    entities: [],
+  },
+  assets: [
+    {
+      id: "big-top-background",
+      path: "assets/merry-big-top.webp",
+      type: "background",
+      license: "CC-BY-4.0",
+    },
+    {
+      id: "big-top-preview",
+      path: "previews/merry-big-top.webp",
+      type: "preview",
+      license: "CC-BY-4.0",
+    },
+  ],
+  locales: {
+    en: {
+      name: "Merry Big Top",
+      description:
+        "A tactile circus stage with playful color, rounded chrome, and buoyant motion.",
+    },
+    "zh-CN": {
+      name: "滑稽马戏团",
+      description: "有趣的马戏舞台、圆润组件、活泼配色与轻快动态。",
+    },
+  },
+};
+
+export const builtinThemes = [
+  nativeRefined,
+  gildedGrandeur,
+  merryBigTop,
+  nocturneStudio,
+  quietGarden,
+];

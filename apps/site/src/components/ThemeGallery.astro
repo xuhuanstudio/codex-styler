@@ -11,22 +11,40 @@ const themes = [
     number: "01",
     name: "Native Refined",
     image: null,
-    tags: zh ? "低干扰 · 明暗双版本 · 自动验证" : "LOW-DISTRACTION · LIGHT/DARK · AUTO VERIFIED",
+    tags: zh ? "低干扰 · 明暗双版本 · 默认 MOSS" : "LOW-DISTRACTION · LIGHT/DARK · MOSS DEFAULT",
     description: zh
-      ? "保留 Codex 原生秩序，重新校准表面对比、边界和阅读节奏。"
-      : "Preserves the native order while recalibrating surface contrast, boundaries, and reading rhythm.",
+      ? "保留 Codex 原生秩序，重新校准表面对比、边界和阅读节奏，并默认搭配 Moss。"
+      : "Preserves the native order while recalibrating surface contrast, boundaries, and reading rhythm, paired with Moss by default.",
   },
   {
     number: "02",
-    name: "Nocturne Studio",
-    image: "/media/nocturne-studio.webp",
-    tags: zh ? "电影感 · 图片背景 · 轻微视差" : "CINEMATIC · IMAGE SCENE · PARALLAX",
+    name: "Gilded Grandeur",
+    image: "/media/gilded-grandeur.webp",
+    tags: zh ? "鎏金 · 完整语义色板 · 默认 RESET GOD" : "GILDED · SEMANTIC PALETTE · RESET GOD DEFAULT",
     description: zh
-      ? "以墨色建筑、烟熏表面与克制的琥珀光构成深夜工作空间。"
-      : "An after-dark workspace built from ink architecture, smoked surfaces, and restrained amber light.",
+      ? "以黑曜石建筑、暖金光线和克制的华丽细节构成层次分明的工作空间，并默认搭配 Reset God。"
+      : "Obsidian architecture, warm gold light, controlled opulence, and Reset God shape a deeply layered workspace.",
   },
   {
     number: "03",
+    name: "Merry Big Top",
+    image: "/media/merry-big-top.webp",
+    tags: zh ? "马戏 · 活泼动态 · 默认 TOKEN THIEF" : "CIRCUS · LIVELY MOTION · TOKEN THIEF DEFAULT",
+    description: zh
+      ? "有趣但不杂乱的马戏舞台，以圆润组件、鲜明状态色、轻快动态和 Token Thief 建立完整风格。"
+      : "A playful but controlled circus stage with rounded chrome, vivid state colors, buoyant motion, and Token Thief.",
+  },
+  {
+    number: "04",
+    name: "Nocturne Studio",
+    image: "/media/nocturne-studio.webp",
+    tags: zh ? "电影感 · 图片背景 · 默认 MOSS" : "CINEMATIC · IMAGE SCENE · MOSS DEFAULT",
+    description: zh
+      ? "以墨色建筑、烟熏表面与克制的琥珀光构成深夜工作空间，并默认搭配 Moss。"
+      : "An after-dark workspace built from ink architecture, smoked surfaces, restrained amber light, and Moss by default.",
+  },
+  {
+    number: "05",
     name: "Quiet Garden Companion",
     image: "/media/quiet-garden.webp",
     tags: zh ? "自然 · 16 方向实体 · 减少动态" : "NATURE · 16-DIRECTION ENTITY · REDUCED MOTION",
@@ -40,8 +58,8 @@ const themes = [
 <BaseLayout
   title={zh ? "主题画廊 — Codex Styler" : "Codex Desktop Theme Gallery — Codex Styler"}
   description={zh
-    ? "浏览 Codex Styler 的原创 OpenAI Codex Desktop 主题：原生精修、夜曲工作室和带 2D 互动壁虎的静谧花园。"
-    : "Explore original Codex Desktop themes from Codex Styler: Native Refined, Nocturne Studio, and Quiet Garden with a 2D interactive gecko."}
+    ? "浏览 Codex Styler 的五个原创 OpenAI Codex Desktop 主题，包括原生精修、金辉盛境、滑稽马戏团、夜曲工作室和静谧花园。"
+    : "Explore five original Codex Desktop themes from Codex Styler, led by Native Refined, Gilded Grandeur, and Merry Big Top."}
   locale={locale}
   path="/themes/"
   image="/media/nocturne-studio.webp"
@@ -49,10 +67,10 @@ const themes = [
   <main class="gallery-page">
     <header class="gallery-hero">
       <span class="eyebrow"><i></i>{zh ? "原创主题 · 可替换场景系统" : "ORIGINAL THEMES · REPLACEABLE SCENE SYSTEM"}</span>
-      <h1>{zh ? "三种气候，同一套开放语法。" : "Three climates. One open grammar."}</h1>
+      <h1>{zh ? "五种气候，同一套开放语法。" : "Five climates. One open grammar."}</h1>
       <p>{zh
-        ? "这些不是写死的皮肤，而是用相同的背景、表面、图层、实体、渲染器和行为模型构成的三个证明。"
-        : "These are not hard-coded skins. They are three proofs built from the same background, surface, layer, entity, renderer, and behavior model."}</p>
+        ? "这些不是写死的皮肤，而是用相同的背景、表面、图层、实体、渲染器和行为模型构成的五个证明。"
+        : "These are not hard-coded skins. They are five proofs built from the same background, surface, layer, entity, renderer, and behavior model."}</p>
     </header>
 
     <section class="gallery-list">

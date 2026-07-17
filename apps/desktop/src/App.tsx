@@ -26,7 +26,6 @@ import {
   Sun,
   Trash2,
   Upload,
-  WifiOff,
   X,
 } from "lucide-react";
 import {
@@ -71,12 +70,16 @@ import {
 } from "./lib/storage";
 import {
   applyTheme,
+  checkForUpdates,
   detectCodex,
+  downloadAndInstallUpdate,
   getRuntimeStatus,
   launchCodex,
   pauseTheme,
   quitCodex,
+  restartApp,
   restoreOfficial,
+  type AvailableUpdate,
   type CodexDetection,
   type RuntimeStatus,
 } from "./lib/runtime";
@@ -101,6 +104,8 @@ type View = "home" | "themes" | "companions" | "settings" | "editor";
 type ThemeCollection = "builtIn" | "mine";
 type NewThemeStep = "choose" | "existing";
 type ThemeVariantName = "light" | "dark";
+type UpdateStatus = "idle" | "checking" | "current" | "error";
+type UpdateInstallStatus = "idle" | "downloading" | "installing" | "restarting";
 
 const initialRuntime: RuntimeStatus = {
   state: "idle",
@@ -134,6 +139,13 @@ export function App() {
   >({});
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.5");
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
+  const [availableUpdate, setAvailableUpdate] =
+    useState<AvailableUpdate | null>(null);
+  const [updateInstallStatus, setUpdateInstallStatus] =
+    useState<UpdateInstallStatus>("idle");
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(
     !settings.onboardingComplete,
   );
@@ -152,20 +164,41 @@ export function App() {
   const [adaptiveSchemes, setAdaptiveSchemes] = useState<AdaptiveScheme[]>([]);
   const [activeAdaptiveScheme, setActiveAdaptiveScheme] =
     useState<AdaptiveSchemeId | null>(null);
+  const startupUpdateCheckRef = useRef(false);
 
   const locale = resolveLocale(settings.locale);
   const t = (key: MessageKey) => translate(locale, key);
+  const themePersistenceMessage = (error: unknown) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (
+      /theme asset is unavailable|missing generated theme asset|declared asset is missing/i.test(
+        detail,
+      )
+    ) {
+      return t("themeAssetUnavailable");
+    }
+    if (/theme manifest is invalid|must |invalid value/i.test(detail)) {
+      return t("themeValidationFailed");
+    }
+    return t("themeSaveFailed");
+  };
   const resolveAsset = (theme: ThemeDefinition, path: string) =>
     themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
-  const selectedCompanion =
+  const explicitCompanion =
     builtinCompanions.find((item) => item.id === settings.companionId) ?? null;
+  const companionForTheme = (theme: ThemeDefinition) => {
+    if (settings.companionMode === "disabled") return null;
+    if (settings.companionMode === "custom") return explicitCompanion;
+    return defaultCompanionForTheme(theme.id);
+  };
+  const selectedCompanion = companionForTheme(selectedTheme);
   const appliedTheme =
     [...builtinThemes, ...localThemes].find(
       (theme) => theme.id === settings.appliedThemeId,
     ) ?? selectedTheme;
   const composeTheme = (
     theme: ThemeDefinition,
-    companion = selectedCompanion,
+    companion: CompanionDefinition | null = companionForTheme(theme),
   ) => {
     if (!companion) return composeThemeWithCompanion(theme, null);
     const overrides: {
@@ -226,6 +259,21 @@ export function App() {
     return () => window.clearTimeout(timeout);
   }, [toast]);
 
+  useEffect(() => {
+    if (
+      startupUpdateCheckRef.current ||
+      !settings.onboardingComplete ||
+      !settings.automaticUpdateChecks
+    ) {
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      startupUpdateCheckRef.current = true;
+      void handleCheckForUpdates(false);
+    }, 900);
+    return () => window.clearTimeout(timeout);
+  }, [settings.automaticUpdateChecks, settings.onboardingComplete]);
+
   const appTheme = useMemo(() => {
     if (settings.appearance === "system") return "system";
     return settings.appearance;
@@ -235,7 +283,7 @@ export function App() {
 
   async function performApply(
     theme: ThemeDefinition,
-    companion: CompanionDefinition | null = selectedCompanion,
+    companion: CompanionDefinition | null = companionForTheme(theme),
   ) {
     const composed = composeTheme(theme, companion);
     setBusy(true);
@@ -277,7 +325,7 @@ export function App() {
 
   function requestApply(
     theme: ThemeDefinition = view === "editor" ? draftTheme : selectedTheme,
-    companion: CompanionDefinition | null = selectedCompanion,
+    companion: CompanionDefinition | null = companionForTheme(theme),
   ) {
     if (needsManualRestart) {
       setPendingApplication({ theme, companion });
@@ -312,6 +360,67 @@ export function App() {
     setToast(t("restore"));
   }
 
+  async function handleCheckForUpdates(manual = true) {
+    setUpdateStatus("checking");
+    try {
+      const result = await checkForUpdates();
+      const checkedAt = new Date().toISOString();
+      setCurrentVersion(result.currentVersion);
+      updateSettings({ lastUpdateCheckAt: checkedAt });
+      setUpdateStatus("current");
+      if (
+        result.update &&
+        (manual || result.update.version !== settings.skippedUpdateVersion)
+      ) {
+        setAvailableUpdate(result.update);
+        setUpdateInstallStatus("idle");
+        setUpdateProgress(null);
+      } else if (manual) {
+        setToast(t("upToDate"));
+      }
+    } catch (error) {
+      console.error(error);
+      setUpdateStatus("error");
+      if (manual) setToast(t("updateCheckFailed"));
+    }
+  }
+
+  async function handleDownloadAndInstallUpdate() {
+    if (!availableUpdate || updateInstallStatus !== "idle") return;
+    let downloaded = 0;
+    let contentLength: number | null = null;
+    setUpdateInstallStatus("downloading");
+    setUpdateProgress(0);
+    try {
+      await downloadAndInstallUpdate((event) => {
+        if (event.event === "Started") {
+          contentLength = event.data.contentLength;
+          downloaded = 0;
+          setUpdateProgress(contentLength ? 0 : null);
+          return;
+        }
+        if (event.event === "Progress") {
+          downloaded += event.data.chunkLength;
+          setUpdateProgress(
+            contentLength
+              ? Math.min(100, Math.round((downloaded / contentLength) * 100))
+              : null,
+          );
+          return;
+        }
+        setUpdateProgress(100);
+        setUpdateInstallStatus("installing");
+      });
+      setUpdateInstallStatus("restarting");
+      await restartApp();
+    } catch (error) {
+      console.error(error);
+      setUpdateInstallStatus("idle");
+      setUpdateProgress(null);
+      setToast(t("updateInstallFailed"));
+    }
+  }
+
   function updateSettings(patch: Partial<UserSettings>) {
     setSettings((current) => ({ ...current, ...patch }));
   }
@@ -331,7 +440,7 @@ export function App() {
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
-    requestApply(theme, selectedCompanion);
+    requestApply(theme, companionForTheme(theme));
   }
 
   function updateVariant(
@@ -381,7 +490,10 @@ export function App() {
   }
 
   function selectCompanion(companion: CompanionDefinition | null) {
-    updateSettings({ companionId: companion?.id ?? null });
+    updateSettings({
+      companionMode: companion ? "custom" : "disabled",
+      companionId: companion?.id ?? null,
+    });
     setToast(t("companionUpdated"));
   }
 
@@ -440,7 +552,7 @@ export function App() {
       setView("editor");
     } catch (error) {
       console.error(error);
-      setToast(t("invalidTheme"));
+      setToast(themePersistenceMessage(error));
     } finally {
       setBusy(false);
     }
@@ -483,7 +595,9 @@ export function App() {
       if (backgroundImportMode === "replace") {
         const replacement = structuredClone(draftTheme);
         replacement.variants = structuredClone(generated.theme.variants);
-        replacement.scene.layers = structuredClone(generated.theme.scene.layers);
+        replacement.scene.layers = structuredClone(
+          generated.theme.scene.layers,
+        );
         replacement.assets = structuredClone(generated.theme.assets);
         delete replacement.metadata.preview;
         const assetMap = await persistGeneratedTheme(
@@ -554,7 +668,7 @@ export function App() {
       setToast(t("exportReady"));
     } catch (error) {
       console.error(error);
-      setToast(t("invalidTheme"));
+      setToast(themePersistenceMessage(error));
     }
   }
 
@@ -594,7 +708,7 @@ export function App() {
       return true;
     } catch (error) {
       console.error(error);
-      setToast(t("invalidTheme"));
+      setToast(themePersistenceMessage(error));
       return false;
     } finally {
       setBusy(false);
@@ -774,7 +888,7 @@ export function App() {
             locale={locale}
             theme={composeTheme(appliedTheme)}
             sourceTheme={appliedTheme}
-            companion={selectedCompanion}
+            companion={companionForTheme(appliedTheme)}
             runtime={runtime}
             runtimeStrategy={settings.runtimeStrategy}
             variant={variant}
@@ -866,8 +980,11 @@ export function App() {
         {view === "settings" && (
           <SettingsView
             settings={settings}
+            currentVersion={currentVersion}
+            updateStatus={updateStatus}
             t={t}
             onChange={updateSettings}
+            onCheckForUpdates={() => void handleCheckForUpdates(true)}
             onOpenOnboarding={() => setShowOnboarding(true)}
           />
         )}
@@ -995,6 +1112,89 @@ export function App() {
         </div>
       )}
 
+      {availableUpdate && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog update-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="update-dialog-title"
+          >
+            <span className="confirm-dialog__icon update-dialog__icon">
+              <Download size={18} />
+            </span>
+            <div className="update-dialog__heading">
+              <span>{t("updateAvailable")}</span>
+              <h2 id="update-dialog-title">
+                Codex Styler {availableUpdate.version}
+              </h2>
+              {availableUpdate.prerelease && <small>{t("prerelease")}</small>}
+            </div>
+            <p>{t("updateAvailableBody")}</p>
+            {availableUpdate.notes && (
+              <div className="update-dialog__notes">
+                <strong>{t("releaseNotes")}</strong>
+                <p>{availableUpdate.notes}</p>
+              </div>
+            )}
+            {updateInstallStatus !== "idle" && (
+              <div className="update-dialog__progress" aria-live="polite">
+                <div>
+                  <span>
+                    {updateInstallStatus === "downloading"
+                      ? t("downloadingUpdate")
+                      : updateInstallStatus === "installing"
+                        ? t("installingUpdate")
+                        : t("restartingAfterUpdate")}
+                  </span>
+                  {updateProgress !== null &&
+                    updateInstallStatus === "downloading" && (
+                      <strong>{updateProgress}%</strong>
+                    )}
+                </div>
+                <span className="update-dialog__progress-track">
+                  <span
+                    style={{
+                      width:
+                        updateProgress === null ? "34%" : `${updateProgress}%`,
+                    }}
+                  />
+                </span>
+              </div>
+            )}
+            <div className="update-dialog__secondary-actions">
+              <button
+                className="text-button"
+                disabled={updateInstallStatus !== "idle"}
+                onClick={() => {
+                  updateSettings({
+                    skippedUpdateVersion: availableUpdate.version,
+                  });
+                  setAvailableUpdate(null);
+                }}
+              >
+                {t("skipThisVersion")}
+              </button>
+              <button
+                className="secondary-button"
+                disabled={updateInstallStatus !== "idle"}
+                onClick={() => setAvailableUpdate(null)}
+              >
+                {t("remindMeLater")}
+              </button>
+              <button
+                className="primary-button"
+                disabled={updateInstallStatus !== "idle"}
+                onClick={() => void handleDownloadAndInstallUpdate()}
+              >
+                <Download size={14} />
+                {t("downloadAndInstall")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {toast && (
         <div className="toast" role="status">
           <Check size={15} />
@@ -1043,10 +1243,9 @@ function HomeView({
   onCompanions: () => void;
   onRestore: () => void;
 }) {
-  const copy =
-    sourceTheme.locales[locale] ?? sourceTheme.locales.en;
+  const copy = sourceTheme.locales[locale] ?? sourceTheme.locales.en;
   const companionCopy = companion
-    ? companion.locales[locale] ?? companion.locales.en
+    ? (companion.locales[locale] ?? companion.locales.en)
     : null;
   return (
     <div className="page home-page">
@@ -1115,19 +1314,25 @@ function HomeView({
 
       <section className="home-actions" aria-label={t("quickActions")}>
         <button onClick={onBrowse}>
-          <span><Palette size={18} /></span>
+          <span>
+            <Palette size={18} />
+          </span>
           <strong>{t("browseThemes")}</strong>
           <small>{t("browseThemesDetail")}</small>
           <ChevronRight size={15} />
         </button>
         <button onClick={onCreateFromImage}>
-          <span><Image size={18} /></span>
+          <span>
+            <Image size={18} />
+          </span>
           <strong>{t("createFromImage")}</strong>
           <small>{t("createFromImageDetail")}</small>
           <ChevronRight size={15} />
         </button>
         <button onClick={onCompanions}>
-          <span><PawPrint size={18} /></span>
+          <span>
+            <PawPrint size={18} />
+          </span>
           <strong>{t("chooseCompanion")}</strong>
           <small>{t("chooseCompanionDetail")}</small>
           <ChevronRight size={15} />
@@ -1201,7 +1406,11 @@ function ThemesView({
         </div>
       </section>
 
-      <div className="theme-collection-tabs" role="tablist" aria-label={t("themes")}>
+      <div
+        className="theme-collection-tabs"
+        role="tablist"
+        aria-label={t("themes")}
+      >
         <button
           role="tab"
           aria-selected={collection === "builtIn"}
@@ -1224,7 +1433,9 @@ function ThemesView({
 
       {themes.length === 0 ? (
         <section className="empty-state theme-empty-state">
-          <span className="empty-state__icon"><FolderOpen size={25} /></span>
+          <span className="empty-state__icon">
+            <FolderOpen size={25} />
+          </span>
           <h2>{t("noLocalThemesTitle")}</h2>
           <p>{t("noLocalThemes")}</p>
           <div className="button-row">
@@ -1236,84 +1447,94 @@ function ThemesView({
             </button>
           </div>
         </section>
-      ) : (<>
-      <section className="featured-theme theme-detail-card">
-        <div className="featured-theme__preview">
-          <div className="featured-theme__label">{t("selectedTheme")}</div>
-          <PreviewWorkspace
-            theme={previewTheme}
-            variant={variant}
-            locale={locale}
-            reduceMotion={reduceMotion}
-            resolveAsset={resolveAsset}
-          />
-        </div>
-        <div className="featured-theme__copy">
-          <span>
-            THEME {String(Math.max(1, selectedIndex)).padStart(2, "0")} /{" "}
-            {localized.name.toUpperCase()}
-          </span>
-          <h2>{localized.name}</h2>
-          <p>{localized.description}</p>
-          <div className="theme-facts">
-            <div>
-              <small>{t("performance")}</small>
-              <strong>{performance}</strong>
+      ) : (
+        <>
+          <section className="featured-theme theme-detail-card">
+            <div className="featured-theme__preview">
+              <div className="featured-theme__label">{t("selectedTheme")}</div>
+              <PreviewWorkspace
+                theme={previewTheme}
+                variant={variant}
+                locale={locale}
+                reduceMotion={reduceMotion}
+                resolveAsset={resolveAsset}
+              />
             </div>
-            <div>
-              <small>{t("interactive")}</small>
-              <strong>
-                {previewTheme.scene.entities.length ? "Pointer" : "—"}
-              </strong>
+            <div className="featured-theme__copy">
+              <span>
+                THEME {String(Math.max(1, selectedIndex)).padStart(2, "0")} /{" "}
+                {localized.name.toUpperCase()}
+              </span>
+              <h2>{localized.name}</h2>
+              <p>{localized.description}</p>
+              <div className="theme-facts">
+                <div>
+                  <small>{t("performance")}</small>
+                  <strong>{performance}</strong>
+                </div>
+                <div>
+                  <small>{t("interactive")}</small>
+                  <strong>
+                    {previewTheme.scene.entities.length ? "Pointer" : "—"}
+                  </strong>
+                </div>
+              </div>
+              <div className="button-row">
+                <button
+                  className="primary-button"
+                  onClick={() => onApply(selectedTheme)}
+                >
+                  <Play size={14} />
+                  {t("apply")}
+                </button>
+                <button
+                  className="secondary-button"
+                  onClick={() => onEdit(selectedTheme)}
+                >
+                  {collection === "builtIn"
+                    ? t("customizeCopy")
+                    : t("editTheme")}
+                  <ChevronRight size={15} />
+                </button>
+              </div>
             </div>
-          </div>
-          <div className="button-row">
-            <button
-              className="primary-button"
-              onClick={() => onApply(selectedTheme)}
-            >
-              <Play size={14} />
-              {t("apply")}
-            </button>
-            <button
-              className="secondary-button"
-              onClick={() => onEdit(selectedTheme)}
-            >
-              {collection === "builtIn" ? t("customizeCopy") : t("editTheme")}
-              <ChevronRight size={15} />
-            </button>
-          </div>
-        </div>
-      </section>
+          </section>
 
-      <section className="theme-index">
-        <div className="section-heading">
-          <div>
-            <span>THEME INDEX</span>
-            <h2>{collection === "builtIn" ? t("builtInThemes") : t("myThemes")}</h2>
-          </div>
-          <span className="section-count">{themes.length} {t("themesCount")}</span>
-        </div>
-        <div className="theme-list">
-          {themes.map((theme, index) => (
-            <ThemeRow
-              key={theme.id}
-              theme={theme}
-              index={index + 1}
-              locale={locale}
-              active={selectedTheme.id === theme.id}
-              resolveAsset={resolveAsset}
-              onSelect={() => onSelect(theme)}
-              onApply={() => onApply(theme)}
-              local={collection === "mine"}
-              onEdit={() => onEdit(theme)}
-              onDelete={() => onDelete(theme)}
-              t={t}
-            />
-          ))}
-        </div>
-      </section>
-      </>)}
+          <section className="theme-index">
+            <div className="section-heading">
+              <div>
+                <span>THEME INDEX</span>
+                <h2>
+                  {collection === "builtIn"
+                    ? t("builtInThemes")
+                    : t("myThemes")}
+                </h2>
+              </div>
+              <span className="section-count">
+                {themes.length} {t("themesCount")}
+              </span>
+            </div>
+            <div className="theme-list">
+              {themes.map((theme, index) => (
+                <ThemeRow
+                  key={theme.id}
+                  theme={theme}
+                  index={index + 1}
+                  locale={locale}
+                  active={selectedTheme.id === theme.id}
+                  resolveAsset={resolveAsset}
+                  onSelect={() => onSelect(theme)}
+                  onApply={() => onApply(theme)}
+                  local={collection === "mine"}
+                  onEdit={() => onEdit(theme)}
+                  onDelete={() => onDelete(theme)}
+                  t={t}
+                />
+              ))}
+            </div>
+          </section>
+        </>
+      )}
     </div>
   );
 }
@@ -1472,6 +1693,27 @@ function CompanionsView({
           {builtinCompanions.map((item) => {
             const copy = item.locales[locale] ?? item.locales.en;
             const active = selected?.id === item.id;
+            const renderer = item.entity.renderer;
+            const previewSize = 64;
+            const frameScale =
+              renderer.type === "sprite-atlas"
+                ? Math.min(
+                    previewSize / renderer.frameWidth,
+                    previewSize / renderer.frameHeight,
+                  )
+                : 1;
+            const backgroundSize =
+              renderer.type === "sprite-atlas"
+                ? `${renderer.columns * renderer.frameWidth * frameScale}px ${renderer.rows * renderer.frameHeight * frameScale}px`
+                : "contain";
+            const frameWidth =
+              renderer.type === "sprite-atlas"
+                ? renderer.frameWidth * frameScale
+                : previewSize;
+            const frameHeight =
+              renderer.type === "sprite-atlas"
+                ? renderer.frameHeight * frameScale
+                : previewSize;
             return (
               <button
                 key={item.id}
@@ -1481,12 +1723,17 @@ function CompanionsView({
                 }
                 onClick={() => onSelect(item)}
               >
-                <span
-                  className="companion-option__visual companion-option__visual--moss"
-                  style={{
-                    backgroundImage: `url(${resolveAsset(theme, item.entity.renderer.asset)})`,
-                  }}
-                />
+                <span className="companion-option__visual companion-option__visual--sprite">
+                  <span
+                    className="companion-option__frame"
+                    style={{
+                      width: `${frameWidth}px`,
+                      height: `${frameHeight}px`,
+                      backgroundImage: `url(${resolveAsset(theme, renderer.asset)})`,
+                      backgroundSize,
+                    }}
+                  />
+                </span>
                 <span>
                   <strong>{copy.name}</strong>
                   <small>{copy.description}</small>
@@ -1568,7 +1815,9 @@ function CreateView({
             <ChevronRight size={16} />
           </button>
           <div>
-            <span>{t("themes")} / {t("editTheme")}</span>
+            <span>
+              {t("themes")} / {t("editTheme")}
+            </span>
             <h1>{theme.locales[locale]?.name ?? theme.metadata.name}</h1>
           </div>
         </div>
@@ -1948,10 +2197,7 @@ function CreateView({
             </InspectorSection>
           )}
           {activeLayer === "motion" && (
-            <InspectorSection
-              title={t("motion")}
-              icon={<Sparkles size={14} />}
-            >
+            <InspectorSection title={t("motion")} icon={<Sparkles size={14} />}>
               <div className="motion-recipes" aria-label={t("motionStyle")}>
                 {[
                   { id: "none", intensity: 0, parallax: 0, fps: 30 },
@@ -1960,8 +2206,8 @@ function CreateView({
                   { id: "expressive", intensity: 0.8, parallax: 14, fps: 60 },
                 ].map((recipe) => {
                   const active =
-                    Math.abs(visual.motion.intensity - recipe.intensity) < 0.01 &&
-                    visual.motion.parallax === recipe.parallax;
+                    Math.abs(visual.motion.intensity - recipe.intensity) <
+                      0.01 && visual.motion.parallax === recipe.parallax;
                   const label =
                     recipe.id === "none"
                       ? t("motionNone")
@@ -1975,7 +2221,11 @@ function CreateView({
                       key={recipe.id}
                       className={active ? "is-active" : ""}
                       onClick={() => {
-                        onUpdateVariant("motion", "intensity", recipe.intensity);
+                        onUpdateVariant(
+                          "motion",
+                          "intensity",
+                          recipe.intensity,
+                        );
                         onUpdateVariant("motion", "parallax", recipe.parallax);
                         onUpdateVariant("motion", "targetFps", recipe.fps);
                       }}
@@ -2197,18 +2447,29 @@ function NewThemeDialog({
             )}
             <span>{t("createTheme")}</span>
             <h2 id="new-theme-title">
-              {step === "existing" ? t("chooseStartingTheme") : t("startYourTheme")}
+              {step === "existing"
+                ? t("chooseStartingTheme")
+                : t("startYourTheme")}
             </h2>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label={t("cancel")}>
+          <button
+            className="icon-button"
+            onClick={onClose}
+            aria-label={t("cancel")}
+          >
             <X size={16} />
           </button>
         </header>
 
         {step === "choose" ? (
           <div className="new-theme-options">
-            <button className="new-theme-option new-theme-option--image" onClick={onImage}>
-              <span className="new-theme-option__icon"><Image size={21} /></span>
+            <button
+              className="new-theme-option new-theme-option--image"
+              onClick={onImage}
+            >
+              <span className="new-theme-option__icon">
+                <Image size={21} />
+              </span>
               <span>
                 <small>{t("recommended")}</small>
                 <strong>{t("createFromImage")}</strong>
@@ -2217,7 +2478,9 @@ function NewThemeDialog({
               <ChevronRight size={16} />
             </button>
             <button className="new-theme-option" onClick={onBlank}>
-              <span className="new-theme-option__icon"><Plus size={21} /></span>
+              <span className="new-theme-option__icon">
+                <Plus size={21} />
+              </span>
               <span>
                 <small>{t("cleanStart")}</small>
                 <strong>{t("startBlank")}</strong>
@@ -2229,7 +2492,9 @@ function NewThemeDialog({
               className="new-theme-option"
               onClick={() => onChooseStep("existing")}
             >
-              <span className="new-theme-option__icon"><Copy size={21} /></span>
+              <span className="new-theme-option__icon">
+                <Copy size={21} />
+              </span>
               <span>
                 <small>{t("optionalStartingPoint")}</small>
                 <strong>{t("useExistingTheme")}</strong>
@@ -2275,15 +2540,30 @@ function NewThemeDialog({
 
 function SettingsView({
   settings,
+  currentVersion,
+  updateStatus,
   t,
   onChange,
+  onCheckForUpdates,
   onOpenOnboarding,
 }: {
   settings: UserSettings;
+  currentVersion: string;
+  updateStatus: UpdateStatus;
   t: (key: MessageKey) => string;
   onChange: (patch: Partial<UserSettings>) => void;
+  onCheckForUpdates: () => void;
   onOpenOnboarding: () => void;
 }) {
+  const lastChecked = (() => {
+    if (!settings.lastUpdateCheckAt) return t("neverChecked");
+    const date = new Date(settings.lastUpdateCheckAt);
+    if (Number.isNaN(date.getTime())) return t("neverChecked");
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(date);
+  })();
   return (
     <div className="page settings-page">
       <section className="page-heading">
@@ -2376,12 +2656,34 @@ function SettingsView({
           onChange={(checked) => onChange({ reduceMotion: checked })}
         />
         <SettingToggle
-          icon={<WifiOff size={17} />}
-          title={t("updateChecks")}
-          description={t("updateChecksDescription")}
-          checked={settings.manualUpdateChecks}
-          onChange={(checked) => onChange({ manualUpdateChecks: checked })}
+          icon={<RefreshCw size={17} />}
+          title={t("automaticUpdateChecks")}
+          description={t("automaticUpdateChecksDescription")}
+          checked={settings.automaticUpdateChecks}
+          onChange={(checked) => onChange({ automaticUpdateChecks: checked })}
         />
+        <section className="settings-group settings-group--row update-settings-row">
+          <div className="update-settings-row__version">
+            <small>{t("currentVersion")}</small>
+            <strong>Codex Styler {currentVersion}</strong>
+            <span>
+              {t("lastChecked")}: {lastChecked}
+            </span>
+          </div>
+          <button
+            className="secondary-button"
+            onClick={onCheckForUpdates}
+            disabled={updateStatus === "checking"}
+          >
+            <RefreshCw
+              size={14}
+              className={updateStatus === "checking" ? "is-spinning" : ""}
+            />
+            {updateStatus === "checking"
+              ? t("checkingForUpdates")
+              : t("checkForUpdates")}
+          </button>
+        </section>
         <section className="trust-grid">
           <article>
             <LockKeyhole size={20} />

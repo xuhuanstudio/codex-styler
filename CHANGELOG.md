@@ -4,6 +4,30 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.5] - 2026-07-17
+
+### Added
+
+- Gilded Grandeur and Merry Big Top as complete light/dark flagship themes with original backgrounds and semantic palettes.
+- Reset God and Token Thief companions, plus calibrated formal resources for Moss, Pico, Puddle, and Mochi.
+- Signed update manifests and archives with in-app download, install, restart, and version skipping.
+- A reusable video-companion pipeline for non-linear direction calibration, shared cropping, background cleanup, and multi-page atlases.
+
+### Changed
+
+- Promoted the two flagship themes to positions two and three, with their signature companions in matching library positions.
+- Expanded theme application across layout, icon treatment, decorations, motion, surface roles, and readability protection.
+- Unified built-in, image-derived, blank, and imported themes behind the same validated runtime and editing workflow.
+- Improved companion attachment, dragging, thumbnail framing, baseline stability, and live composer resizing.
+
+### Fixed
+
+- Custom themes now save and apply through the same verified Codex connection path as built-in themes.
+- Theme package validation no longer rejects valid locally generated archives.
+- SVG icon geometry is preserved while themed containers change visual treatment.
+- Hover and route transitions no longer allow a scene layer to cover the Codex application.
+- Light themes retain readable text and controls over imported image backgrounds.
+
 ## [0.1.0-alpha.4] - 2026-07-16
 
 ### Added
