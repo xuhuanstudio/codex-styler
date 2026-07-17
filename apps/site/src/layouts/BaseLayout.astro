@@ -19,23 +19,23 @@ const english = new URL(base + path, Astro.site);
 const chinese = new URL(base + "/zh-cn" + path, Astro.site);
 const socialImage = new URL(base + image, Astro.site);
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.1.0-alpha.5";
-const releaseAsset = "Codex-Styler_0.1.0-alpha.5_aarch64-unsigned.dmg";
-const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
+const releaseTag = "v0.1.0-alpha.6";
+const downloadUrl = `${repo}/releases/tag/${releaseTag}`;
 const isChinese = locale === "zh-CN";
 const structuredData = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
   name: "Codex Styler",
   applicationCategory: "DeveloperApplication",
-  operatingSystem: "macOS 13 or later",
-  softwareVersion: "0.1.0-alpha.5",
+  operatingSystem: "macOS 13 or later; Windows 11",
+  softwareVersion: "0.1.0-alpha.6",
   description,
   url: canonical.toString(),
   downloadUrl,
   releaseNotes: repo + "/releases/tag/" + releaseTag,
-  softwareRequirements: "macOS 13 or later; OpenAI Codex Desktop installed separately",
-  processorRequirements: "Apple Silicon (arm64)",
+  softwareRequirements:
+    "macOS 13 or later or Windows 11; OpenAI Codex Desktop installed separately",
+  processorRequirements: "Apple Silicon (arm64) or Windows x64",
   codeRepository: repo,
   license: repo + "/blob/main/LICENSE",
   isAccessibleForFree: true,

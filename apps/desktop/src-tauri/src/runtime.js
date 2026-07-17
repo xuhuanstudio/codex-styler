@@ -1,11 +1,14 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 11) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 12) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
   const ENTITY_ID = "codex-styler-entity-root";
   const STYLE_ID = "codex-styler-runtime-style";
   const APP_ROOT_ATTRIBUTE = "data-codex-styler-app-root";
+  const OVERLAY_ROOT_ATTRIBUTE = "data-codex-styler-overlay-root";
+  const UNLAYERED_ROOT_ATTRIBUTE = "data-codex-styler-unlayered-root";
+  const STATIC_ROOT_ATTRIBUTE = "data-codex-styler-static-root";
   const HEX = /^#[0-9a-f]{6}$/i;
   const DATA_IMAGE = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i;
   const PALETTE_KEYS = new Set([
@@ -268,17 +271,85 @@
     document
       .querySelectorAll(`[${APP_ROOT_ATTRIBUTE}]`)
       .forEach((element) => element.removeAttribute(APP_ROOT_ATTRIBUTE));
+    document
+      .querySelectorAll(
+        `[${OVERLAY_ROOT_ATTRIBUTE}], [${UNLAYERED_ROOT_ATTRIBUTE}], [${STATIC_ROOT_ATTRIBUTE}]`,
+      )
+      .forEach((element) => {
+        element.removeAttribute(OVERLAY_ROOT_ATTRIBUTE);
+        element.removeAttribute(UNLAYERED_ROOT_ATTRIBUTE);
+        element.removeAttribute(STATIC_ROOT_ATTRIBUTE);
+      });
   };
 
-  const updateAppRoot = () => {
-    const root = (
+  const injectedRoot = (element) =>
+    element?.id === BACKDROP_ID || element?.id === ENTITY_ID;
+
+  const appRootFallback = () => {
+    const conventionalRoot = document.querySelector("body > #root");
+    if (conventionalRoot) return conventionalRoot;
+
+    const currentRoot = document.querySelector(
+      `body > [${APP_ROOT_ATTRIBUTE}]`,
+    );
+    if (currentRoot?.isConnected) return currentRoot;
+
+    return Array.from(document.body.children)
+      .filter(
+        (element) =>
+          !injectedRoot(element) &&
+          !["SCRIPT", "STYLE", "LINK"].includes(element.tagName),
+      )
+      .sort((left, right) => {
+        const leftBounds = left.getBoundingClientRect();
+        const rightBounds = right.getBoundingClientRect();
+        return (
+          rightBounds.width * rightBounds.height -
+          leftBounds.width * leftBounds.height
+        );
+      })[0];
+  };
+
+  const updateStackingRoots = () => {
+    const anchoredRoot = (
       document.querySelector("aside.app-shell-left-panel") ||
       document.querySelector("main.main-surface")
     )?.closest("body > *");
+    const root = anchoredRoot || appRootFallback();
     document.querySelectorAll(`[${APP_ROOT_ATTRIBUTE}]`).forEach((element) => {
       if (element !== root) element.removeAttribute(APP_ROOT_ATTRIBUTE);
     });
     root?.setAttribute(APP_ROOT_ATTRIBUTE, "");
+
+    const overlaySelector =
+      '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]';
+    Array.from(document.body.children).forEach((element) => {
+      const overlay =
+        element !== root &&
+        !injectedRoot(element) &&
+        (element.matches(overlaySelector) ||
+          Boolean(element.querySelector(overlaySelector)));
+      if (!overlay) {
+        element.removeAttribute(OVERLAY_ROOT_ATTRIBUTE);
+        element.removeAttribute(UNLAYERED_ROOT_ATTRIBUTE);
+        element.removeAttribute(STATIC_ROOT_ATTRIBUTE);
+        return;
+      }
+
+      if (element.hasAttribute(OVERLAY_ROOT_ATTRIBUTE)) return;
+      const computed = getComputedStyle(element);
+      element.setAttribute(OVERLAY_ROOT_ATTRIBUTE, "");
+      if (computed.zIndex === "auto") {
+        element.setAttribute(UNLAYERED_ROOT_ATTRIBUTE, "");
+      } else {
+        element.removeAttribute(UNLAYERED_ROOT_ATTRIBUTE);
+      }
+      if (computed.position === "static") {
+        element.setAttribute(STATIC_ROOT_ATTRIBUTE, "");
+      } else {
+        element.removeAttribute(STATIC_ROOT_ATTRIBUTE);
+      }
+    });
   };
 
   const semanticPalette = (appearance, background, variant) => {
@@ -698,11 +769,18 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="task"] main.main-surface {
           background-blend-mode: normal !important;
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface > header,
-        html[data-codex-styler][data-codex-styler-mode="semantic"] header.app-header-tint {
+        html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface > header:not(.app-header-tint) {
           background: color-mix(in srgb, ${appearance.surface} ${Math.min(90, strongSurfacePercent + 4)}%, transparent) !important;
           border-color: ${appearance.border} !important;
           backdrop-filter: blur(${appearance.focusBlur}px) !important;
+        }
+        /* Codex intentionally layers docked-panel tabs above this fixed tint.
+           An opaque injected tint paints over those tabs even though they
+           remain present and interactive in the DOM. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] header.app-header-tint {
+          background: transparent !important;
+          border-color: transparent !important;
+          backdrop-filter: none !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface [role="main"] {
           background: transparent !important;
@@ -958,8 +1036,11 @@
       html[data-codex-styler] body > [${APP_ROOT_ATTRIBUTE}] {
         position: relative; z-index: 1;
       }
-      html[data-codex-styler] body > :not([${APP_ROOT_ATTRIBUTE}]):not(#${BACKDROP_ID}):not(#${ENTITY_ID}) {
+      html[data-codex-styler] body > [${OVERLAY_ROOT_ATTRIBUTE}][${UNLAYERED_ROOT_ATTRIBUTE}] {
         z-index: 2;
+      }
+      html[data-codex-styler] body > [${OVERLAY_ROOT_ATTRIBUTE}][${STATIC_ROOT_ATTRIBUTE}] {
+        position: relative;
       }
       #${BACKDROP_ID} {
         position: fixed; inset: 0; z-index: 0; pointer-events: none;
@@ -999,9 +1080,15 @@
       document.querySelector('[data-testid="home-icon"]') ||
       (document.querySelector('[data-feature="game-source"]') &&
         document.querySelector(".group\\/home-suggestions"));
+    const settings =
+      !document.querySelector("aside.app-shell-left-panel") &&
+      !document.querySelector("main.main-surface") &&
+      document.querySelector(
+        `body > [${APP_ROOT_ATTRIBUTE}] .main-surface`,
+      );
     document.documentElement.setAttribute(
       "data-codex-styler-page",
-      home ? "home" : "task",
+      home ? "home" : settings ? "settings" : "task",
     );
   };
 
@@ -1388,11 +1475,26 @@
   const verifySemanticAdapter = () => {
     const sidebar = document.querySelector("aside.app-shell-left-panel");
     const main = document.querySelector("main.main-surface");
-    if (!sidebar) return { ok: false, reason: "sidebar anchor was not found" };
-    if (!main)
-      return { ok: false, reason: "main workspace anchor was not found" };
     if (!document.getElementById(STYLE_ID)) {
       return { ok: false, reason: "runtime stylesheet was removed" };
+    }
+    const appRoot = document.querySelector(
+      `body > [${APP_ROOT_ATTRIBUTE}]`,
+    );
+    if (!appRoot) {
+      return { ok: false, reason: "application root was not found" };
+    }
+    if (!sidebar || !main) {
+      const alternateSurface = appRoot.querySelector(
+        '.main-surface, [role="dialog"], [role="alertdialog"]',
+      );
+      if (alternateSurface || appRoot.childElementCount > 0) {
+        return { ok: true, reason: null };
+      }
+      return {
+        ok: false,
+        reason: "a visible application surface was not found",
+      };
     }
     const mainStyle = getComputedStyle(main);
     if (
@@ -1431,7 +1533,7 @@
       "data-codex-styler-decorations",
       appearance.decorations || "none",
     );
-    updateAppRoot();
+    updateStackingRoots();
     installStyles(theme, variant, Boolean(safeMode));
     updatePageKind();
     updateResponsiveLayout();
@@ -1462,7 +1564,7 @@
       resolvedMode,
     };
     mutationObserver = new MutationObserver(() => {
-      updateAppRoot();
+      updateStackingRoots();
       updatePageKind();
       updateResponsiveLayout();
       entityPositioner?.();
@@ -1578,7 +1680,7 @@
   };
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 11,
+    version: 12,
     apply,
     pause: remove,
     restore: remove,

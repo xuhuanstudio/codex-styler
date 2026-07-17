@@ -4,6 +4,23 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.6] - 2026-07-17
+
+### Added
+
+- Windows 11 x64 NSIS preview packaging with a directly downloadable installer EXE and a Tauri-signed updater archive.
+- A cross-platform release assembly job that publishes macOS and Windows update entries, SHA-256 checksums, an SPDX SBOM, and provenance attestations together.
+
+### Changed
+
+- Updated the website, READMEs, release metadata, and in-app version display for the first dual-platform Alpha.
+
+### Fixed
+
+- Settings and other full-page Codex routes remain above the injected background after application-root transitions.
+- Native Portal and Toast layers keep their own stacking order instead of inheriting the application-root layer.
+- Docked right-panel tabs remain visible above the fixed title bar while semantic header tinting stays intact.
+
 ## [0.1.0-alpha.5] - 2026-07-17
 
 ### Added

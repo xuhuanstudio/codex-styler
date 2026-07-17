@@ -40,7 +40,7 @@ describe("injected compatibility runtime", () => {
   it("falls back automatically when Codex adapter anchors are absent", async () => {
     const outcome = await runtime().apply(nativeRefined, "dark", "auto");
     expect(outcome.resolvedMode).toBe("compatibility");
-    expect(outcome.reason).toContain("sidebar anchor");
+    expect(outcome.reason).toContain("application root");
     expect(document.documentElement.dataset.codexStylerMode).toBe(
       "compatibility",
     );
@@ -58,7 +58,7 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(11);
+    expect(runtime().version).toBe(12);
   });
 
   it("uses semantic styling when live adapter verification succeeds", async () => {
@@ -93,9 +93,7 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       "--color-background-button-primary: var(--codex-styler-accent)",
     );
-    expect(stylesheet?.textContent).toContain(
-      "--color-token-menu-background:",
-    );
+    expect(stylesheet?.textContent).toContain("--color-token-menu-background:");
     expect(stylesheet?.textContent).toContain(
       "--color-token-diff-editor-inserted-line-background:",
     );
@@ -120,9 +118,7 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       "data-codex-styler-collision-guard",
     );
-    expect(stylesheet?.textContent).not.toContain(
-      "padding: 32px 10px 10px",
-    );
+    expect(stylesheet?.textContent).not.toContain("padding: 32px 10px 10px");
     expect(stylesheet?.textContent).toContain('[data-testid="home-icon"]');
     expect(stylesheet?.textContent).not.toContain(
       "aside.app-shell-left-panel button svg",
@@ -130,6 +126,14 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).not.toContain("main.main-surface::after");
     expect(stylesheet?.textContent).not.toContain("width: 27px !important");
     expect(stylesheet?.textContent).not.toContain('thread-summary-panel"] svg');
+    expect(stylesheet?.textContent).toContain(
+      "main.main-surface > header:not(.app-header-tint)",
+    );
+    const appHeaderRule = stylesheet?.textContent
+      ?.split("header.app-header-tint {")[1]
+      ?.split("}")[0];
+    expect(appHeaderRule).toContain("background: transparent !important");
+    expect(appHeaderRule).toContain("backdrop-filter: none !important");
     expect(stylesheet?.textContent).toContain(
       'data-codex-styler-layout="editorial"] main.main-surface',
     );
@@ -167,6 +171,67 @@ describe("injected compatibility runtime", () => {
     expect(transientPortal).not.toHaveAttribute("data-codex-styler-app-root");
   });
 
+  it("keeps full-page settings routes above the backdrop", async () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <aside class="app-shell-left-panel"></aside>
+        <main class="main-surface"><div role="main"></div></main>
+      </div>
+    `;
+    vi.stubGlobal(
+      "getComputedStyle",
+      vi.fn(() => ({
+        backgroundColor: "rgba(20, 24, 28, 0.72)",
+        backgroundImage: "none",
+      })),
+    );
+
+    const outcome = await runtime().apply(nativeRefined, "dark", "auto");
+    expect(outcome.resolvedMode).toBe("semantic");
+
+    const root = document.getElementById("root") as HTMLElement;
+    root.innerHTML = `
+      <div class="main-surface">
+        <nav>Settings</nav>
+        <section>General settings</section>
+      </div>
+    `;
+
+    await vi.waitFor(() => {
+      expect(root).toHaveAttribute("data-codex-styler-app-root");
+      expect(document.documentElement.dataset.codexStylerPage).toBe("settings");
+    });
+    await new Promise((resolve) => setTimeout(resolve, 750));
+
+    expect(document.documentElement.dataset.codexStylerMode).toBe("semantic");
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-fallback",
+    );
+  });
+
+  it("preserves native portal layering while tracking overlay roots", async () => {
+    document.body.innerHTML = `
+      <div id="root">
+        <aside class="app-shell-left-panel"></aside>
+        <main class="main-surface"><div role="main"></div></main>
+      </div>
+    `;
+    await runtime().apply(nativeRefined, "dark", "developer");
+
+    const portal = document.createElement("div");
+    portal.style.position = "fixed";
+    portal.style.zIndex = "55";
+    portal.innerHTML = '<div role="dialog">Theme settings</div>';
+    document.body.appendChild(portal);
+
+    await vi.waitFor(() => {
+      expect(portal).toHaveAttribute("data-codex-styler-overlay-root");
+    });
+    expect(portal).not.toHaveAttribute("data-codex-styler-app-root");
+    expect(portal).not.toHaveAttribute("data-codex-styler-unlayered-root");
+    expect(getComputedStyle(portal).zIndex).toBe("55");
+  });
+
   it("maps optional semantic palette roles to Codex component tokens", async () => {
     document.body.innerHTML = `
       <div id="codex-app-root">
@@ -192,9 +257,7 @@ describe("injected compatibility runtime", () => {
     await runtime().apply(theme, "dark", "developer");
 
     const stylesheet = document.getElementById("codex-styler-runtime-style");
-    expect(stylesheet?.textContent).toContain(
-      "--codex-styler-canvas: #101318",
-    );
+    expect(stylesheet?.textContent).toContain("--codex-styler-canvas: #101318");
     expect(stylesheet?.textContent).toContain(
       "--codex-styler-surface-raised: #252A31",
     );
@@ -234,9 +297,9 @@ describe("injected compatibility runtime", () => {
       clientWidth: { value: 680, configurable: true },
     });
     project.getBoundingClientRect = () =>
-      ({ top: 680, bottom: 720 } as DOMRect);
+      ({ top: 680, bottom: 720 }) as DOMRect;
     composer.getBoundingClientRect = () =>
-      ({ top: 700, bottom: 798 } as DOMRect);
+      ({ top: 700, bottom: 798 }) as DOMRect;
     vi.stubGlobal(
       "getComputedStyle",
       vi.fn(() => ({
@@ -247,9 +310,7 @@ describe("injected compatibility runtime", () => {
 
     await runtime().apply(nativeRefined, "dark", "developer");
 
-    expect(document.documentElement.dataset.codexStylerDensity).toBe(
-      "compact",
-    );
+    expect(document.documentElement.dataset.codexStylerDensity).toBe("compact");
     expect(document.documentElement).toHaveAttribute(
       "data-codex-styler-collision-guard",
     );
