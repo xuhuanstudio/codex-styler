@@ -4,6 +4,26 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.1.0-alpha.9] - 2026-07-17
+
+### Added
+
+- Automatic Windows discovery for Microsoft Store packages, standard user/system installs, and verified running desktop processes.
+- A validated custom Codex application path in Settings as a fallback when automatic discovery cannot find a nonstandard install.
+
+### Changed
+
+- Unified theme and companion selection around one live configuration model: changes apply immediately while Codex is connected and remain clearly pending otherwise.
+- Kept the sidebar as the only global start/apply action while preserving explicit Save and Apply actions inside the theme editor.
+- Windows restart now waits for a normal close before terminating only the verified Codex UI process tree when the packaged app hides instead of exiting.
+
+### Fixed
+
+- Changing a companion now updates the active Codex scene without requiring a manual close and reapply cycle.
+- Companion placement changes are debounced and synchronized to the active runtime.
+- Restart confirmation now finishes after Codex has already closed and exposes a visible retryable error instead of appearing stuck.
+- Desktop detection no longer confuses Codex CLI/resource processes with the supported desktop UI process.
+
 ## [0.1.0-alpha.8] - 2026-07-17
 
 ### Added

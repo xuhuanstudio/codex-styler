@@ -263,13 +263,22 @@ fn delete_theme_archive(app: AppHandle, theme_id: String) -> Result<(), String> 
 }
 
 #[tauri::command]
-fn detect_codex() -> Result<model::CodexDetection, String> {
-    codex::detect_codex().map_err(|error| error.to_string())
+fn detect_codex(custom_path: Option<String>) -> Result<model::CodexDetection, String> {
+    codex::detect_codex(custom_path.as_deref().map(std::path::Path::new))
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
-async fn quit_codex(state: State<'_, Mutex<AppRuntime>>) -> Result<model::CodexDetection, String> {
-    let detection = codex::quit_codex()
+fn validate_codex_path(path: String) -> bool {
+    codex::validate_install_path(std::path::Path::new(&path))
+}
+
+#[tauri::command]
+async fn quit_codex(
+    state: State<'_, Mutex<AppRuntime>>,
+    custom_path: Option<String>,
+) -> Result<model::CodexDetection, String> {
+    let detection = codex::quit_codex(custom_path.as_deref().map(std::path::Path::new))
         .await
         .map_err(|error| error.to_string())?;
     let mut runtime = state
@@ -288,14 +297,18 @@ fn runtime_status(state: State<'_, Mutex<AppRuntime>>) -> RuntimeStatus {
 }
 
 #[tauri::command]
-async fn launch_codex(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStatus, String> {
+async fn launch_codex(
+    state: State<'_, Mutex<AppRuntime>>,
+    custom_path: Option<String>,
+) -> Result<RuntimeStatus, String> {
     if let Ok(runtime) = state.lock()
         && runtime.connected
     {
         return Ok(runtime.status());
     }
 
-    let detection = codex::detect_codex().map_err(|error| error.to_string())?;
+    let detection = codex::detect_codex(custom_path.as_deref().map(std::path::Path::new))
+        .map_err(|error| error.to_string())?;
     if !detection.installed {
         return Err("Codex Desktop was not found on this device".into());
     }
@@ -454,11 +467,13 @@ async fn restore_official(state: State<'_, Mutex<AppRuntime>>) -> Result<Runtime
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Mutex::new(AppRuntime::default()))
         .manage(PendingUpdate(Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             detect_codex,
+            validate_codex_path,
             quit_codex,
             runtime_status,
             launch_codex,
@@ -520,17 +535,17 @@ mod tests {
 
     #[test]
     fn alpha_builds_select_the_newest_non_draft_prerelease() {
-        let current = Version::parse("0.1.0-alpha.8").unwrap();
+        let current = Version::parse("0.1.0-alpha.9").unwrap();
         let selected = select_release(
             &current,
             [
                 GitHubRelease {
-                    tag_name: "v0.1.0-alpha.9".into(),
+                    tag_name: "v0.1.0-alpha.10".into(),
                     draft: false,
                     prerelease: true,
                 },
                 GitHubRelease {
-                    tag_name: "v0.1.0-alpha.10".into(),
+                    tag_name: "v0.1.0-alpha.11".into(),
                     draft: true,
                     prerelease: true,
                 },
@@ -542,7 +557,7 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(selected.tag_name, "v0.1.0-alpha.9");
+        assert_eq!(selected.tag_name, "v0.1.0-alpha.10");
     }
 
     #[test]

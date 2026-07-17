@@ -35,7 +35,7 @@ Limits are enforced during import:
 
 `Pause` removes Styler's live scene while retaining the managed connection. `Restore official` removes the entire Styler root and disconnects. No injected code is persisted in Codex. If Styler itself crashes, closing the managed Codex window and reopening Codex normally starts without the injected scene.
 
-Styler never force-quits an already running Codex process. When applying a theme requires a managed restart, the desktop UI explains the consequence and requires confirmation before sending the operating system's normal quit request. If Codex does not close normally, Styler stops and leaves the process untouched.
+When applying a theme requires a managed restart, the desktop UI explains the consequence and requires confirmation before sending the operating system's normal quit request. On macOS, a failed normal quit stops the operation. On Windows, the packaged app can interpret the close request as hide/minimize; after a bounded wait, Styler may terminate only the verified Codex UI process tree covered by the user's restart confirmation. CLI processes and unrelated applications are excluded from desktop-process detection.
 
 ## Known limits
 

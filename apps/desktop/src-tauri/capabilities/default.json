@@ -3,5 +3,9 @@
   "identifier": "default",
   "description": "Minimal permissions for the local Codex Styler desktop window.",
   "windows": ["main"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "dialog:allow-open"
+  ]
 }
