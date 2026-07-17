@@ -4,12 +4,48 @@ import {
   type ThemeDefinition,
   type ThemePackage,
 } from "@codex-styler/theme-core";
+import { invoke } from "@tauri-apps/api/core";
 import { themeAssetUrl } from "./assets";
 
 export type ThemeAssetMap = Record<string, string>;
 
 const databaseName = "codex-styler.v1";
 const archiveStore = "theme-archives";
+const themeIdHeader = "x-codex-styler-theme-id";
+
+function isTauri(): boolean {
+  return "__TAURI_INTERNALS__" in window;
+}
+
+async function blobBytes(blob: Blob): Promise<Uint8Array> {
+  if (typeof blob.arrayBuffer === "function") {
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read theme archive"));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+async function responseBytes(
+  result: ArrayBuffer | ArrayBufferView | Blob | number[],
+): Promise<Uint8Array> {
+  if (result instanceof Blob) return blobBytes(result);
+  if (result instanceof ArrayBuffer) return new Uint8Array(result);
+  if (ArrayBuffer.isView(result)) {
+    return new Uint8Array(
+      result.buffer.slice(
+        result.byteOffset,
+        result.byteOffset + result.byteLength,
+      ),
+    );
+  }
+  if (Array.isArray(result)) return Uint8Array.from(result);
+  throw new Error("Theme archive response did not contain binary data");
+}
 
 function openDatabase(): Promise<IDBDatabase | null> {
   if (!("indexedDB" in window)) return Promise.resolve(null);
@@ -29,6 +65,14 @@ function openDatabase(): Promise<IDBDatabase | null> {
 }
 
 async function saveArchive(themeId: string, archive: Blob): Promise<void> {
+  if (isTauri()) {
+    await invoke<void>(
+      "save_theme_archive",
+      await blobBytes(archive),
+      { headers: { [themeIdHeader]: themeId } },
+    );
+    return;
+  }
   const database = await openDatabase();
   if (!database) return;
 
@@ -43,6 +87,19 @@ async function saveArchive(themeId: string, archive: Blob): Promise<void> {
 }
 
 async function loadArchive(themeId: string): Promise<Blob | null> {
+  if (isTauri()) {
+    const result = await invoke<
+      ArrayBuffer | ArrayBufferView | Blob | number[]
+    >(
+      "load_theme_archive",
+      { themeId },
+    );
+    const bytes = await responseBytes(result);
+    if (bytes.byteLength === 0) return null;
+    return new Blob([Uint8Array.from(bytes).buffer], {
+      type: "application/zip",
+    });
+  }
   const database = await openDatabase();
   if (!database) return null;
 
@@ -59,6 +116,10 @@ async function loadArchive(themeId: string): Promise<Blob | null> {
 }
 
 export async function deleteThemeArchive(themeId: string): Promise<void> {
+  if (isTauri()) {
+    await invoke("delete_theme_archive", { themeId });
+    return;
+  }
   const database = await openDatabase();
   if (!database) return;
 
@@ -95,7 +156,9 @@ export function createThemeAssetMap(themePackage: ThemePackage): ThemeAssetMap {
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
   const response = await fetch(url);
-  if (!response.ok) throw new Error("Could not load " + url);
+  if (!response.ok) {
+    throw new Error("Theme asset is unavailable: " + url);
+  }
   return new Uint8Array(await response.arrayBuffer());
 }
 

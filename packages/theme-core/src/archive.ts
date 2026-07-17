@@ -52,6 +52,20 @@ function hasExpectedMagic(path: string, bytes: Uint8Array): boolean {
   return false;
 }
 
+async function readBlob(blob: Blob): Promise<ArrayBuffer> {
+  if (typeof blob.arrayBuffer === "function") return blob.arrayBuffer();
+  if (typeof FileReader === "undefined") {
+    throw new Error("This runtime cannot read theme package bytes");
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read theme package"));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
 function readUint16BE(bytes: Uint8Array, offset: number): number {
   return bytes[offset] * 256 + bytes[offset + 1];
 }
@@ -163,7 +177,7 @@ export async function importThemePackage(
     throw new Error("Theme package exceeds the 50 MiB compressed limit");
   }
 
-  const zipInput = input instanceof Blob ? await input.arrayBuffer() : input;
+  const zipInput = input instanceof Blob ? await readBlob(input) : input;
   const zip = await JSZip.loadAsync(zipInput);
   const files = new Map<string, Uint8Array>();
   let declaredTotal = 0;

@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 import type { ThemeDefinition } from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
 import type { RuntimeStrategy } from "./storage";
@@ -20,6 +20,23 @@ export interface RuntimeStatus {
   compatibility: "supported" | "safe" | "blocked";
   message: string | null;
 }
+
+export interface AvailableUpdate {
+  version: string;
+  notes: string | null;
+  publishedAt: string | null;
+  prerelease: boolean;
+}
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  update: AvailableUpdate | null;
+}
+
+export type UpdateDownloadEvent =
+  | { event: "Started"; data: { contentLength: number | null } }
+  | { event: "Progress"; data: { chunkLength: number } }
+  | { event: "Finished" };
 
 const browserStatus: RuntimeStatus = {
   state: "idle",
@@ -113,4 +130,25 @@ export async function pauseTheme(): Promise<RuntimeStatus> {
 export async function restoreOfficial(): Promise<RuntimeStatus> {
   if (!isTauri()) return { ...browserStatus };
   return invoke<RuntimeStatus>("restore_official");
+}
+
+export async function checkForUpdates(): Promise<UpdateCheckResult> {
+  if (!isTauri()) {
+    return { currentVersion: "0.1.0-alpha.5", update: null };
+  }
+  return invoke<UpdateCheckResult>("check_for_updates");
+}
+
+export async function downloadAndInstallUpdate(
+  onEvent: (event: UpdateDownloadEvent) => void,
+): Promise<void> {
+  if (!isTauri()) return;
+  const channel = new Channel<UpdateDownloadEvent>();
+  channel.onmessage = onEvent;
+  await invoke("download_and_install_update", { onEvent: channel });
+}
+
+export async function restartApp(): Promise<void> {
+  if (!isTauri()) return;
+  await invoke("restart_app");
 }

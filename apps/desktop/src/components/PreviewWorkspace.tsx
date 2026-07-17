@@ -53,7 +53,7 @@ export function PreviewWorkspace({
   const composerRef = useRef<HTMLDivElement>(null);
   const entityRef = useRef<HTMLDivElement>(null);
   const spriteCanvasRef = useRef<HTMLCanvasElement>(null);
-  const spriteImageRef = useRef<HTMLImageElement | null>(null);
+  const spriteImageRefs = useRef<HTMLImageElement[]>([]);
   const [direction, setDirection] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [spriteReady, setSpriteReady] = useState(0);
@@ -65,6 +65,13 @@ export function PreviewWorkspace({
   const entityImage = entity
     ? resolveAsset(theme, entity.renderer.asset)
     : undefined;
+  const entityPageImages =
+    entity?.renderer.type === "sprite-atlas"
+      ? (entity.renderer.pages ?? [entity.renderer.asset]).map((path) =>
+          resolveAsset(theme, path),
+        )
+      : [];
+  const entityPageImagesKey = entityPageImages.join("\n");
   const protectedText = readableColor(
     visual.appearance.text,
     visual.appearance.surface,
@@ -79,38 +86,46 @@ export function PreviewWorkspace({
     : visual.appearance.surfaceOpacity;
 
   useEffect(() => {
-    if (!entityImage || entity?.renderer.type !== "sprite-atlas") {
-      spriteImageRef.current = null;
+    if (!entityPageImages.length || entity?.renderer.type !== "sprite-atlas") {
+      spriteImageRefs.current = [];
       return;
     }
-    const image = new window.Image();
-    image.decoding = "async";
-    image.onload = () => {
-      spriteImageRef.current = image;
-      setSpriteReady((value) => value + 1);
-    };
-    image.src = entityImage;
+    const images = entityPageImages.map((source) => {
+      const image = new window.Image();
+      image.decoding = "async";
+      image.onload = () => setSpriteReady((value) => value + 1);
+      image.src = source;
+      return image;
+    });
+    spriteImageRefs.current = images;
     return () => {
-      image.onload = null;
-      if (spriteImageRef.current === image) spriteImageRef.current = null;
+      images.forEach((image) => {
+        image.onload = null;
+      });
+      if (spriteImageRefs.current === images) spriteImageRefs.current = [];
     };
-  }, [entity?.renderer.type, entityImage]);
+  }, [entity?.renderer.type, entityPageImagesKey]);
 
   useEffect(() => {
     if (
       !entity ||
       entity.renderer.type !== "sprite-atlas" ||
-      !spriteCanvasRef.current ||
-      !spriteImageRef.current
+      !spriteCanvasRef.current
     )
       return;
+    const framesPerPage =
+      entity.renderer.framesPerPage ??
+      entity.renderer.columns * entity.renderer.rows;
+    const pageIndex = Math.floor(direction / framesPerPage);
+    const image = spriteImageRefs.current[pageIndex];
+    if (!image?.complete || !image.naturalWidth) return;
     const height =
       entity.size * (entity.renderer.frameHeight / entity.renderer.frameWidth);
     drawSpriteFrame(
       spriteCanvasRef.current,
-      spriteImageRef.current,
+      image,
       entity.renderer,
-      direction,
+      direction % framesPerPage,
       entity.size,
       height,
     );
@@ -201,6 +216,7 @@ export function PreviewWorkspace({
         anchorX,
         anchorY,
         entity.renderer.directions,
+        entity.renderer.frameAngles,
       ),
     );
   }

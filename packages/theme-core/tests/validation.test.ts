@@ -2,8 +2,10 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import JSZip from "jszip";
 import {
+  builtinCompanions,
   builtinThemes,
   composeThemeWithCompanion,
+  defaultCompanionForTheme,
   exportThemePackage,
   importThemePackage,
   isSafeArchivePath,
@@ -24,7 +26,7 @@ describe("built-in themes", () => {
   it("declares replaceable shell treatments instead of hard-coded theme ids", () => {
     expect(
       builtinThemes.map((theme) => theme.variants.dark.appearance.layout),
-    ).toEqual(["native", "editorial", "immersive"]);
+    ).toEqual(["native", "editorial", "immersive", "editorial", "immersive"]);
     expect(
       builtinThemes.every(
         (theme) => theme.variants.dark.appearance.iconStyle !== undefined,
@@ -44,6 +46,28 @@ describe("built-in themes", () => {
     expect(JSON.stringify(theme)).not.toContain("--color-token");
   });
 
+  it("ships the two expressive themes with complete light and dark palettes", () => {
+    const expressiveThemeIds = new Set([
+      "codex-styler.gilded-grandeur",
+      "codex-styler.merry-big-top",
+    ]);
+    const expressiveThemes = builtinThemes.filter((theme) =>
+      expressiveThemeIds.has(theme.id),
+    );
+    expect(expressiveThemes).toHaveLength(2);
+    for (const theme of expressiveThemes) {
+      for (const variant of Object.values(theme.variants)) {
+        expect(variant.background.image, theme.id).toBeDefined();
+        expect(
+          Object.keys(variant.appearance.palette ?? {}),
+          `${theme.id} semantic palette`,
+        ).toHaveLength(19);
+        expect(variant.appearance.iconStyle).toBe("themed");
+        expect(variant.appearance.decorations).toBe("expressive");
+      }
+    }
+  });
+
   it("uses a CSP-safe precompiled schema validator", async () => {
     const source = await readFile(
       new URL("../src/generated/theme-validator.ts", import.meta.url),
@@ -60,8 +84,54 @@ describe("built-in themes", () => {
     expect(composed.scene.entities[0]?.id).toBe("moss-gecko");
     expect(composed.scene.entities[0]?.anchor).toEqual({ x: 40, y: 60 });
     expect(composed.scene.entities[0]?.attachment?.target).toBe("composer");
-    expect(composed.scene.entities[0]?.renderer.normalization).toBe("grounded");
+    expect(composed.scene.entities[0]?.renderer.normalization).toBe("preserve");
+    expect(mossCompanion.assets).toHaveLength(4);
+    expect(composed.scene.entities[0]?.renderer).toMatchObject({
+      directions: 181,
+      framesPerPage: 48,
+      transitionFps: 60,
+    });
     expect(validateTheme(composed)).toEqual({ ok: true, issues: [] });
+  });
+
+  it("recommends an intentional companion for every built-in theme", () => {
+    expect(
+      builtinThemes.map((theme) => defaultCompanionForTheme(theme.id)?.id),
+    ).toEqual([
+      "moss-gecko",
+      "reset-god",
+      "token-thief",
+      "moss-gecko",
+      "moss-gecko",
+    ]);
+    expect(defaultCompanionForTheme("local.blank-theme")).toBeNull();
+  });
+
+  it("ships every calibrated companion as a valid independent composition", () => {
+    expect(builtinCompanions.map((companion) => companion.id)).toEqual([
+      "moss-gecko",
+      "reset-god",
+      "token-thief",
+      "pico-parrot",
+      "puddle-frog",
+      "mochi-cat",
+    ]);
+    for (const companion of builtinCompanions) {
+      const composed = composeThemeWithCompanion(nativeRefined, companion);
+      const renderer = composed.scene.entities[0]?.renderer;
+      expect(renderer?.type, companion.id).toBe("sprite-atlas");
+      if (renderer?.type !== "sprite-atlas") continue;
+      expect(renderer.pages, companion.id).toHaveLength(
+        companion.assets.length,
+      );
+      expect(renderer.frameAngles, companion.id).toHaveLength(
+        renderer.directions,
+      );
+      expect(validateTheme(composed), companion.id).toEqual({
+        ok: true,
+        issues: [],
+      });
+    }
   });
 });
 
@@ -88,6 +158,10 @@ describe("pointer direction mapping", () => {
     expect(pointerDirectionFrame(100, 50, 50, 50, 16)).toBe(4);
     expect(pointerDirectionFrame(50, 100, 50, 50, 16)).toBe(8);
     expect(pointerDirectionFrame(0, 50, 50, 50, 16)).toBe(12);
+  });
+
+  it("uses calibrated non-linear frame angles when supplied", () => {
+    expect(pointerDirectionFrame(100, 50, 50, 50, 4, [0, 20, 40, 180])).toBe(2);
   });
 });
 

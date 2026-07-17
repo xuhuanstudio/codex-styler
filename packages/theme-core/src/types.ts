@@ -107,11 +107,15 @@ export interface SceneLayer {
 export interface SpriteAtlasRenderer {
   type: "sprite-atlas";
   asset: string;
+  pages?: string[];
   columns: number;
   rows: number;
+  framesPerPage?: number;
   frameWidth: number;
   frameHeight: number;
-  directions: 4 | 8 | 16;
+  directions: number;
+  frameAngles?: number[];
+  transitionFps?: number;
   normalization?: "preserve" | "grounded";
   alphaThreshold?: number;
 }

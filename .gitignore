@@ -16,6 +16,7 @@ playwright-report/
 test-results/
 tmp/
 output/
+artifacts/
 .lighthouseci/
 .playwright-cli/
 *.tsbuildinfo

@@ -7,8 +7,8 @@ const zh = locale === "zh-CN";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const docsBase = base + (zh ? "/zh-cn/docs/" : "/docs/");
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.1.0-alpha.4";
-const releaseAsset = "Codex-Styler_0.1.0-alpha.4_aarch64-unsigned.dmg";
+const releaseTag = "v0.1.0-alpha.5";
+const releaseAsset = "Codex-Styler_0.1.0-alpha.5_aarch64-unsigned.dmg";
 const downloadUrl = `${repo}/releases/download/${releaseTag}/${releaseAsset}`;
 const copy = zh
   ? {
@@ -97,19 +97,27 @@ const copy = zh
     <section class="theme-showcase" id="themes">
       <div class="section-heading">
         <span class="section-number">02 / THEMES</span>
-        <h2>{zh ? "三个主题，证明一个通用框架。" : "Three themes. One open system."}</h2>
+        <h2>{zh ? "五个主题，证明一个通用框架。" : "Five themes. One open system."}</h2>
       </div>
       <article class="theme-feature theme-feature-native">
         <div class="theme-copy"><span>01</span><h3>Native Refined</h3><p>{zh ? "把原生工作区重新校准得更安静、更清晰。" : "A quieter, more deliberate calibration of the native workspace."}</p></div>
         <div class="native-canvas"><i></i><i></i><i></i></div>
       </article>
       <article class="theme-feature">
+        <img src={base + "/media/gilded-grandeur.webp"} alt={zh ? "金辉盛境主题背景" : "Gilded Grandeur theme background"} />
+        <div class="theme-copy"><span>02</span><h3>Gilded Grandeur</h3><p>{zh ? "黑曜石建筑、鎏金暖光与默认搭配的 Reset God。" : "Obsidian architecture, warm gilded light, and Reset God by default."}</p></div>
+      </article>
+      <article class="theme-feature">
+        <img src={base + "/media/merry-big-top.webp"} alt={zh ? "滑稽马戏团主题背景" : "Merry Big Top theme background"} />
+        <div class="theme-copy"><span>03</span><h3>Merry Big Top</h3><p>{zh ? "有趣的马戏舞台、活泼动态与默认搭配的 Token Thief。" : "A playful circus stage, buoyant motion, and Token Thief by default."}</p></div>
+      </article>
+      <article class="theme-feature">
         <img src={base + "/media/nocturne-studio.webp"} alt={zh ? "夜曲工作室主题背景" : "Nocturne Studio theme background"} />
-        <div class="theme-copy"><span>02</span><h3>Nocturne Studio</h3><p>{zh ? "墨色空间、克制玻璃与一线琥珀光。" : "Ink-dark space, quiet glass, and one controlled amber horizon."}</p></div>
+        <div class="theme-copy"><span>04</span><h3>Nocturne Studio</h3><p>{zh ? "墨色空间、克制玻璃与一线琥珀光。" : "Ink-dark space, quiet glass, and one controlled amber horizon."}</p></div>
       </article>
       <article class="theme-feature">
         <img src={base + "/media/quiet-garden.webp"} alt={zh ? "静谧花园主题背景" : "Quiet Garden theme background"} />
-        <div class="theme-copy"><span>03</span><h3>Quiet Garden Companion</h3><p>{zh ? "绿色场景与会注视光标方向的小壁虎 Moss。" : "A living green scene watched by Moss, a pointer-aware gecko."}</p></div>
+        <div class="theme-copy"><span>05</span><h3>Quiet Garden Companion</h3><p>{zh ? "绿色场景与会注视光标方向的小壁虎 Moss。" : "A living green scene watched by Moss, a pointer-aware gecko."}</p></div>
       </article>
     </section>
 

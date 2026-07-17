@@ -10,7 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
   applyTheme,
+  checkForUpdates,
+  downloadAndInstallUpdate,
   getRuntimeStatus,
+  restartApp,
   type RuntimeStatus,
 } from "./lib/runtime";
 
@@ -45,6 +48,12 @@ vi.mock("./lib/runtime", async (importOriginal) => {
       message: null,
     }),
     applyTheme: vi.fn(),
+    checkForUpdates: vi.fn().mockResolvedValue({
+      currentVersion: "0.1.0-alpha.5",
+      update: null,
+    }),
+    downloadAndInstallUpdate: vi.fn(),
+    restartApp: vi.fn(),
   };
 });
 
@@ -57,6 +66,13 @@ describe("Codex Styler shell", () => {
     vi.mocked(getRuntimeStatus).mockReset();
     vi.mocked(getRuntimeStatus).mockResolvedValue(disconnectedRuntime);
     vi.mocked(applyTheme).mockReset();
+    vi.mocked(checkForUpdates).mockReset();
+    vi.mocked(checkForUpdates).mockResolvedValue({
+      currentVersion: "0.1.0-alpha.5",
+      update: null,
+    });
+    vi.mocked(downloadAndInstallUpdate).mockReset();
+    vi.mocked(restartApp).mockReset();
     localStorage.clear();
     localStorage.setItem(
       "codex-styler.settings.v1",
@@ -65,7 +81,9 @@ describe("Codex Styler shell", () => {
         appearance: "system",
         runtimeStrategy: "auto",
         reduceMotion: false,
-        manualUpdateChecks: true,
+        automaticUpdateChecks: false,
+        skippedUpdateVersion: null,
+        lastUpdateCheckAt: null,
         onboardingComplete: true,
       }),
     );
@@ -151,6 +169,47 @@ describe("Codex Styler shell", () => {
     expect(strategy.value).toBe("enhanced");
   });
 
+  it("checks for updates from settings and reports the current version", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByText("Codex Styler 0.1.0-alpha.5")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+    await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce());
+    expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
+  });
+
+  it("downloads, installs, and restarts from the update dialog", async () => {
+    vi.mocked(checkForUpdates).mockResolvedValue({
+      currentVersion: "0.1.0-alpha.5",
+      update: {
+        version: "0.1.0-alpha.5",
+        notes: "A safer updater and corrected companion thumbnails.",
+        publishedAt: "2026-07-17T08:00:00Z",
+        prerelease: true,
+      },
+    });
+    vi.mocked(downloadAndInstallUpdate).mockImplementation(async (onEvent) => {
+      onEvent({ event: "Started", data: { contentLength: 100 } });
+      onEvent({ event: "Progress", data: { chunkLength: 100 } });
+      onEvent({ event: "Finished" });
+    });
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Codex Styler 0.1.0-alpha.5",
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Download and install" }),
+    );
+    await waitFor(() =>
+      expect(downloadAndInstallUpdate).toHaveBeenCalledOnce(),
+    );
+    await waitFor(() => expect(restartApp).toHaveBeenCalledOnce());
+  });
+
   it("exposes a native window drag region", () => {
     const { container } = render(<App />);
     expect(
@@ -167,6 +226,19 @@ describe("Codex Styler shell", () => {
     expect(screen.getAllByText("Nocturne Studio").length).toBeGreaterThan(0);
   });
 
+  it("ships the gilded and circus themes with their signature companions", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Selected: Gilded Grandeur" }),
+    );
+    expect(screen.getByLabelText("Reset God")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Selected: Merry Big Top" }),
+    );
+    expect(screen.getByLabelText("Token Thief")).toBeInTheDocument();
+  });
+
   it("keeps companions independent and exposes draggable placement", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Companions" }));
@@ -177,6 +249,37 @@ describe("Codex Styler shell", () => {
     expect(
       document.querySelector('.scene-entity[data-draggable="true"]'),
     ).toBeInTheDocument();
+  });
+
+  it("clips companion thumbnails to exactly one atlas frame", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    const pico = screen.getByRole("button", { name: /Pico/ });
+    const viewport = pico.querySelector(".companion-option__visual--sprite");
+    const frame = pico.querySelector<HTMLElement>(".companion-option__frame");
+    expect(viewport).toContainElement(frame);
+    expect(frame?.style.backgroundImage).toContain("pico-parrot-atlas");
+    expect(Number.parseFloat(frame?.style.width ?? "0")).toBeLessThanOrEqual(
+      64,
+    );
+    expect(Number.parseFloat(frame?.style.height ?? "0")).toBeLessThanOrEqual(
+      64,
+    );
+  });
+
+  it("uses each refined theme's default companion until the user disables it", () => {
+    render(<App />);
+    expect(document.querySelector(".scene-entity")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    fireEvent.click(screen.getByRole("button", { name: /No companion/ }));
+    expect(document.querySelector(".scene-entity")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Selected: Nocturne Studio" }),
+    );
+    expect(document.querySelector(".scene-entity")).not.toBeInTheDocument();
   });
 
   it("makes editor layers and reset controls actionable", () => {
@@ -205,7 +308,9 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }));
     expect(screen.getByRole("menuitem", { name: /Moss/ })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Motion" }));
-    expect(screen.getByRole("button", { name: /Expressive/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Expressive/ }),
+    ).toBeInTheDocument();
   });
 
   it("keeps theme creation inside the theme library", () => {
@@ -217,9 +322,15 @@ describe("Codex Styler shell", () => {
     expect(
       screen.getByRole("dialog", { name: "How would you like to begin?" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Create from image/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Start blank/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Use existing theme/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Create from image/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Start blank/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Use existing theme/ }),
+    ).toBeInTheDocument();
   });
 
   it("deletes a local theme after confirmation", async () => {

@@ -698,7 +698,10 @@ button:disabled {
   background: var(--shell-elevated);
   cursor: pointer;
   text-align: left;
-  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .home-actions > button:hover {
@@ -976,6 +979,24 @@ button:disabled {
   border: 0;
   color: var(--accent);
   background: transparent;
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.text-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+  transform: none;
+}
+
+.is-spinning {
+  animation: control-spin 800ms linear infinite;
+}
+
+@keyframes control-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .theme-index {
@@ -2404,8 +2425,17 @@ button:disabled {
   background-repeat: no-repeat;
 }
 
-.companion-option__visual--moss {
-  background-size: 400% 200%;
+.companion-option__visual--sprite {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.companion-option__frame {
+  display: block;
+  flex: none;
+  background-position: 0 0;
+  background-repeat: no-repeat;
 }
 
 .companion-option__visual--empty {
@@ -2620,6 +2650,24 @@ button:disabled {
   margin: 0;
   color: var(--ink-muted);
   font-size: 9px;
+}
+
+.update-settings-row__version {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.update-settings-row__version small,
+.update-settings-row__version span {
+  color: var(--ink-faint);
+  font-size: 8.5px;
+}
+
+.update-settings-row__version strong {
+  font-size: 11px;
+  font-weight: 650;
 }
 
 .segmented-control {
@@ -3088,7 +3136,10 @@ button:disabled {
   background: var(--shell-soft);
   cursor: pointer;
   text-align: left;
-  transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 
 .new-theme-option:hover {
@@ -3101,7 +3152,11 @@ button:disabled {
   color: white;
   border-color: #315fca;
   background:
-    radial-gradient(circle at 80% 15%, rgba(142, 174, 247, 0.5), transparent 36%),
+    radial-gradient(
+      circle at 80% 15%,
+      rgba(142, 174, 247, 0.5),
+      transparent 36%
+    ),
     linear-gradient(145deg, #1c315f, #18223b 68%, #111722);
 }
 
@@ -3268,6 +3323,100 @@ button:disabled {
 }
 .confirm-dialog .button-row {
   justify-content: flex-end;
+  margin-top: 22px;
+}
+
+.update-dialog {
+  width: min(500px, 100%);
+}
+
+.update-dialog__icon {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.update-dialog__heading {
+  position: relative;
+  margin: 18px 0 8px;
+}
+
+.update-dialog__heading > span {
+  color: var(--ink-faint);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.update-dialog__heading h2 {
+  display: inline-block;
+  margin: 6px 8px 0 0;
+}
+
+.update-dialog__heading small {
+  display: inline-flex;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.update-dialog__notes {
+  max-height: 150px;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--shell-soft);
+}
+
+.update-dialog__notes > strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 9px;
+}
+
+.update-dialog__notes p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.update-dialog__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.update-dialog__progress > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--ink-muted);
+  font-size: 9px;
+}
+
+.update-dialog__progress-track {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--shell-soft);
+}
+
+.update-dialog__progress-track > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 180ms ease;
+}
+
+.update-dialog__secondary-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
   margin-top: 22px;
 }
 
