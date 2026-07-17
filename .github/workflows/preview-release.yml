@@ -1,4 +1,4 @@
-name: macOS preview release
+name: Cross-platform preview release
 
 on:
   push:
@@ -54,9 +54,8 @@ jobs:
           test -f "$notes"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
           echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
-          echo "UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
-          echo "UPDATER_SIG_NAME=Codex-Styler_${version}_aarch64.app.tar.gz.sig" >> "$GITHUB_ENV"
-          echo "SBOM_NAME=Codex-Styler_${version}_aarch64.spdx.json" >> "$GITHUB_ENV"
+          echo "MAC_UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
+          echo "MAC_UPDATER_SIG_NAME=Codex-Styler_${version}_aarch64.app.tar.gz.sig" >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
       - run: node scripts/verify-release-version.mjs "${{ env.RELEASE_VERSION }}"
@@ -83,19 +82,19 @@ jobs:
           --target aarch64-apple-darwin
           --bundles app,dmg
 
-      - name: Stage and verify install and update artifacts
+      - name: Stage and verify macOS artifacts
         shell: bash
         run: |
           set -euo pipefail
           source_dmg="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/Codex Styler_${RELEASE_VERSION}_aarch64.dmg"
           source_updater="apps/desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Codex Styler.app.tar.gz"
           source_updater_sig="${source_updater}.sig"
-          release_dir="$GITHUB_WORKSPACE/release"
+          release_dir="$GITHUB_WORKSPACE/release-macos"
           mount_dir="$RUNNER_TEMP/codex-styler-dmg"
           mkdir -p "$release_dir" "$mount_dir"
           cp "$source_dmg" "$release_dir/$DMG_NAME"
-          cp "$source_updater" "$release_dir/$UPDATER_NAME"
-          cp "$source_updater_sig" "$release_dir/$UPDATER_SIG_NAME"
+          cp "$source_updater" "$release_dir/$MAC_UPDATER_NAME"
+          cp "$source_updater_sig" "$release_dir/$MAC_UPDATER_SIG_NAME"
 
           hdiutil verify "$release_dir/$DMG_NAME"
           hdiutil attach -nobrowse -readonly -mountpoint "$mount_dir" "$release_dir/$DMG_NAME"
@@ -111,51 +110,218 @@ jobs:
 
           hdiutil detach "$mount_dir"
           trap - EXIT
-          update_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${UPDATER_NAME}"
-          signature="$(cat "$release_dir/$UPDATER_SIG_NAME")"
-          notes="$(cat ".github/release-notes/${GITHUB_REF_NAME}.md")"
-          jq -n \
-            --arg version "$RELEASE_VERSION" \
-            --arg notes "$notes" \
-            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-            --arg signature "$signature" \
-            --arg url "$update_url" \
-            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $signature, url: $url}}}' \
-            > "$release_dir/latest.json"
-          jq -e \
-            '.version != "" and .platforms["darwin-aarch64"].signature != "" and (.platforms["darwin-aarch64"].url | startswith("https://github.com/xuhuanstudio/codex-styler/releases/download/"))' \
-            "$release_dir/latest.json" >/dev/null
-          (cd "$release_dir" && shasum -a 256 "$DMG_NAME" "$UPDATER_NAME" > SHA256SUMS.txt)
+          test -s "$release_dir/$MAC_UPDATER_NAME"
+          test -s "$release_dir/$MAC_UPDATER_SIG_NAME"
 
-      - name: Export and validate SPDX dependency SBOM
+      - name: Attest macOS build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            ./release-macos/${{ env.DMG_NAME }}
+            ./release-macos/${{ env.MAC_UPDATER_NAME }}
+
+      - name: Retain macOS release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: codex-styler-${{ env.RELEASE_VERSION }}-macos-aarch64
+          path: release-macos/*
+          if-no-files-found: error
+          retention-days: 30
+
+  windows-x64:
+    name: Windows x64 preview
+    runs-on: windows-2022
+    environment: preview-release
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: x86_64-pc-windows-msvc
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Prepare release metadata
+        shell: pwsh
+        run: |
+          $version = $env:GITHUB_REF_NAME.Substring(1)
+          $notes = ".github/release-notes/$($env:GITHUB_REF_NAME).md"
+          if (-not (Test-Path $notes)) { throw "Missing release notes: $notes" }
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "EXE_NAME=Codex-Styler_$($version)_x64-unsigned-setup.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WIN_UPDATER_NAME=Codex-Styler_$($version)_x64.nsis.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WIN_UPDATER_SIG_NAME=Codex-Styler_$($version)_x64.nsis.zip.sig" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/verify-release-version.mjs "${{ env.RELEASE_VERSION }}"
+      - run: pnpm check
+      - run: pnpm audit --audit-level high --registry=https://registry.npmjs.org
+
+      - name: Check Rust
+        working-directory: apps/desktop/src-tauri
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets -- -D warnings
+          cargo test
+
+      - uses: taiki-e/install-action@cargo-audit
+      - run: cargo audit
+        working-directory: apps/desktop/src-tauri
+
+      - name: Build unsigned Windows x64 NSIS installer
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: >-
+          pnpm --filter @codex-styler/desktop tauri build
+          --target x86_64-pc-windows-msvc
+          --bundles nsis
+
+      - name: Stage and verify Windows artifacts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $bundle = "apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
+          $installers = @(Get-ChildItem -Path $bundle -File -Filter "*-setup.exe")
+          $updaters = @(Get-ChildItem -Path $bundle -File -Filter "*.nsis.zip")
+          if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)." }
+          if ($updaters.Count -ne 1) { throw "Expected one NSIS updater archive, found $($updaters.Count)." }
+          $updaterSignature = "$($updaters[0].FullName).sig"
+          if (-not (Test-Path $updaterSignature)) { throw "Missing NSIS updater signature." }
+
+          $releaseDir = Join-Path $env:GITHUB_WORKSPACE "release-windows"
+          New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
+          $installerTarget = Join-Path $releaseDir $env:EXE_NAME
+          $updaterTarget = Join-Path $releaseDir $env:WIN_UPDATER_NAME
+          $signatureTarget = Join-Path $releaseDir $env:WIN_UPDATER_SIG_NAME
+          Copy-Item $installers[0].FullName $installerTarget
+          Copy-Item $updaters[0].FullName $updaterTarget
+          Copy-Item $updaterSignature $signatureTarget
+
+          $header = [System.IO.File]::ReadAllBytes($installerTarget)[0..1]
+          if ($header[0] -ne 0x4d -or $header[1] -ne 0x5a) { throw "Installer is not a Windows PE executable." }
+          if ((Get-Item $installerTarget).Length -lt 1MB) { throw "Installer is unexpectedly small." }
+          if ((Get-Item $updaterTarget).Length -lt 1MB) { throw "Updater archive is unexpectedly small." }
+          if ((Get-Item $signatureTarget).Length -eq 0) { throw "Updater signature is empty." }
+          $authenticode = Get-AuthenticodeSignature $installerTarget
+          Write-Host "Installer Authenticode status: $($authenticode.Status)"
+          Get-FileHash -Algorithm SHA256 $installerTarget | Format-List
+
+      - name: Attest Windows build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            ./release-windows/${{ env.EXE_NAME }}
+            ./release-windows/${{ env.WIN_UPDATER_NAME }}
+
+      - name: Retain Windows release assets
+        uses: actions/upload-artifact@v7
+        with:
+          name: codex-styler-${{ env.RELEASE_VERSION }}-windows-x64
+          path: release-windows/*
+          if-no-files-found: error
+          retention-days: 30
+
+  assemble-release:
+    name: Assemble draft pre-release
+    needs:
+      - macos-apple-silicon
+      - windows-x64
+    runs-on: ubuntu-latest
+    environment: preview-release
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Prepare release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#v}"
+          notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          test -f "$notes"
+          echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
+          echo "MAC_UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
+          echo "MAC_UPDATER_SIG_NAME=Codex-Styler_${version}_aarch64.app.tar.gz.sig" >> "$GITHUB_ENV"
+          echo "EXE_NAME=Codex-Styler_${version}_x64-unsigned-setup.exe" >> "$GITHUB_ENV"
+          echo "WIN_UPDATER_NAME=Codex-Styler_${version}_x64.nsis.zip" >> "$GITHUB_ENV"
+          echo "WIN_UPDATER_SIG_NAME=Codex-Styler_${version}_x64.nsis.zip.sig" >> "$GITHUB_ENV"
+          echo "SBOM_NAME=Codex-Styler_${version}.spdx.json" >> "$GITHUB_ENV"
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: codex-styler-${{ env.RELEASE_VERSION }}-*
+          path: release
+          merge-multiple: true
+
+      - name: Create update manifest, checksums, and SBOM
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          for asset in \
+            "$DMG_NAME" "$MAC_UPDATER_NAME" "$MAC_UPDATER_SIG_NAME" \
+            "$EXE_NAME" "$WIN_UPDATER_NAME" "$WIN_UPDATER_SIG_NAME"; do
+            test -s "release/$asset"
+          done
+
+          mac_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${MAC_UPDATER_NAME}"
+          windows_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${WIN_UPDATER_NAME}"
+          mac_signature="$(cat "release/$MAC_UPDATER_SIG_NAME")"
+          windows_signature="$(cat "release/$WIN_UPDATER_SIG_NAME")"
+          notes="$(cat ".github/release-notes/${GITHUB_REF_NAME}.md")"
+          jq -n \
+            --arg version "$RELEASE_VERSION" \
+            --arg notes "$notes" \
+            --arg pub_date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg mac_signature "$mac_signature" \
+            --arg mac_url "$mac_url" \
+            --arg windows_signature "$windows_signature" \
+            --arg windows_url "$windows_url" \
+            '{version: $version, notes: $notes, pub_date: $pub_date, platforms: {"darwin-aarch64": {signature: $mac_signature, url: $mac_url}, "windows-x86_64": {signature: $windows_signature, url: $windows_url}}}' \
+            > release/latest.json
+          jq -e \
+            '.version != "" and (.platforms | keys | sort) == ["darwin-aarch64", "windows-x86_64"] and (.platforms[] | .signature != "" and (.url | startswith("https://github.com/xuhuanstudio/codex-styler/releases/download/")))' \
+            release/latest.json >/dev/null
+
+          (cd release && sha256sum "$DMG_NAME" "$MAC_UPDATER_NAME" "$EXE_NAME" "$WIN_UPDATER_NAME" > SHA256SUMS.txt)
           gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" \
             --jq '.sbom' > "release/$SBOM_NAME"
           jq -e \
             '.spdxVersion == "SPDX-2.3" and (.packages | length) > 0 and (.relationships | length) > 0' \
             "release/$SBOM_NAME" >/dev/null
 
-      - name: Attest build provenance
-        uses: actions/attest@v4
-        with:
-          subject-path: |
-            ./release/${{ env.DMG_NAME }}
-            ./release/${{ env.UPDATER_NAME }}
-
-      - name: Attest SBOM
+      - name: Attest macOS SBOM
         uses: actions/attest@v4
         with:
           subject-path: ./release/${{ env.DMG_NAME }}
           sbom-path: ./release/${{ env.SBOM_NAME }}
 
-      - name: Retain reviewed release assets
+      - name: Attest Windows SBOM
+        uses: actions/attest@v4
+        with:
+          subject-path: ./release/${{ env.EXE_NAME }}
+          sbom-path: ./release/${{ env.SBOM_NAME }}
+
+      - name: Retain assembled release assets
         uses: actions/upload-artifact@v7
         with:
-          name: codex-styler-${{ env.RELEASE_VERSION }}-macos-aarch64
+          name: codex-styler-${{ env.RELEASE_VERSION }}-release
           path: release/*
           if-no-files-found: error
           retention-days: 30
@@ -168,5 +334,5 @@ jobs:
           --verify-tag
           --draft
           --prerelease
-          --title "Codex Styler ${RELEASE_VERSION} — macOS Apple Silicon Alpha"
+          --title "Codex Styler ${RELEASE_VERSION} — macOS & Windows Alpha"
           --notes-file ".github/release-notes/${GITHUB_REF_NAME}.md"

@@ -16,6 +16,7 @@ async function readJson(path) {
 const rootPackage = await readJson("package.json");
 const desktopPackage = await readJson("apps/desktop/package.json");
 const sitePackage = await readJson("apps/site/package.json");
+const themeCorePackage = await readJson("packages/theme-core/package.json");
 const tauriConfig = await readJson("apps/desktop/src-tauri/tauri.conf.json");
 const cargoManifest = await readFile(
   new URL("../apps/desktop/src-tauri/Cargo.toml", import.meta.url),
@@ -29,11 +30,38 @@ const desktopMessages = await readFile(
   new URL("../apps/desktop/src/lib/i18n.ts", import.meta.url),
   "utf8",
 );
+const desktopRuntime = await readFile(
+  new URL("../apps/desktop/src/lib/runtime.ts", import.meta.url),
+  "utf8",
+);
+const desktopApp = await readFile(
+  new URL("../apps/desktop/src/App.tsx", import.meta.url),
+  "utf8",
+);
+const siteLanding = await readFile(
+  new URL("../apps/site/src/components/LandingPage.astro", import.meta.url),
+  "utf8",
+);
+const readme = await readFile(new URL("../README.md", import.meta.url), "utf8");
+const chineseReadme = await readFile(
+  new URL("../README.zh-CN.md", import.meta.url),
+  "utf8",
+);
+const releaseNotes = await readFile(
+  new URL(`../.github/release-notes/v${expected}.md`, import.meta.url),
+  "utf8",
+);
 
 const cargoVersion = cargoManifest.match(
   /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/mu,
 )?.[1];
 const siteVersion = siteLayout.match(/softwareVersion:\s*"([^"]+)"/u)?.[1];
+const runtimeVersion = desktopRuntime.match(
+  /currentVersion:\s*"([^"]+)"/u,
+)?.[1];
+const appVersion = desktopApp.match(
+  /useState\("(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)"\)/u,
+)?.[1];
 const alphaMatch = expected.match(/^\d+\.\d+\.\d+-alpha\.(\d+)$/u);
 const expectedDisplayVersion = alphaMatch
   ? `Alpha 0.${alphaMatch[1]}`
@@ -46,9 +74,12 @@ const versions = new Map([
   ["package.json", rootPackage.version],
   ["apps/desktop/package.json", desktopPackage.version],
   ["apps/site/package.json", sitePackage.version],
+  ["packages/theme-core/package.json", themeCorePackage.version],
   ["apps/desktop/src-tauri/tauri.conf.json", tauriConfig.version],
   ["apps/desktop/src-tauri/Cargo.toml", cargoVersion],
   ["apps/site/src/layouts/BaseLayout.astro", siteVersion],
+  ["apps/desktop/src/lib/runtime.ts", runtimeVersion],
+  ["apps/desktop/src/App.tsx", appVersion],
 ]);
 
 const mismatches = [...versions].filter(([, version]) => version !== expected);
@@ -71,6 +102,33 @@ if (
   process.exit(1);
 }
 
+const releaseTag = `v${expected}`;
+const macAsset = `Codex-Styler_${expected}_aarch64-unsigned.dmg`;
+const windowsAsset = `Codex-Styler_${expected}_x64-unsigned-setup.exe`;
+const releaseReferences = new Map([
+  ["README.md", readme],
+  ["README.zh-CN.md", chineseReadme],
+  ["apps/site/src/components/LandingPage.astro", siteLanding],
+  [`.github/release-notes/${releaseTag}.md`, releaseNotes],
+]);
+
+const staleReleaseReferences = [...releaseReferences].flatMap(
+  ([path, contents]) => {
+    const missing = [releaseTag, macAsset, windowsAsset].filter(
+      (value) => !contents.includes(value),
+    );
+    return missing.map((value) => `${path}: missing ${value}`);
+  },
+);
+
+if (staleReleaseReferences.length > 0) {
+  console.error(`Release links for ${expected} are not synchronized:`);
+  for (const mismatch of staleReleaseReferences) {
+    console.error(`- ${mismatch}`);
+  }
+  process.exit(1);
+}
+
 console.log(
-  `Release version ${expected} is synchronized across ${versions.size} files and the desktop display.`,
+  `Release version ${expected} is synchronized across ${versions.size} files, the desktop display, and both platform downloads.`,
 );

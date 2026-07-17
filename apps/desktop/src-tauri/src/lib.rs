@@ -520,17 +520,17 @@ mod tests {
 
     #[test]
     fn alpha_builds_select_the_newest_non_draft_prerelease() {
-        let current = Version::parse("0.1.0-alpha.5").unwrap();
+        let current = Version::parse("0.1.0-alpha.6").unwrap();
         let selected = select_release(
             &current,
             [
                 GitHubRelease {
-                    tag_name: "v0.1.0-alpha.6".into(),
+                    tag_name: "v0.1.0-alpha.7".into(),
                     draft: false,
                     prerelease: true,
                 },
                 GitHubRelease {
-                    tag_name: "v0.1.0-alpha.7".into(),
+                    tag_name: "v0.1.0-alpha.8".into(),
                     draft: true,
                     prerelease: true,
                 },
@@ -542,7 +542,7 @@ mod tests {
             ],
         )
         .unwrap();
-        assert_eq!(selected.tag_name, "v0.1.0-alpha.6");
+        assert_eq!(selected.tag_name, "v0.1.0-alpha.7");
     }
 
     #[test]

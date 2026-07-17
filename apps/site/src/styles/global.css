@@ -351,6 +351,7 @@ img {
 
 .hero-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
   margin-top: 32px;
 }

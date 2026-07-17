@@ -26,8 +26,8 @@ export const docs: DocPage[] = [
         {
           heading: "Download and install",
           paragraphs: [
-            "Use Download Alpha in the site navigation to get the current macOS Apple Silicon DMG. It requires macOS 13 or later. Drag Codex Styler to Applications, then Control-click it and choose Open on first launch.",
-            "The Alpha is ad-hoc signed but not signed with an Apple Developer ID or notarized. Do not disable Gatekeeper globally. Stable releases will not ship until macOS notarization and Windows code signing are both in place.",
+            "Use Download Alpha in the site navigation to choose the macOS Apple Silicon DMG or Windows 11 x64 installer EXE. On macOS, drag Codex Styler to Applications, then Control-click it and choose Open on first launch. On Windows, run the per-user NSIS installer.",
+            "The macOS Alpha is ad-hoc signed but not notarized, and the Windows Alpha is not Authenticode-signed. Verify the published checksum and provenance before continuing. Do not disable Gatekeeper or SmartScreen globally.",
             "Install OpenAI Codex Desktop separately. Codex Styler does not bundle, replace, patch, or redistribute the Codex application.",
           ],
         },
@@ -49,8 +49,8 @@ export const docs: DocPage[] = [
         {
           heading: "下载与安装",
           paragraphs: [
-            "通过网站导航中的“下载 Alpha”获取当前 macOS Apple Silicon DMG，需要 macOS 13 或更高版本。把 Codex Styler 拖入“应用程序”，首次启动时按住 Control 点击并选择“打开”。",
-            "该 Alpha 采用临时 ad-hoc 签名，但没有 Apple Developer ID 签名和公证。不要全局关闭 Gatekeeper；macOS 公证和 Windows 代码签名完成前不会发布稳定版。",
+            "通过网站导航中的“下载 Alpha”选择 macOS Apple Silicon DMG 或 Windows 11 x64 安装 EXE。macOS 上把 Codex Styler 拖入“应用程序”，首次启动时按住 Control 点击并选择“打开”；Windows 上运行按用户安装的 NSIS 安装程序。",
+            "macOS Alpha 采用临时 ad-hoc 签名但尚未公证，Windows Alpha 尚无 Authenticode 签名。继续前请核对 Release 中的校验和与构建证明，不要全局关闭 Gatekeeper 或 SmartScreen。",
             "请单独安装 OpenAI Codex Desktop。Codex Styler 不捆绑、不替换、不修改也不分发 Codex 应用。",
           ],
         },
@@ -255,7 +255,7 @@ export const docs: DocPage[] = [
         {
           heading: "Current alpha targets",
           paragraphs: [
-            "The first verified target is macOS on Apple Silicon. Windows 11 x64 is the cross-platform beta target. A platform is not listed as supported until it passes installation, launch, sleep/wake, restore, upgrade, and uninstall checks on a real device.",
+            "Alpha installers are available for macOS on Apple Silicon and Windows 11 x64. macOS has the current real-device evidence; the Windows package is produced and structurally checked in CI but remains experimental until installation, launch, sleep/wake, restore, upgrade, and uninstall pass on a real Windows 11 device.",
           ],
         },
         {
@@ -269,7 +269,7 @@ export const docs: DocPage[] = [
         {
           heading: "当前 Alpha 目标",
           paragraphs: [
-            "第一个验证目标是 Apple Silicon macOS，Windows 11 x64 是跨平台 Beta 目标。只有在真实设备完成安装、启动、睡眠恢复、还原、升级和卸载测试后，平台才会被列为受支持。",
+            "当前 Alpha 同时提供 Apple Silicon macOS 与 Windows 11 x64 安装包。macOS 已有现阶段真实设备验证记录；Windows 包由 CI 构建并完成结构校验，但在真实 Windows 11 设备通过安装、启动、睡眠恢复、还原、升级和卸载前仍属于实验性预览。",
           ],
         },
         {
