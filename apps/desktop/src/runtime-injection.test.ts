@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeRefined } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
+import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
 
 interface InjectedRuntime {
   version: number;
@@ -8,7 +9,16 @@ interface InjectedRuntime {
     theme: typeof nativeRefined,
     variant: "light" | "dark",
     mode: "auto" | "compatibility" | "developer",
-  ) => Promise<{ resolvedMode: string; reason: string | null }>;
+    revision?: number,
+  ) => Promise<{
+    resolvedMode: string;
+    reason: string | null;
+    stale?: boolean;
+  }>;
+  updateEntity: (
+    entity: unknown,
+    revision?: number,
+  ) => { ok: boolean; stale: boolean };
   restore: () => void;
 }
 
@@ -34,6 +44,7 @@ describe("injected compatibility runtime", () => {
 
   afterEach(() => {
     runtime().restore();
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
 
@@ -58,7 +69,7 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(12);
+    expect(runtime().version).toBe(15);
   });
 
   it("uses semantic styling when live adapter verification succeeds", async () => {
@@ -232,6 +243,46 @@ describe("injected compatibility runtime", () => {
     expect(getComputedStyle(portal).zIndex).toBe("55");
   });
 
+  it.each(["dialog", "toast", "menu"] as const)(
+    "keeps %s portals above the companion layer",
+    async (kind) => {
+      document.body.innerHTML = codexFixture("task");
+      await runtime().apply(nativeRefined, "dark", "developer");
+
+      const portal = portalFixture(kind);
+      document.body.appendChild(portal);
+
+      await vi.waitFor(() => {
+        expect(portal).toHaveAttribute("data-codex-styler-overlay-root");
+      });
+      expect(portal).toHaveAttribute("data-codex-styler-unlayered-root");
+      const stylesheet = document.getElementById("codex-styler-runtime-style");
+      expect(stylesheet?.textContent).toContain("z-index: 11");
+      expect(stylesheet?.textContent).toContain("z-index: 10");
+    },
+  );
+
+  it("keeps right-panel tabs and a dynamic composer in the application root", async () => {
+    document.body.innerHTML = codexFixture("right-panel");
+    await runtime().apply(nativeRefined, "dark", "developer");
+
+    const root = document.getElementById("root") as HTMLElement;
+    const tablist = root.querySelector('[role="tablist"]');
+    expect(root).toHaveAttribute("data-codex-styler-app-root");
+    expect(tablist).not.toBeNull();
+
+    const composer = document.createElement("div");
+    composer.className = "composer-surface-chrome";
+    root.querySelector('[role="main"]')?.appendChild(composer);
+    await vi.waitFor(() => {
+      expect(root).toHaveAttribute("data-codex-styler-app-root");
+      expect([...root.querySelectorAll(".composer-surface-chrome")]).toContain(
+        composer,
+      );
+    });
+    expect(document.getElementById("codex-styler-scene-root")).not.toBeNull();
+  });
+
   it("maps optional semantic palette roles to Codex component tokens", async () => {
     document.body.innerHTML = `
       <div id="codex-app-root">
@@ -320,5 +371,79 @@ describe("injected compatibility runtime", () => {
     const outcome = await runtime().apply(nativeRefined, "dark", "developer");
     expect(outcome.resolvedMode).toBe("developer");
     expect(document.documentElement.dataset.codexStylerMode).toBe("semantic");
+  });
+
+  it("accepts calibrated poses and ignores stale entity revisions", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    const image =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA" +
+      "DUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
+    const theme = structuredClone(nativeRefined);
+    const entity = {
+      id: "test-companion",
+      name: "Test companion",
+      renderer: {
+        type: "sprite-atlas" as const,
+        asset: image,
+        pages: [image],
+        columns: 2,
+        rows: 2,
+        framesPerPage: 4,
+        frameWidth: 1,
+        frameHeight: 1,
+        directions: 4,
+        frameCount: 4,
+        poses: [
+          { id: "pose-up", angle: 0, frame: 0 },
+          { id: "pose-right", angle: 90, frame: 1 },
+          { id: "pose-down", angle: 180, frame: 2 },
+          { id: "pose-left", angle: 270, frame: 3 },
+        ],
+        idleClips: [
+          {
+            id: "blink",
+            poseIds: ["pose-up"],
+            frames: [{ frame: 0, durationMs: 80 }],
+            minimumDelayMs: 500,
+            maximumDelayMs: 1000,
+          },
+        ],
+        neutralFrame: 0,
+        reducedMotionFrame: 0,
+        transitionFps: 30,
+        normalization: "preserve" as const,
+        alphaThreshold: 12,
+      },
+      behaviors: [
+        "idle" as const,
+        "look-at-pointer" as const,
+        "reduce-motion-fallback" as const,
+      ],
+      anchor: { x: 80, y: 70 },
+      size: 80,
+      opacity: 1,
+    };
+    theme.scene.entities = [entity];
+
+    const outcome = await runtime().apply(theme, "dark", "compatibility", 5);
+    expect(outcome.stale).not.toBe(true);
+    expect(document.getElementById("codex-styler-entity-root")).not.toBeNull();
+
+    expect(runtime().updateEntity(null, 6).stale).toBe(false);
+    expect(
+      document.getElementById("codex-styler-entity-root")?.childElementCount,
+    ).toBe(0);
+    expect(runtime().updateEntity(entity, 4).stale).toBe(true);
+    expect(
+      document.getElementById("codex-styler-entity-root")?.childElementCount,
+    ).toBe(0);
   });
 });

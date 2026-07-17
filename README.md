@@ -15,21 +15,21 @@
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9">Download Alpha</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.1">Download Beta</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/">Website</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/docs/getting-started/">Documentation</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/xuhuanstudio/codex-styler/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xuhuanstudio/codex-styler/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.9-2563EB?style=flat-square"></a>
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.1"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.2.0--beta.1-2563EB?style=flat-square"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-365443?style=flat-square"></a>
   <a href="ASSET_LICENSES.md"><img alt="CC BY 4.0 assets" src="https://img.shields.io/badge/art-CC%20BY%204.0-9B6E3F?style=flat-square"></a>
   <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555D57?style=flat-square">
 </p>
 
 > [!IMPORTANT]
-> Codex Styler is an Alpha preview. The macOS DMG is ad-hoc signed but not notarized, and the Windows EXE is not Authenticode-signed. v1 Stable remains gated on complete real-device testing and platform code signing.
+> Codex Styler 0.2 is a Creator Beta. The macOS DMG is ad-hoc signed but not notarized, and the Windows EXE is not Authenticode-signed. Windows Beta 1 awaits community real-device verification; v1 Stable remains gated on complete evidence and platform code signing.
 
 ![Gilded Grandeur Codex theme with the Reset God companion](docs/media/codex-theme-gilded-grandeur.webp)
 
@@ -66,6 +66,7 @@ OpenAI Codex Desktop already includes useful appearance controls and Pets. Codex
 
 - **Reversible runtime:** launches Codex with a temporary loopback CDP session; never edits <code>app.asar</code>, application resources, or signatures.
 - **Image-adaptive creator:** import a local PNG, JPEG, or WebP and Styler derives luminance, dominant color, accent, and contrast before fitting the image to one of four curated visual systems. You can then refine layout, icon treatment, details, surfaces, radius, motion, and companion placement without authoring CSS.
+- **Companion Studio:** turn a still image, naturally sorted sequence, short video, or existing atlas into calibrated pointer directions and pose-aware idle motion through a visual timeline and direction dial—without editing atlas coordinates or JSON.
 - **Open scene model:** themes declare <code>layers[]</code>, <code>entities[]</code>, a renderer, and behaviors instead of reaching into Codex DOM internals.
 - **Data-only packages:** local raster assets and JSON; no scripts, arbitrary CSS, SVG, video, remote URLs, or executable fonts.
 - **Local-first:** no account, telemetry, cloud sync, or online store; optional update checks only contact GitHub Releases.
@@ -96,14 +97,14 @@ Companions are selected independently from themes. Native Refined, Nocturne Stud
 
 Every shipped image and sprite is original project artwork. The reference repositories are studied for ideas only; their assets and source are not redistributed.
 
-## Download Alpha 0.9
+## Download Creator Beta 1
 
-- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.9/Codex-Styler_0.1.0-alpha.9_aarch64-unsigned.dmg)**
-- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.9/Codex-Styler_0.1.0-alpha.9_x64-unsigned-setup.exe)**
+- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.1/Codex-Styler_0.2.0-beta.1_aarch64-unsigned.dmg)**
+- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.1/Codex-Styler_0.2.0-beta.1_x64-unsigned-setup.exe)**
 
-On macOS, open the DMG, drag Codex Styler to Applications, then Control-click the app and choose **Open** on first launch. On Windows, SmartScreen may warn because this Alpha does not yet have an Authenticode certificate; inspect the published checksum and provenance before continuing. Never disable Gatekeeper or SmartScreen globally.
+On macOS, open the DMG, drag Codex Styler to Applications, then Control-click the app and choose **Open** on first launch. On Windows, SmartScreen may warn because this Beta does not yet have an Authenticode certificate; inspect the published checksum and provenance before continuing. Never disable Gatekeeper or SmartScreen globally.
 
-The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater artifacts, tested scope, and known limitations. Intel macOS is not included in this Alpha.
+The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.1) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater artifacts, tested scope, and known limitations. Intel macOS is not included. Windows Beta 1 is CI-built and structurally verified but remains marked as awaiting community real-device validation.
 
 ## Run from source
 
@@ -138,9 +139,9 @@ Codex Styler reserves a random port on <code>127.0.0.1</code>, starts the instal
 
 The default **Enhanced mode** first applies the complete semantic treatment—including navigation, content surfaces, composer, dialogs, and the thread summary panel—then checks live anchors and computed styles. A different Codex version is informational, not a failure. Styler falls back only when the runtime health check detects an actual structural or rendering problem. **Conservative mode** always limits styling to the isolated background and scene layer. When Codex is already open, Styler asks for confirmation before restarting it. On Windows, where the packaged app may turn a normal close request into a background hide, Styler waits first and then terminates only the verified Codex UI process tree covered by that confirmation.
 
-See [the security model](docs/security-model.md), [theme package specification](docs/theme-format.md), and [security policy](SECURITY.md).
+See [the security model](docs/security-model.md), [theme package specification](docs/theme-format.md), [companion creation guide](docs/creating-companions.md), [companion package specification](docs/companion-format.md), [diagnostics guide](docs/diagnostics.md), and [security policy](SECURITY.md).
 
-## Theme format
+## Data-only package formats
 
 A <code>.codex-styler-theme</code> file is a validated ZIP containing:
 
@@ -153,11 +154,14 @@ previews/*.png | *.jpg | *.webp
 
 The public format identifier is <code>codex-styler-theme-v1</code>. The JSON Schema and TypeScript interfaces live in <code>packages/theme-core</code>.
 
+A <code>.codex-styler-companion</code> archive uses <code>codex-styler-companion-v1</code> and stores calibrated poses, pose-aware idle clips, paged atlases, a dedicated portrait, and licenses. Source videos and local project history are never exported.
+
 Validate a manifest or package:
 
 ```bash
 pnpm theme:validate path/to/theme.json
 pnpm theme:validate path/to/theme.codex-styler-theme
+pnpm package:validate path/to/companion.codex-styler-companion
 ```
 
 ## Project structure
@@ -186,10 +190,10 @@ Please report security issues through GitHub private vulnerability reporting, no
 
 ## Status and roadmap
 
-The current repository implements the Foundation and cross-platform Alpha packaging layers. The next public gates are:
+The repository is now in Reliability & Creator Beta. The next public gates are:
 
-- real-device acceptance coverage for macOS Apple Silicon and Windows 11 x64
-- signed cross-platform Beta installers
+- two independent Windows 11 x64 Beta diagnostics and complete macOS/Windows RC acceptance
+- migration, upgrade, recovery, screenshot, and performance evidence for RC
 - signed and notarized v1 Stable on both platforms
 
 See [ROADMAP.md](ROADMAP.md) and [COMPATIBILITY.md](COMPATIBILITY.md).

@@ -1,4 +1,15 @@
+use std::{collections::VecDeque, time::SystemTime};
+
 use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LifecycleEvent {
+    pub timestamp_ms: u128,
+    pub action: String,
+    pub outcome: String,
+    pub duration_ms: u64,
+}
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,13 +22,15 @@ pub struct CodexDetection {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Default, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 pub enum RuntimeState {
     #[default]
-    Idle,
+    Disconnected,
     Launching,
     Connected,
+    Applying,
     Applied,
+    Fallback,
     Paused,
     Error,
 }
@@ -43,9 +56,26 @@ pub struct AppRuntime {
     pub codex_version: Option<String>,
     pub compatibility: Compatibility,
     pub message: Option<String>,
+    pub revision: u64,
+    pub lifecycle: VecDeque<LifecycleEvent>,
 }
 
 impl AppRuntime {
+    pub fn record(&mut self, action: &str, outcome: &str, duration_ms: u64) {
+        self.lifecycle.push_back(LifecycleEvent {
+            timestamp_ms: SystemTime::UNIX_EPOCH
+                .elapsed()
+                .map(|duration| duration.as_millis())
+                .unwrap_or_default(),
+            action: action.into(),
+            outcome: outcome.into(),
+            duration_ms,
+        });
+        while self.lifecycle.len() > 80 {
+            self.lifecycle.pop_front();
+        }
+    }
+
     pub fn status(&self) -> RuntimeStatus {
         RuntimeStatus {
             state: self.state,
@@ -55,6 +85,7 @@ impl AppRuntime {
             codex_version: self.codex_version.clone(),
             compatibility: self.compatibility,
             message: self.message.clone(),
+            revision: self.revision,
         }
     }
 }
@@ -69,6 +100,7 @@ pub struct RuntimeStatus {
     pub codex_version: Option<String>,
     pub compatibility: Compatibility,
     pub message: Option<String>,
+    pub revision: u64,
 }
 
 impl RuntimeStatus {
@@ -81,6 +113,7 @@ impl RuntimeStatus {
             codex_version: None,
             compatibility: Compatibility::Safe,
             message: Some(message.into()),
+            revision: 0,
         }
     }
 }

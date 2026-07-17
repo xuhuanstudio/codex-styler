@@ -74,6 +74,7 @@ export const nativeRefined: ThemeDefinition = {
     license: "CC-BY-4.0",
     tags: ["minimal", "native", "light", "dark"],
     preview: "previews/native-refined.webp",
+    recommendedCompanionId: "moss-gecko",
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
@@ -153,6 +154,7 @@ export const nocturneStudio: ThemeDefinition = {
     license: "CC-BY-4.0",
     tags: ["cinematic", "dark", "image", "studio"],
     preview: "previews/nocturne-studio.webp",
+    recommendedCompanionId: "moss-gecko",
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
@@ -257,6 +259,7 @@ export const quietGarden: ThemeDefinition = {
     license: "CC-BY-4.0",
     tags: ["nature", "calm", "image", "light", "dark"],
     preview: "previews/quiet-garden.webp",
+    recommendedCompanionId: "moss-gecko",
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
@@ -372,6 +375,7 @@ export const gildedGrandeur: ThemeDefinition = {
     license: "CC-BY-4.0",
     tags: ["gold", "luxury", "image", "editorial", "light", "dark"],
     preview: "previews/gilded-grandeur.webp",
+    recommendedCompanionId: "reset-god",
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },
@@ -545,6 +549,7 @@ export const merryBigTop: ThemeDefinition = {
     license: "CC-BY-4.0",
     tags: ["circus", "playful", "image", "colorful", "light", "dark"],
     preview: "previews/merry-big-top.webp",
+    recommendedCompanionId: "token-thief",
   },
   compatibility: {
     styler: { minimumVersion: "0.1.0" },

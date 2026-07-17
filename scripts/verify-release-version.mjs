@@ -62,9 +62,13 @@ const runtimeVersion = desktopRuntime.match(
 const appVersion = desktopApp.match(
   /useState\("(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)"\)/u,
 )?.[1];
-const alphaMatch = expected.match(/^\d+\.\d+\.\d+-alpha\.(\d+)$/u);
-const expectedDisplayVersion = alphaMatch
-  ? `Alpha 0.${alphaMatch[1]}`
+const previewMatch = expected.match(/^\d+\.\d+\.\d+-(alpha|beta|rc)\.(\d+)$/u);
+const expectedDisplayVersion = previewMatch
+  ? previewMatch[1] === "alpha"
+    ? `Alpha 0.${previewMatch[2]}`
+    : previewMatch[1] === "beta"
+      ? `Beta ${previewMatch[2]}`
+      : `RC ${previewMatch[2]}`
   : expected;
 const displayVersions = [
   ...desktopMessages.matchAll(/version:\s*"([^"]+)"/gu),

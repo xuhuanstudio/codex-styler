@@ -17,7 +17,7 @@ Styler launches a user-approved, managed Codex process with a random loopback de
 - An already running Codex instance cannot be themed silently; a restart flow requires explicit confirmation.
 - Compatibility must be tested per Codex version.
 - The local debugging port is a security-sensitive capability and must never bind beyond loopback.
-- Unknown versions can still receive an isolated safe-mode scene, while semantic styling stays disabled.
+- A Codex version change is informational rather than an automatic failure. Enhanced mode attempts semantic styling and falls back only after live anchor, visibility, layer, stylesheet, or readability checks fail; Conservative mode always keeps styling inside isolated scene layers.
 
 ## Rejected alternatives
 

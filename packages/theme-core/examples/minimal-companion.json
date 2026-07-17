@@ -1,0 +1,50 @@
+{
+  "format": "codex-styler-companion-v1",
+  "id": "example-static-companion",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "Example companion",
+    "description": "A minimal static companion manifest for validation and tooling examples.",
+    "author": "Codex Styler contributors",
+    "license": "CC-BY-4.0",
+    "tags": ["example", "static"],
+    "preview": "previews/portrait.webp"
+  },
+  "compatibility": {
+    "styler": { "minimumVersion": "0.2.0" }
+  },
+  "entity": {
+    "id": "example-companion",
+    "name": "Example companion",
+    "renderer": {
+      "type": "image",
+      "asset": "assets/companion.webp",
+      "normalization": "grounded",
+      "alphaThreshold": 12
+    },
+    "behaviors": ["idle", "reduce-motion-fallback"],
+    "anchor": { "x": 78, "y": 72 },
+    "size": 160,
+    "opacity": 1
+  },
+  "assets": [
+    {
+      "id": "companion-image",
+      "path": "assets/companion.webp",
+      "type": "image",
+      "license": "CC-BY-4.0"
+    },
+    {
+      "id": "companion-preview",
+      "path": "previews/portrait.webp",
+      "type": "preview",
+      "license": "CC-BY-4.0"
+    }
+  ],
+  "locales": {
+    "en": {
+      "name": "Example companion",
+      "description": "A minimal static companion."
+    }
+  }
+}

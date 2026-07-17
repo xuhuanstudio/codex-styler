@@ -1,8 +1,10 @@
 export const THEME_FORMAT = "codex-styler-theme-v1" as const;
+export const COMPANION_FORMAT = "codex-styler-companion-v1" as const;
 
 export type ThemeFormat = typeof THEME_FORMAT;
+export type CompanionFormat = typeof COMPANION_FORMAT;
 export type ThemeVariantName = "light" | "dark";
-export type AssetType = "background" | "sprite-atlas" | "preview";
+export type AssetType = "background" | "image" | "sprite-atlas" | "preview";
 export type RendererType = "image" | "sprite-atlas";
 export type BehaviorType =
   "idle" | "parallax" | "look-at-pointer" | "reduce-motion-fallback";
@@ -15,6 +17,26 @@ export interface ThemeMetadata {
   tags: string[];
   homepage?: string;
   preview?: string;
+  recommendedCompanionId?: string;
+}
+
+export interface CompanionPose {
+  id: string;
+  angle: number;
+  frame: number;
+}
+
+export interface CompanionIdleFrame {
+  frame: number;
+  durationMs: number;
+}
+
+export interface CompanionIdleClip {
+  id: string;
+  poseIds: string[];
+  frames: CompanionIdleFrame[];
+  minimumDelayMs: number;
+  maximumDelayMs: number;
 }
 
 export interface ThemeCompatibility {
@@ -114,8 +136,14 @@ export interface SpriteAtlasRenderer {
   frameWidth: number;
   frameHeight: number;
   directions: number;
+  frameCount?: number;
   frameAngles?: number[];
+  poses?: CompanionPose[];
+  idleClips?: CompanionIdleClip[];
+  neutralFrame?: number;
+  reducedMotionFrame?: number;
   transitionFps?: number;
+  followSmoothing?: number;
   normalization?: "preserve" | "grounded";
   alphaThreshold?: number;
 }
@@ -175,6 +203,36 @@ export interface ThemeDefinition {
 
 export interface ThemePackage {
   theme: ThemeDefinition;
+  files: Map<string, Uint8Array>;
+}
+
+export interface CompanionMetadata {
+  name: string;
+  description: string;
+  author: string;
+  license: string;
+  tags: string[];
+  homepage?: string;
+  preview?: string;
+}
+
+export interface CompanionPackageDefinition {
+  format: CompanionFormat;
+  id: string;
+  version: string;
+  metadata: CompanionMetadata;
+  compatibility: {
+    styler: {
+      minimumVersion: string;
+    };
+  };
+  entity: SceneEntity;
+  assets: ThemeAsset[];
+  locales: Record<string, { name: string; description: string }>;
+}
+
+export interface CompanionPackage {
+  companion: CompanionPackageDefinition;
   files: Map<string, Uint8Array>;
 }
 

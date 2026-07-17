@@ -436,7 +436,11 @@ export function PreviewWorkspace({
             onPointerCancel={handleEntityPointerUp}
           >
             {entityImage && entity.renderer.type === "sprite-atlas" ? (
-              <canvas ref={spriteCanvasRef} className="scene-entity__sprite" />
+              <canvas
+                ref={spriteCanvasRef}
+                className="scene-entity__sprite"
+                data-ready={spriteReady > 0 ? "true" : "false"}
+              />
             ) : entityImage ? (
               <div className="scene-entity__image" />
             ) : (

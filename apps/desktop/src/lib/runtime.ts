@@ -1,6 +1,11 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import type { ThemeDefinition } from "@codex-styler/theme-core";
+import {
+  composeThemeWithCompanion,
+  type CompanionDefinition,
+  type CompanionOverrides,
+  type ThemeDefinition,
+} from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
 import type { RuntimeStrategy } from "./storage";
 
@@ -13,13 +18,23 @@ export interface CodexDetection {
 }
 
 export interface RuntimeStatus {
-  state: "idle" | "launching" | "connected" | "applied" | "paused" | "error";
+  state:
+    | "disconnected"
+    | "restart-required"
+    | "launching"
+    | "connected"
+    | "applying"
+    | "applied"
+    | "fallback"
+    | "paused"
+    | "error";
   connected: boolean;
   startedByStyler: boolean;
   port: number | null;
   codexVersion: string | null;
   compatibility: "supported" | "safe" | "blocked";
   message: string | null;
+  revision: number;
 }
 
 export interface AvailableUpdate {
@@ -34,19 +49,30 @@ export interface UpdateCheckResult {
   update: AvailableUpdate | null;
 }
 
+/** The user-facing configuration remains decomposed until runtime compilation. */
+export interface AppliedConfiguration {
+  theme: ThemeDefinition;
+  companion: CompanionDefinition | null;
+  companionOverrides?: CompanionOverrides;
+  variant: "light" | "dark";
+  runtimeStrategy: RuntimeStrategy;
+  revision: number;
+}
+
 export type UpdateDownloadEvent =
   | { event: "Started"; data: { contentLength: number | null } }
   | { event: "Progress"; data: { chunkLength: number } }
   | { event: "Finished" };
 
 const browserStatus: RuntimeStatus = {
-  state: "idle",
+  state: "disconnected",
   connected: false,
   startedByStyler: false,
   port: null,
   codexVersion: null,
   compatibility: "safe",
   message: null,
+  revision: 0,
 };
 
 function isTauri(): boolean {
@@ -127,6 +153,7 @@ export async function applyTheme(
   variant: "light" | "dark",
   runtimeStrategy: RuntimeStrategy,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
+  revision = 0,
 ): Promise<RuntimeStatus> {
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
   if (!isTauri()) {
@@ -136,6 +163,7 @@ export async function applyTheme(
       connected: true,
       startedByStyler: true,
       port: 9229,
+      revision,
       message: "Theme applied in preview mode",
     };
   }
@@ -144,7 +172,59 @@ export async function applyTheme(
     variant,
     compatibilityMode:
       runtimeStrategy === "enhanced" ? "auto" : "compatibility",
+    revision,
   });
+}
+
+export async function applyConfiguration(
+  configuration: AppliedConfiguration,
+  resolveAsset?: (theme: ThemeDefinition, path: string) => string,
+): Promise<RuntimeStatus> {
+  const compiled = composeThemeWithCompanion(
+    configuration.theme,
+    configuration.companion,
+    configuration.companionOverrides,
+  );
+  return applyTheme(
+    compiled,
+    configuration.variant,
+    configuration.runtimeStrategy,
+    resolveAsset,
+    configuration.revision,
+  );
+}
+
+export async function updateCompanion(
+  theme: ThemeDefinition,
+  resolveAsset: ((theme: ThemeDefinition, path: string) => string) | undefined,
+  revision: number,
+): Promise<RuntimeStatus> {
+  const payload = await prepareThemeForRuntime(theme, resolveAsset);
+  const entity = payload.scene.entities[0] ?? null;
+  if (!isTauri()) {
+    return {
+      ...browserStatus,
+      state: "applied",
+      connected: true,
+      startedByStyler: true,
+      port: 9229,
+      revision,
+      message: "Companion updated in preview mode",
+    };
+  }
+  return invoke<RuntimeStatus>("update_companion", { entity, revision });
+}
+
+export async function updateCompanionConfiguration(
+  configuration: AppliedConfiguration,
+  resolveAsset?: (theme: ThemeDefinition, path: string) => string,
+): Promise<RuntimeStatus> {
+  const compiled = composeThemeWithCompanion(
+    configuration.theme,
+    configuration.companion,
+    configuration.companionOverrides,
+  );
+  return updateCompanion(compiled, resolveAsset, configuration.revision);
 }
 
 export async function pauseTheme(): Promise<RuntimeStatus> {
@@ -167,7 +247,7 @@ export async function restoreOfficial(): Promise<RuntimeStatus> {
 
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.1.0-alpha.9", update: null };
+    return { currentVersion: "0.2.0-beta.1", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates");
 }

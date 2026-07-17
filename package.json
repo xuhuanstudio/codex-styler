@@ -1,6 +1,6 @@
 {
   "name": "codex-styler",
-  "version": "0.1.0-alpha.9",
+  "version": "0.2.0-beta.1",
   "private": true,
   "description": "Unofficial, open-source Codex theme editor and Codex skin creator for OpenAI Codex Desktop.",
   "license": "Apache-2.0",
@@ -23,7 +23,10 @@
     "check:links": "node scripts/check-site-links.mjs",
     "check:lighthouse": "npx --yes @lhci/cli@0.15.1 autorun",
     "check:release-version": "node scripts/verify-release-version.mjs",
-    "theme:validate": "pnpm --filter @codex-styler/theme-core theme:validate"
+    "test:e2e": "pnpm --filter @codex-styler/desktop test:e2e",
+    "test:e2e:update": "pnpm --filter @codex-styler/desktop test:e2e:update",
+    "theme:validate": "pnpm --filter @codex-styler/theme-core theme:validate",
+    "package:validate": "pnpm --filter @codex-styler/theme-core package:validate"
   },
   "devDependencies": {
     "prettier": "^3.6.2",

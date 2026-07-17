@@ -6,7 +6,7 @@ Thank you for helping build a safer and more expressive Codex Desktop customizat
 
 - Search existing issues and discussions.
 - Use an issue before changing the public theme schema, CDP lifecycle, security limits, licensing policy, or supported-platform promise.
-- Keep themes data-only. Do not add remote resources, arbitrary JavaScript, arbitrary CSS, SVG, video, or executable fonts.
+- Keep exported themes and companions data-only. Do not add remote resources, arbitrary JavaScript, arbitrary CSS, SVG, video, or executable fonts.
 - Never copy assets or code from a reference project without a compatible license and attribution.
 
 ## Local setup
@@ -40,11 +40,11 @@ A built-in theme must provide:
 
 - valid <code>codex-styler-theme-v1</code> data;
 - light and dark variants;
-- a safe-mode presentation;
+- a readable Conservative-mode presentation;
 - reduced-motion behavior;
 - original or compatibly licensed raster assets;
 - preview art, attribution, and replacement specifications;
-- no more than one v1 interactive entity.
+- an optional recommendation rather than an embedded global companion for new exports.
 
 Run the validator before submitting:
 
@@ -52,9 +52,28 @@ Run the validator before submitting:
 pnpm theme:validate path/to/theme.json
 ```
 
+## Companion contributions
+
+A built-in or shared companion must provide:
+
+- valid `codex-styler-companion-v1` data and a portrait preview;
+- at least four calibrated poses in `[0, 360)`, a neutral frame, and a reduced-motion frame;
+- shared canvas, scale, crop, and ground-line geometry across every frame;
+- pose-aware idle clips for blinks, breathing, or gestures instead of duplicate direction poses;
+- local PNG, JPEG, or WebP assets with complete authorship, source, and license declarations;
+- no raw source video or Companion Studio project history in the exported package.
+
+Use Companion Studio for visual calibration, then validate the exported archive:
+
+```bash
+pnpm package:validate path/to/companion.codex-styler-companion
+```
+
+Review alpha edges on black, white, and representative theme colors before submitting. See [Creating companions](docs/creating-companions.md) for the complete workflow.
+
 ## Compatibility reports
 
-Include the operating system, architecture, Codex version, Codex Styler commit or release, and exact safe/semantic mode. Review diagnostic output before attaching it.
+Include the operating system, architecture, Codex version, Codex Styler commit or release, and exact Enhanced/Conservative mode. Generate the redacted diagnostics archive, preview both files, and attach it manually only after confirming that it contains no private workspace data.
 
 ## Security
 

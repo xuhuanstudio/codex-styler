@@ -51,11 +51,17 @@ function openDatabase(): Promise<IDBDatabase | null> {
   if (!("indexedDB" in window)) return Promise.resolve(null);
 
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(databaseName, 1);
+    const request = indexedDB.open(databaseName, 3);
     request.onupgradeneeded = () => {
       const database = request.result;
       if (!database.objectStoreNames.contains(archiveStore)) {
         database.createObjectStore(archiveStore);
+      }
+      if (!database.objectStoreNames.contains("companion-archives")) {
+        database.createObjectStore("companion-archives");
+      }
+      if (!database.objectStoreNames.contains("companion-project-files")) {
+        database.createObjectStore("companion-project-files");
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -66,11 +72,9 @@ function openDatabase(): Promise<IDBDatabase | null> {
 
 async function saveArchive(themeId: string, archive: Blob): Promise<void> {
   if (isTauri()) {
-    await invoke<void>(
-      "save_theme_archive",
-      await blobBytes(archive),
-      { headers: { [themeIdHeader]: themeId } },
-    );
+    await invoke<void>("save_theme_archive", await blobBytes(archive), {
+      headers: { [themeIdHeader]: themeId },
+    });
     return;
   }
   const database = await openDatabase();
@@ -90,10 +94,7 @@ async function loadArchive(themeId: string): Promise<Blob | null> {
   if (isTauri()) {
     const result = await invoke<
       ArrayBuffer | ArrayBufferView | Blob | number[]
-    >(
-      "load_theme_archive",
-      { themeId },
-    );
+    >("load_theme_archive", { themeId });
     const bytes = await responseBytes(result);
     if (bytes.byteLength === 0) return null;
     return new Blob([Uint8Array.from(bytes).buffer], {

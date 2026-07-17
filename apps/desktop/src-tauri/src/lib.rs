@@ -1,9 +1,15 @@
 mod cdp;
 mod codex;
+mod diagnostics;
 mod error;
 mod model;
 
-use std::{fs, path::PathBuf, sync::Mutex};
+use std::{
+    fs,
+    path::{Component, Path, PathBuf},
+    sync::Mutex,
+    time::Instant,
+};
 
 use model::{AppRuntime, RuntimeStatus};
 use semver::Version;
@@ -63,6 +69,29 @@ fn release_version(tag: &str) -> Option<Version> {
     Version::parse(tag.trim().trim_start_matches(['v', 'V'])).ok()
 }
 
+fn prerelease_channel(version: &Version) -> Option<&str> {
+    version
+        .pre
+        .as_str()
+        .split('.')
+        .next()
+        .filter(|value| !value.is_empty())
+}
+
+fn release_allowed_for_channel(current: &Version, candidate: &Version) -> bool {
+    match prerelease_channel(current) {
+        None => candidate.pre.is_empty(),
+        Some("alpha") => true,
+        Some("beta") => {
+            candidate.pre.is_empty() || matches!(prerelease_channel(candidate), Some("beta" | "rc"))
+        }
+        Some("rc") => {
+            candidate.pre.is_empty() || matches!(prerelease_channel(candidate), Some("rc"))
+        }
+        Some(channel) => candidate.pre.is_empty() || prerelease_channel(candidate) == Some(channel),
+    }
+}
+
 fn select_release(
     current: &Version,
     releases: impl IntoIterator<Item = GitHubRelease>,
@@ -70,10 +99,10 @@ fn select_release(
     releases
         .into_iter()
         .filter(|release| !release.draft)
-        .filter(|release| !current.pre.is_empty() || !release.prerelease)
         .filter_map(|release| {
             let version = release_version(&release.tag_name)?;
-            (version > *current).then_some((version, release))
+            (version > *current && release_allowed_for_channel(current, &version))
+                .then_some((version, release))
         })
         .max_by(|(left, _), (right, _)| left.cmp(right))
         .map(|(_, release)| release)
@@ -227,6 +256,19 @@ fn theme_archive_path(app: &AppHandle, theme_id: &str) -> Result<PathBuf, String
     Ok(directory.join(format!("{theme_id}.codex-styler-theme")))
 }
 
+fn companion_archive_path(app: &AppHandle, companion_id: &str) -> Result<PathBuf, String> {
+    if !is_valid_theme_id(companion_id) {
+        return Err("Companion id is not safe for local storage".into());
+    }
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("companions");
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory.join(format!("{companion_id}.codex-styler-companion")))
+}
+
 #[tauri::command]
 fn save_theme_archive(app: AppHandle, request: Request<'_>) -> Result<(), String> {
     let theme_id = request
@@ -258,6 +300,161 @@ fn delete_theme_archive(app: AppHandle, theme_id: String) -> Result<(), String> 
     let path = theme_archive_path(&app, &theme_id)?;
     if path.exists() {
         fs::remove_file(path).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn save_companion_archive(app: AppHandle, request: Request<'_>) -> Result<(), String> {
+    let companion_id = request
+        .headers()
+        .get("x-codex-styler-companion-id")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| "Companion archive request is missing a valid companion id".to_string())?;
+    let archive = match request.body() {
+        InvokeBody::Raw(bytes) => bytes,
+        InvokeBody::Json(_) => {
+            return Err("Companion archive request must contain raw bytes".into());
+        }
+    };
+    let path = companion_archive_path(&app, companion_id)?;
+    fs::write(path, archive).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn load_companion_archive(app: AppHandle, companion_id: String) -> Result<Response, String> {
+    let path = companion_archive_path(&app, &companion_id)?;
+    if !path.exists() {
+        return Ok(Response::new(Vec::<u8>::new()));
+    }
+    fs::read(path)
+        .map(Response::new)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn delete_companion_archive(app: AppHandle, companion_id: String) -> Result<(), String> {
+    let path = companion_archive_path(&app, &companion_id)?;
+    if path.exists() {
+        fs::remove_file(path).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn companion_project_directory(app: &AppHandle, project_id: &str) -> Result<PathBuf, String> {
+    if !is_valid_theme_id(project_id) {
+        return Err("Companion project id is not safe for local storage".into());
+    }
+    let directory = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("companion-projects")
+        .join(project_id);
+    fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
+    Ok(directory)
+}
+
+fn is_safe_project_path(path: &str) -> bool {
+    if path.is_empty() || path.len() > 160 || path.contains('\\') {
+        return false;
+    }
+    let candidate = Path::new(path);
+    if candidate.is_absolute()
+        || candidate
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+    {
+        return false;
+    }
+    path == "project.json"
+        || (path.starts_with("sources/")
+            && path
+                .strip_prefix("sources/")
+                .is_some_and(|name| !name.is_empty() && !name.contains('/')))
+}
+
+fn companion_project_file_path(
+    app: &AppHandle,
+    project_id: &str,
+    project_path: &str,
+) -> Result<PathBuf, String> {
+    if !is_safe_project_path(project_path) {
+        return Err("Companion project path is not safe for local storage".into());
+    }
+    let path = companion_project_directory(app, project_id)?.join(project_path);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    Ok(path)
+}
+
+#[tauri::command]
+fn save_companion_project_file(app: AppHandle, request: Request<'_>) -> Result<(), String> {
+    let project_id = request
+        .headers()
+        .get("x-codex-styler-project-id")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| "Project file request is missing a valid project id".to_string())?;
+    let project_path = request
+        .headers()
+        .get("x-codex-styler-project-path")
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| "Project file request is missing a valid relative path".to_string())?;
+    let contents = match request.body() {
+        InvokeBody::Raw(bytes) => bytes,
+        InvokeBody::Json(_) => return Err("Project file request must contain raw bytes".into()),
+    };
+    let path = companion_project_file_path(&app, project_id, project_path)?;
+    fs::write(path, contents).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn load_companion_project_file(
+    app: AppHandle,
+    project_id: String,
+    project_path: String,
+) -> Result<Response, String> {
+    let path = companion_project_file_path(&app, &project_id, &project_path)?;
+    if !path.exists() {
+        return Ok(Response::new(Vec::<u8>::new()));
+    }
+    fs::read(path)
+        .map(Response::new)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_companion_projects(app: AppHandle) -> Result<Vec<String>, String> {
+    let root = app
+        .path()
+        .app_data_dir()
+        .map_err(|error| error.to_string())?
+        .join("companion-projects");
+    if !root.exists() {
+        return Ok(Vec::new());
+    }
+    let mut projects = Vec::new();
+    for entry in fs::read_dir(root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let file_type = entry.file_type().map_err(|error| error.to_string())?;
+        if !file_type.is_dir() {
+            continue;
+        }
+        let id = entry.file_name().to_string_lossy().into_owned();
+        if is_valid_theme_id(&id) && entry.path().join("project.json").exists() {
+            projects.push(id);
+        }
+    }
+    projects.sort();
+    Ok(projects)
+}
+
+#[tauri::command]
+fn delete_companion_project(app: AppHandle, project_id: String) -> Result<(), String> {
+    let directory = companion_project_directory(&app, &project_id)?;
+    if directory.exists() {
+        fs::remove_dir_all(directory).map_err(|error| error.to_string())?;
     }
     Ok(())
 }
@@ -301,6 +498,7 @@ async fn launch_codex(
     state: State<'_, Mutex<AppRuntime>>,
     custom_path: Option<String>,
 ) -> Result<RuntimeStatus, String> {
+    let started_at = Instant::now();
     if let Ok(runtime) = state.lock()
         && runtime.connected
     {
@@ -348,6 +546,11 @@ async fn launch_codex(
     runtime.codex_version = detection.version;
     runtime.compatibility = compatibility_for_version(runtime.codex_version.as_deref());
     runtime.message = Some("Connected through a temporary loopback-only CDP session".into());
+    runtime.record(
+        "launch",
+        "connected",
+        started_at.elapsed().as_millis() as u64,
+    );
     Ok(runtime.status())
 }
 
@@ -356,18 +559,25 @@ async fn apply_theme(
     theme: Value,
     variant: String,
     compatibility_mode: String,
+    revision: u64,
     state: State<'_, Mutex<AppRuntime>>,
 ) -> Result<RuntimeStatus, String> {
+    let started_at = Instant::now();
     if variant != "light" && variant != "dark" {
         return Err("Theme variant must be light or dark".into());
     }
     if !is_valid_compatibility_mode(&compatibility_mode) {
-        return Err("Compatibility mode must be auto, compatibility, or developer".into());
+        return Err("The requested runtime strategy is invalid".into());
     }
     let websocket_url = {
-        let runtime = state
+        let mut runtime = state
             .lock()
             .map_err(|_| "Runtime state is unavailable".to_string())?;
+        if revision < runtime.revision {
+            return Ok(runtime.status());
+        }
+        runtime.revision = revision;
+        runtime.state = model::RuntimeState::Applying;
         runtime
             .websocket_url
             .clone()
@@ -379,11 +589,12 @@ async fn apply_theme(
     let mode_json =
         serde_json::to_string(&compatibility_mode).map_err(|error| error.to_string())?;
     let expression = format!(
-        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {});",
+        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {});",
         include_str!("runtime.js"),
         theme_json,
         variant_json,
         mode_json,
+        revision,
     );
 
     let response = cdp::evaluate(&websocket_url, &expression)
@@ -402,7 +613,14 @@ async fn apply_theme(
     let mut runtime = state
         .lock()
         .map_err(|_| "Runtime state is unavailable".to_string())?;
-    runtime.state = model::RuntimeState::Applied;
+    if revision != runtime.revision {
+        return Ok(runtime.status());
+    }
+    runtime.state = if matches!(resolved_mode, "semantic" | "developer") {
+        model::RuntimeState::Applied
+    } else {
+        model::RuntimeState::Fallback
+    };
     runtime.compatibility = if matches!(resolved_mode, "semantic" | "developer") {
         model::Compatibility::Supported
     } else {
@@ -412,10 +630,64 @@ async fn apply_theme(
         "semantic" => "Theme applied after live Codex interface verification".into(),
         "developer" => "Theme applied in developer mode without compatibility enforcement".into(),
         _ => fallback_reason.map_or_else(
-            || "Theme applied in isolated compatibility mode".into(),
-            |reason| format!("Automatic verification fell back to compatibility mode: {reason}"),
+            || "Theme applied in isolated Conservative mode".into(),
+            |reason| format!("Enhanced verification fell back to Conservative mode: {reason}"),
         ),
     });
+    runtime.record(
+        "apply-configuration",
+        resolved_mode,
+        started_at.elapsed().as_millis() as u64,
+    );
+    Ok(runtime.status())
+}
+
+#[tauri::command]
+async fn update_companion(
+    entity: Option<Value>,
+    revision: u64,
+    state: State<'_, Mutex<AppRuntime>>,
+) -> Result<RuntimeStatus, String> {
+    let started_at = Instant::now();
+    let websocket_url = {
+        let mut runtime = state
+            .lock()
+            .map_err(|_| "Runtime state is unavailable".to_string())?;
+        if revision < runtime.revision {
+            return Ok(runtime.status());
+        }
+        runtime.revision = revision;
+        runtime.state = model::RuntimeState::Applying;
+        runtime
+            .websocket_url
+            .clone()
+            .ok_or_else(|| "Codex is not connected".to_string())?
+    };
+    let entity_json = serde_json::to_string(&entity).map_err(|error| error.to_string())?;
+    let expression = format!(
+        "window.__CODEX_STYLER_RUNTIME__?.updateEntity({}, {});",
+        entity_json, revision,
+    );
+    cdp::evaluate(&websocket_url, &expression)
+        .await
+        .map_err(|error| error.to_string())?;
+    let mut runtime = state
+        .lock()
+        .map_err(|_| "Runtime state is unavailable".to_string())?;
+    if revision != runtime.revision {
+        return Ok(runtime.status());
+    }
+    runtime.state = if runtime.compatibility == model::Compatibility::Supported {
+        model::RuntimeState::Applied
+    } else {
+        model::RuntimeState::Fallback
+    };
+    runtime.message = Some("Companion configuration updated without reinjecting the theme".into());
+    runtime.record(
+        "update-companion",
+        "applied",
+        started_at.elapsed().as_millis() as u64,
+    );
     Ok(runtime.status())
 }
 
@@ -458,7 +730,7 @@ async fn restore_official(state: State<'_, Mutex<AppRuntime>>) -> Result<Runtime
     runtime.state = if runtime.connected {
         model::RuntimeState::Connected
     } else {
-        model::RuntimeState::Idle
+        model::RuntimeState::Disconnected
     };
     runtime.message = Some("All Codex Styler runtime nodes were removed".into());
     Ok(runtime.status())
@@ -478,14 +750,23 @@ pub fn run() {
             runtime_status,
             launch_codex,
             apply_theme,
+            update_companion,
             pause_theme,
             restore_official,
             save_theme_archive,
             load_theme_archive,
             delete_theme_archive,
+            save_companion_archive,
+            load_companion_archive,
+            delete_companion_archive,
+            save_companion_project_file,
+            load_companion_project_file,
+            list_companion_projects,
+            delete_companion_project,
             check_for_updates,
             download_and_install_update,
-            restart_app
+            restart_app,
+            diagnostics::run_diagnostics
         ])
         .run(tauri::generate_context!())
         .expect("error while running Codex Styler");
@@ -580,5 +861,54 @@ mod tests {
         )
         .unwrap();
         assert_eq!(selected.tag_name, "v1.0.1");
+    }
+
+    #[test]
+    fn beta_builds_skip_alpha_but_accept_beta_rc_and_stable() {
+        let current = Version::parse("0.2.0-beta.1").unwrap();
+        let selected = select_release(
+            &current,
+            [
+                GitHubRelease {
+                    tag_name: "v0.3.0-alpha.4".into(),
+                    draft: false,
+                    prerelease: true,
+                },
+                GitHubRelease {
+                    tag_name: "v0.2.0-beta.2".into(),
+                    draft: false,
+                    prerelease: true,
+                },
+                GitHubRelease {
+                    tag_name: "v0.2.0-rc.1".into(),
+                    draft: false,
+                    prerelease: true,
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(selected.tag_name, "v0.2.0-rc.1");
+    }
+
+    #[test]
+    fn rc_builds_do_not_move_back_to_beta_or_alpha() {
+        let current = Version::parse("0.2.0-rc.1").unwrap();
+        let selected = select_release(
+            &current,
+            [
+                GitHubRelease {
+                    tag_name: "v0.3.0-beta.1".into(),
+                    draft: false,
+                    prerelease: true,
+                },
+                GitHubRelease {
+                    tag_name: "v0.2.0-rc.2".into(),
+                    draft: false,
+                    prerelease: true,
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(selected.tag_name, "v0.2.0-rc.2");
     }
 }

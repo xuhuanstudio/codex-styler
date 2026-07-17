@@ -3,6 +3,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Film,
   FolderOpen,
   Image,
   Languages,
@@ -33,12 +34,15 @@ import {
   builtinThemes,
   composeThemeWithCompanion,
   defaultCompanionForTheme,
+  embeddedCompanionForTheme,
   type CompanionDefinition,
   type EntityAttachment,
   type ThemeDefinition,
   type ThemeVariant,
 } from "@codex-styler/theme-core";
 import {
+  lazy,
+  Suspense,
   useEffect,
   useMemo,
   useRef,
@@ -52,6 +56,11 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BrandMark } from "./components/BrandMark";
 import { Onboarding } from "./components/Onboarding";
 import { PreviewWorkspace } from "./components/PreviewWorkspace";
+import type { CompanionCreatorProject } from "./features/companion-creator/model";
+import {
+  deleteCompanionProject,
+  listCompanionProjects,
+} from "./features/companion-creator/project-files";
 import {
   resolveLocale,
   translate,
@@ -61,7 +70,9 @@ import {
 } from "./lib/i18n";
 import {
   loadLocalThemes,
+  loadLocalCompanions,
   loadSettings,
+  saveLocalCompanions,
   saveLocalThemes,
   saveSettings,
   type ManagerAppearance,
@@ -69,7 +80,7 @@ import {
   type UserSettings,
 } from "./lib/storage";
 import {
-  applyTheme,
+  applyConfiguration,
   checkForUpdates,
   chooseCodexInstallPath,
   detectCodex,
@@ -80,6 +91,7 @@ import {
   quitCodex,
   restartApp,
   restoreOfficial,
+  updateCompanionConfiguration,
   validateCodexInstallPath,
   type AvailableUpdate,
   type CodexDetection,
@@ -100,10 +112,33 @@ import {
   persistGeneratedTheme,
   type ThemeAssetMap,
 } from "./lib/theme-files";
-import { themeAssetUrl } from "./lib/assets";
 
-type View = "home" | "themes" | "companions" | "settings" | "editor";
+const CompanionCreator = lazy(() =>
+  import("./features/companion-creator/CompanionCreator").then((module) => ({
+    default: module.CompanionCreator,
+  })),
+);
+import {
+  deleteCompanionArchive,
+  exportCompanion,
+  hydrateCompanionAssetMaps,
+  importCompanion,
+  persistCompanion,
+  type CompanionAssetMap,
+} from "./lib/companion-files";
+import { themeAssetUrl } from "./lib/assets";
+import {
+  collectDiagnostics,
+  diagnosticsSummary,
+  exportDiagnostics,
+  openWindowsCompatibilityIssue,
+  type DiagnosticsReport,
+} from "./lib/diagnostics";
+
+type View =
+  "home" | "themes" | "companions" | "settings" | "editor" | "companion-editor";
 type ThemeCollection = "builtIn" | "mine";
+type CompanionCollection = "builtIn" | "mine";
 type NewThemeStep = "choose" | "existing";
 type ThemeVariantName = "light" | "dark";
 type UpdateStatus = "idle" | "checking" | "current" | "error";
@@ -113,15 +148,18 @@ type ApplySuccessMessage =
   | "themeApplied"
   | "companionApplied"
   | "companionPositionApplied";
+type ConfigurationState =
+  "pending" | "applying" | "applied" | "paused" | "fallback" | "error";
 
 const initialRuntime: RuntimeStatus = {
-  state: "idle",
+  state: "disconnected",
   connected: false,
   startedByStyler: false,
   port: null,
   codexVersion: null,
   compatibility: "safe",
   message: null,
+  revision: 0,
 };
 
 export function App() {
@@ -139,28 +177,45 @@ export function App() {
   const [detection, setDetection] = useState<CodexDetection | null>(null);
   const [localThemes, setLocalThemes] =
     useState<ThemeDefinition[]>(loadLocalThemes);
+  const [localCompanions, setLocalCompanions] =
+    useState<CompanionDefinition[]>(loadLocalCompanions);
   const [themeCollection, setThemeCollection] =
     useState<ThemeCollection>("builtIn");
+  const [companionCollection, setCompanionCollection] =
+    useState<CompanionCollection>("builtIn");
   const [newThemeStep, setNewThemeStep] = useState<NewThemeStep | null>(null);
   const [themeAssetMaps, setThemeAssetMaps] = useState<
     Record<string, ThemeAssetMap>
   >({});
+  const [companionAssetMaps, setCompanionAssetMaps] = useState<
+    Record<string, CompanionAssetMap>
+  >({});
+  const [companionProjects, setCompanionProjects] = useState<
+    CompanionCreatorProject[]
+  >([]);
+  const [activeCompanionProject, setActiveCompanionProject] =
+    useState<CompanionCreatorProject | null>(null);
   const [busy, setBusy] = useState(false);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.9");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.1");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
   const [updateInstallStatus, setUpdateInstallStatus] =
     useState<UpdateInstallStatus>("idle");
   const [updateProgress, setUpdateProgress] = useState<number | null>(null);
+  const [diagnosticsReport, setDiagnosticsReport] =
+    useState<DiagnosticsReport | null>(null);
+  const [diagnosticsBusy, setDiagnosticsBusy] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(
     !settings.onboardingComplete,
   );
   const [pendingDelete, setPendingDelete] = useState<ThemeDefinition | null>(
     null,
   );
+  const [pendingCompanionDelete, setPendingCompanionDelete] =
+    useState<CompanionDefinition | null>(null);
   const [pendingApplication, setPendingApplication] = useState<{
     theme: ThemeDefinition;
     companion: CompanionDefinition | null;
@@ -170,6 +225,7 @@ export function App() {
   } | null>(null);
   const [restartError, setRestartError] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const companionImportRef = useRef<HTMLInputElement>(null);
   const backgroundImportRef = useRef<HTMLInputElement>(null);
   const [backgroundImportMode, setBackgroundImportMode] = useState<
     "create" | "replace"
@@ -179,6 +235,7 @@ export function App() {
     useState<AdaptiveSchemeId | null>(null);
   const startupUpdateCheckRef = useRef(false);
   const liveCompanionSyncRef = useRef<number | null>(null);
+  const applyRevisionRef = useRef(0);
 
   const locale = resolveLocale(settings.locale);
   const t = (key: MessageKey) => translate(locale, key);
@@ -196,8 +253,7 @@ export function App() {
     }
     return t("themeSaveFailed");
   };
-  const resolveAsset = (theme: ThemeDefinition, path: string) =>
-    themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
+  const allCompanions = [...builtinCompanions, ...localCompanions];
   const companionForTheme = (
     theme: ThemeDefinition,
     sourceSettings: UserSettings = settings,
@@ -205,26 +261,68 @@ export function App() {
     if (sourceSettings.companionMode === "disabled") return null;
     if (sourceSettings.companionMode === "custom") {
       return (
-        builtinCompanions.find(
-          (item) => item.id === sourceSettings.companionId,
-        ) ?? null
+        allCompanions.find((item) => item.id === sourceSettings.companionId) ??
+        null
       );
     }
-    return defaultCompanionForTheme(theme.id);
+    const recommendedId = theme.metadata.recommendedCompanionId;
+    return (
+      (recommendedId
+        ? allCompanions.find((item) => item.id === recommendedId)
+        : null) ??
+      embeddedCompanionForTheme(theme) ??
+      defaultCompanionForTheme(theme.id)
+    );
   };
   const selectedCompanion = companionForTheme(selectedTheme);
+  const resolveAsset = (theme: ThemeDefinition, path: string) => {
+    const companion = companionForTheme(theme);
+    return (
+      themeAssetMaps[theme.id]?.[path] ??
+      (companion ? companionAssetMaps[companion.id]?.[path] : undefined) ??
+      themeAssetUrl(theme, path)
+    );
+  };
   const appliedTheme =
     [...builtinThemes, ...localThemes].find(
       (theme) => theme.id === settings.appliedThemeId,
     ) ?? selectedTheme;
-  const isLive = runtime.connected && runtime.state === "applied";
+  const isLive =
+    runtime.connected &&
+    settings.appliedThemeId !== null &&
+    (runtime.state === "applied" ||
+      runtime.state === "fallback" ||
+      runtime.state === "applying");
+  const configurationState: ConfigurationState =
+    runtime.state === "error"
+      ? "error"
+      : runtime.state === "fallback"
+        ? "fallback"
+        : runtime.state === "paused"
+          ? "paused"
+          : runtime.state === "applying" || runtime.state === "launching"
+            ? "applying"
+            : runtime.state === "applied"
+              ? "applied"
+              : "pending";
+  const configurationStateKey: MessageKey =
+    configurationState === "applying"
+      ? "statusApplying"
+      : configurationState === "applied"
+        ? "statusApplied"
+        : configurationState === "paused"
+          ? "statusPaused"
+          : configurationState === "fallback"
+            ? "statusFallback"
+            : configurationState === "error"
+              ? "statusError"
+              : "statusPending";
   const displayedTheme = isLive ? appliedTheme : selectedTheme;
-  const composeTheme = (
-    theme: ThemeDefinition,
-    companion: CompanionDefinition | null = companionForTheme(theme),
-    sourceSettings: UserSettings = settings,
+  const companionOverridesFor = (
+    companion: CompanionDefinition | null,
+    sourceSettings: UserSettings,
   ) => {
-    if (!companion) return composeThemeWithCompanion(theme, null);
+    if (!companion) return undefined;
     const overrides: {
       anchor?: { x: number; y: number };
       attachment?: EntityAttachment | null;
@@ -239,10 +337,20 @@ export function App() {
         companion.id,
       )
     ) {
-      overrides.attachment =
-        sourceSettings.companionAttachments[companion.id];
+      overrides.attachment = sourceSettings.companionAttachments[companion.id];
     }
-    return composeThemeWithCompanion(theme, companion, overrides);
+    return overrides;
+  };
+  const composeTheme = (
+    theme: ThemeDefinition,
+    companion: CompanionDefinition | null = companionForTheme(theme),
+    sourceSettings: UserSettings = settings,
+  ) => {
+    return composeThemeWithCompanion(
+      theme,
+      companion,
+      companionOverridesFor(companion, sourceSettings),
+    );
   };
 
   useEffect(() => {
@@ -269,12 +377,29 @@ export function App() {
     void Promise.all([
       detectCodex(settingsRef.current.codexInstallPath),
       getRuntimeStatus(),
-    ]).then(
-      ([detected, status]) => {
-        setDetection(detected);
-        setRuntime(status);
-      },
-    );
+    ]).then(([detected, status]) => {
+      syncDetection(detected, status);
+    });
+  }, []);
+
+  useEffect(() => {
+    void listCompanionProjects()
+      .then(setCompanionProjects)
+      .catch((error) =>
+        console.warn("Could not restore companion drafts", error),
+      );
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    void hydrateCompanionAssetMaps(localCompanions).then((maps) => {
+      if (active) {
+        setCompanionAssetMaps((current) => ({ ...current, ...maps }));
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -317,7 +442,26 @@ export function App() {
     return settings.appearance;
   }, [settings.appearance]);
 
-  const needsManualRestart = detection?.running === true && !runtime.connected;
+  const needsManualRestart =
+    runtime.state === "restart-required" ||
+    (detection?.running === true && !runtime.connected);
+
+  function syncDetection(
+    nextDetection: CodexDetection,
+    status?: RuntimeStatus,
+  ) {
+    setDetection(nextDetection);
+    setRuntime((current) => {
+      const next = status ?? current;
+      if (next.connected) return next;
+      if (nextDetection.running) {
+        return { ...next, state: "restart-required" };
+      }
+      return next.state === "restart-required"
+        ? { ...next, state: "disconnected" }
+        : next;
+    });
+  }
 
   async function performApply(
     theme: ThemeDefinition,
@@ -328,19 +472,32 @@ export function App() {
       successMessage?: ApplySuccessMessage;
     } = {},
   ) {
+    const revision = ++applyRevisionRef.current;
     const preserveSelection = options.preserveSelection ?? false;
     const successMessage = options.successMessage ?? "configurationApplied";
-    const composed = composeTheme(theme, companion, settingsSnapshot);
     setBusy(true);
+    setRuntime((current) => ({
+      ...current,
+      state: "applying",
+      revision,
+      message: null,
+    }));
     try {
       let next = await getRuntimeStatus();
-      setRuntime(next);
+      if (revision !== applyRevisionRef.current) return;
       if (!next.connected) {
         const currentDetection = await detectCodex(
           settingsSnapshot.codexInstallPath,
         );
-        setDetection(currentDetection);
+        if (revision !== applyRevisionRef.current) return;
+        syncDetection(currentDetection);
         if (currentDetection.running) {
+          setRuntime((current) => ({
+            ...current,
+            state: "restart-required",
+            message: null,
+            revision,
+          }));
           setRestartError(null);
           setPendingApplication({
             theme,
@@ -354,19 +511,30 @@ export function App() {
       }
       if (!next.connected) {
         next = await launchCodex(settingsSnapshot.codexInstallPath);
+        if (revision !== applyRevisionRef.current) return;
       }
-      next = await applyTheme(
-        composed,
-        variant,
-        settingsSnapshot.runtimeStrategy,
+      next = await applyConfiguration(
+        {
+          theme,
+          companion,
+          companionOverrides: companionOverridesFor(
+            companion,
+            settingsSnapshot,
+          ),
+          variant,
+          runtimeStrategy: settingsSnapshot.runtimeStrategy,
+          revision,
+        },
         resolveAsset,
       );
+      if (revision !== applyRevisionRef.current) return;
       setRuntime(next);
       if (!preserveSelection) setSelectedTheme(theme);
       updateSettings({ appliedThemeId: theme.id });
-      setDetection(await detectCodex(settingsSnapshot.codexInstallPath));
+      syncDetection(await detectCodex(settingsSnapshot.codexInstallPath));
       setToast(t(successMessage));
     } catch (error) {
+      if (revision !== applyRevisionRef.current) return;
       const detail = error instanceof Error ? error.message : String(error);
       setRuntime((current) => ({
         ...current,
@@ -375,7 +543,53 @@ export function App() {
       }));
       setToast(`${t("applyFailed")}: ${detail}`);
     } finally {
-      setBusy(false);
+      if (revision === applyRevisionRef.current) setBusy(false);
+    }
+  }
+
+  async function performCompanionUpdate(
+    theme: ThemeDefinition,
+    companion: CompanionDefinition | null,
+    settingsSnapshot: UserSettings,
+    successMessage: ApplySuccessMessage,
+  ) {
+    const revision = ++applyRevisionRef.current;
+    setBusy(true);
+    setRuntime((current) => ({
+      ...current,
+      state: "applying",
+      revision,
+      message: null,
+    }));
+    try {
+      const next = await updateCompanionConfiguration(
+        {
+          theme,
+          companion,
+          companionOverrides: companionOverridesFor(
+            companion,
+            settingsSnapshot,
+          ),
+          variant,
+          runtimeStrategy: settingsSnapshot.runtimeStrategy,
+          revision,
+        },
+        resolveAsset,
+      );
+      if (revision !== applyRevisionRef.current) return;
+      setRuntime(next);
+      setToast(t(successMessage));
+    } catch (error) {
+      if (revision !== applyRevisionRef.current) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      setRuntime((current) => ({
+        ...current,
+        state: "error",
+        message: detail,
+      }));
+      setToast(`${t("applyFailed")}: ${detail}`);
+    } finally {
+      if (revision === applyRevisionRef.current) setBusy(false);
     }
   }
 
@@ -409,7 +623,7 @@ export function App() {
     setBusy(true);
     try {
       const detected = await quitCodex(application.settings.codexInstallPath);
-      setDetection(detected);
+      syncDetection(detected);
       setPendingApplication(null);
       setRestartError(null);
       await performApply(
@@ -519,7 +733,7 @@ export function App() {
         return;
       }
       updateSettings({ codexInstallPath: path });
-      setDetection(await detectCodex(path));
+      syncDetection(await detectCodex(path));
       setToast(t("codexPathSaved"));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -533,10 +747,24 @@ export function App() {
     setInstallPathBusy(true);
     try {
       updateSettings({ codexInstallPath: null });
-      setDetection(await detectCodex(null));
+      syncDetection(await detectCodex(null));
       setToast(t("automaticDetectionRestored"));
     } finally {
       setInstallPathBusy(false);
+    }
+  }
+
+  async function handleRunDiagnostics() {
+    setDiagnosticsBusy(true);
+    try {
+      setDiagnosticsReport(
+        await collectDiagnostics(settingsRef.current.codexInstallPath),
+      );
+    } catch (error) {
+      console.error(error);
+      setToast(t("diagnosticsFailed"));
+    } finally {
+      setDiagnosticsBusy(false);
     }
   }
 
@@ -546,7 +774,6 @@ export function App() {
   }
 
   function chooseTheme(theme: ThemeDefinition) {
-    if (busy) return;
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
@@ -615,7 +842,6 @@ export function App() {
   }
 
   function selectCompanion(companion: CompanionDefinition | null) {
-    if (busy) return;
     if (liveCompanionSyncRef.current !== null) {
       window.clearTimeout(liveCompanionSyncRef.current);
       liveCompanionSyncRef.current = null;
@@ -625,10 +851,12 @@ export function App() {
       companionId: companion?.id ?? null,
     });
     if (isLive) {
-      void performApply(appliedTheme, companion, next, {
-        preserveSelection: true,
-        successMessage: "companionApplied",
-      });
+      void performCompanionUpdate(
+        appliedTheme,
+        companion,
+        next,
+        "companionApplied",
+      );
     } else {
       setToast(t("companionPending"));
     }
@@ -643,10 +871,12 @@ export function App() {
     const companion = companionForTheme(theme, nextSettings);
     liveCompanionSyncRef.current = window.setTimeout(() => {
       liveCompanionSyncRef.current = null;
-      void performApply(theme, companion, nextSettings, {
-        preserveSelection: true,
-        successMessage: "companionPositionApplied",
-      });
+      void performCompanionUpdate(
+        theme,
+        companion,
+        nextSettings,
+        "companionPositionApplied",
+      );
     }, 180);
   }
 
@@ -736,6 +966,111 @@ export function App() {
       setToast(t("invalidTheme"));
     } finally {
       event.target.value = "";
+    }
+  }
+
+  async function handleCompanionImport(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    try {
+      const imported = await importCompanion(file);
+      const next = [
+        imported.companion,
+        ...localCompanions.filter(
+          (companion) => companion.id !== imported.companion.id,
+        ),
+      ];
+      setCompanionAssetMaps((current) => ({
+        ...current,
+        [imported.companion.id]: imported.assetMap,
+      }));
+      setLocalCompanions(next);
+      saveLocalCompanions(next);
+      setCompanionCollection("mine");
+      selectCompanion(imported.companion);
+      setToast(t("companionImported"));
+      setView("companions");
+    } catch (error) {
+      console.error(error);
+      setToast(t("invalidCompanion"));
+    } finally {
+      event.target.value = "";
+    }
+  }
+
+  async function handleSavedCompanion(
+    companion: CompanionDefinition,
+    files: Map<string, Uint8Array>,
+  ) {
+    const assetMap = await persistCompanion(companion, files);
+    const next = [
+      companion,
+      ...localCompanions.filter((item) => item.id !== companion.id),
+    ];
+    setCompanionAssetMaps((current) => ({
+      ...current,
+      [companion.id]: assetMap,
+    }));
+    setLocalCompanions(next);
+    saveLocalCompanions(next);
+    setCompanionCollection("mine");
+    selectCompanion(companion);
+    setCompanionProjects(await listCompanionProjects().catch(() => []));
+    setView("companions");
+    setToast(t("companionSaved"));
+  }
+
+  async function handleDeleteCompanionProject(projectId: string) {
+    try {
+      await deleteCompanionProject(projectId);
+      setCompanionProjects((current) =>
+        current.filter((project) => project.id !== projectId),
+      );
+    } catch (error) {
+      console.error(error);
+      setToast(t("companionProjectDeleteFailed"));
+    }
+  }
+
+  async function handleExportCompanion(companion: CompanionDefinition) {
+    try {
+      await exportCompanion(
+        companion,
+        (path) =>
+          companionAssetMaps[companion.id]?.[path] ??
+          themeAssetUrl(selectedTheme, path),
+      );
+      setToast(t("companionExported"));
+    } catch (error) {
+      console.error(error);
+      setToast(t("invalidCompanion"));
+    }
+  }
+
+  async function handleDeleteCompanion() {
+    if (!pendingCompanionDelete) return;
+    const companionId = pendingCompanionDelete.id;
+    try {
+      await deleteCompanionArchive(companionId);
+      const next = localCompanions.filter((item) => item.id !== companionId);
+      setLocalCompanions(next);
+      saveLocalCompanions(next);
+      setCompanionAssetMaps((current) => {
+        for (const url of Object.values(current[companionId] ?? {})) {
+          if (url.startsWith("blob:")) URL.revokeObjectURL(url);
+        }
+        const remaining = { ...current };
+        delete remaining[companionId];
+        return remaining;
+      });
+      if (settingsRef.current.companionId === companionId) {
+        selectCompanion(null);
+      }
+      setPendingCompanionDelete(null);
+      setToast(t("companionDeleted"));
+    } catch (error) {
+      console.error(error);
+      setToast(t("invalidCompanion"));
     }
   }
 
@@ -909,7 +1244,12 @@ export function App() {
     { id: "companions", label: "companions", icon: <PawPrint size={17} /> },
     { id: "settings", label: "settings", icon: <Settings size={17} /> },
   ];
-  const activeNavigation = view === "editor" ? "themes" : view;
+  const activeNavigation =
+    view === "editor"
+      ? "themes"
+      : view === "companion-editor"
+        ? "companions"
+        : view;
 
   return (
     <div className="app" data-manager-theme={appTheme}>
@@ -949,13 +1289,17 @@ export function App() {
                 (runtime.connected ? " connection-indicator--online" : "")
               }
             />
-            <strong>
+            <strong>{t(configurationStateKey)}</strong>
+            <small
+              className="configuration-status-pill"
+              data-state={configurationState}
+            >
               {runtime.connected
                 ? t("connected")
                 : needsManualRestart
                   ? t("codexRunning")
-                  : t("ready")}
-            </strong>
+                  : t("disconnected")}
+            </small>
           </div>
           <span>
             {runtime.connected
@@ -967,7 +1311,7 @@ export function App() {
                   : t("unknownCompatibility")}
           </span>
           <div className="connection-card__actions">
-            {runtime.state === "applied" ? (
+            {runtime.state === "applied" || runtime.state === "fallback" ? (
               <button onClick={handlePause}>
                 <Pause size={13} />
                 {t("pause")}
@@ -1015,7 +1359,7 @@ export function App() {
             <span className="topbar-status__dot" />
             {runtime.connected && runtime.compatibility === "supported"
               ? t("compatible")
-              : runtime.state === "applied"
+              : runtime.state === "applied" || runtime.state === "fallback"
                 ? t("compatibilityMode")
                 : t("unknownCompatibility")}
           </div>
@@ -1091,16 +1435,62 @@ export function App() {
             locale={locale}
             selected={selectedCompanion}
             theme={composeTheme(selectedTheme)}
+            localCompanions={localCompanions}
+            projects={companionProjects}
+            collection={companionCollection}
             variant={variant}
             reduceMotion={settings.reduceMotion}
             t={t}
             onSelect={selectCompanion}
+            onCollectionChange={setCompanionCollection}
+            onCreate={() => {
+              setActiveCompanionProject(null);
+              setView("companion-editor");
+            }}
+            onEditProject={(project) => {
+              setActiveCompanionProject(project);
+              setView("companion-editor");
+            }}
+            onDeleteProject={(projectId) =>
+              void handleDeleteCompanionProject(projectId)
+            }
+            onImport={() => companionImportRef.current?.click()}
+            onExport={(companion) => void handleExportCompanion(companion)}
+            onDelete={setPendingCompanionDelete}
             onAnchorChange={updateEntityAnchor}
             onAttachmentChange={updateEntityAttachment}
             resolveAsset={resolveAsset}
+            resolveCompanionAsset={(companion, path) =>
+              companionAssetMaps[companion.id]?.[path] ??
+              themeAssetUrl(selectedTheme, path)
+            }
             isLive={isLive}
             busy={busy}
           />
+        )}
+
+        {view === "companion-editor" && (
+          <Suspense
+            fallback={
+              <main className="page companion-creator">
+                <section className="empty-state" aria-live="polite">
+                  <PawPrint aria-hidden="true" />
+                  <h2>{t("loadingCompanionStudio")}</h2>
+                </section>
+              </main>
+            }
+          >
+            <CompanionCreator
+              locale={locale}
+              initialProject={activeCompanionProject}
+              onBack={() => {
+                void listCompanionProjects()
+                  .then(setCompanionProjects)
+                  .finally(() => setView("companions"));
+              }}
+              onSaved={handleSavedCompanion}
+            />
+          </Suspense>
         )}
 
         {view === "editor" && (
@@ -1148,6 +1538,8 @@ export function App() {
             onChooseCodexInstall={handleChooseCodexInstall}
             onUseAutomaticCodexInstall={handleUseAutomaticCodexInstall}
             onCheckForUpdates={() => void handleCheckForUpdates(true)}
+            diagnosticsBusy={diagnosticsBusy}
+            onRunDiagnostics={() => void handleRunDiagnostics()}
             onOpenOnboarding={() => setShowOnboarding(true)}
           />
         )}
@@ -1166,6 +1558,13 @@ export function App() {
         className="visually-hidden"
         accept="image/png,image/jpeg,image/webp"
         onChange={handleBackgroundImport}
+      />
+      <input
+        ref={companionImportRef}
+        type="file"
+        className="visually-hidden"
+        accept=".codex-styler-companion"
+        onChange={handleCompanionImport}
       />
 
       {showOnboarding && (
@@ -1241,6 +1640,42 @@ export function App() {
         </div>
       )}
 
+      {pendingCompanionDelete && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-companion-title"
+          >
+            <span className="confirm-dialog__icon">
+              <Trash2 size={18} />
+            </span>
+            <h2 id="delete-companion-title">{t("deleteCompanionTitle")}</h2>
+            <p>{t("deleteCompanionBody")}</p>
+            <strong>
+              {pendingCompanionDelete.locales[locale]?.name ??
+                pendingCompanionDelete.name}
+            </strong>
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                onClick={() => setPendingCompanionDelete(null)}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => void handleDeleteCompanion()}
+              >
+                <Trash2 size={14} />
+                {t("deleteCompanion")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {pendingApplication && (
         <div className="confirm-backdrop" role="presentation">
           <section
@@ -1281,6 +1716,64 @@ export function App() {
                   : restartError
                     ? t("retryRestart")
                     : t("quitAndContinue")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {diagnosticsReport && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="diagnostics-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="diagnostics-title"
+          >
+            <header>
+              <span className="confirm-dialog__icon">
+                <ShieldCheck size={18} />
+              </span>
+              <div>
+                <span className="page-kicker">LOCAL REDACTED REPORT</span>
+                <h2 id="diagnostics-title">{t("diagnosticsTitle")}</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setDiagnosticsReport(null)}
+                aria-label={t("cancel")}
+              >
+                <X size={15} />
+              </button>
+            </header>
+            <p>{t("diagnosticsPrivacy")}</p>
+            <div className="diagnostics-checks">
+              {diagnosticsReport.checks.map((check) => (
+                <div key={check.id} data-status={check.status}>
+                  <span>{check.status}</span>
+                  <strong>{check.id}</strong>
+                  <small>{check.detail}</small>
+                </div>
+              ))}
+            </div>
+            <details>
+              <summary>{t("previewDiagnosticText")}</summary>
+              <pre>{diagnosticsSummary(diagnosticsReport)}</pre>
+            </details>
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                onClick={openWindowsCompatibilityIssue}
+              >
+                <ChevronRight size={14} />
+                {t("openCompatibilityIssue")}
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => void exportDiagnostics(diagnosticsReport)}
+              >
+                <Download size={14} />
+                {t("exportDiagnostics")}
               </button>
             </div>
           </section>
@@ -1418,7 +1911,9 @@ function HomeView({
   const companionCopy = companion
     ? (companion.locales[locale] ?? companion.locales.en)
     : null;
-  const setupIsLive = runtime.connected && runtime.state === "applied";
+  const setupIsLive =
+    runtime.connected &&
+    (runtime.state === "applied" || runtime.state === "fallback");
   return (
     <div className="page home-page">
       <section className="page-heading home-heading">
@@ -1428,11 +1923,19 @@ function HomeView({
           <p>{t("homeDescription")}</p>
         </div>
         <div className="home-heading__status">
-          <span className={runtime.state === "applied" ? "is-live" : ""} />
+          <span className={setupIsLive ? "is-live" : ""} />
           <div>
             <small>{t("codexAppearance")}</small>
             <strong>
-              {runtime.state === "applied" ? t("themeActive") : t("ready")}
+              {runtime.state === "fallback"
+                ? t("statusFallback")
+                : setupIsLive
+                  ? t("themeActive")
+                  : runtime.state === "error"
+                    ? t("statusError")
+                    : runtime.state === "paused"
+                      ? t("statusPaused")
+                      : t("ready")}
             </strong>
           </div>
         </div>
@@ -1721,7 +2224,6 @@ function ThemesView({
                   locale={locale}
                   active={selectedTheme.id === theme.id}
                   live={liveThemeId === theme.id}
-                  busy={busy}
                   resolveAsset={resolveAsset}
                   onSelect={() => onSelect(theme)}
                   local={collection === "mine"}
@@ -1744,7 +2246,6 @@ function ThemeRow({
   locale,
   active,
   live,
-  busy,
   resolveAsset,
   onSelect,
   local,
@@ -1757,7 +2258,6 @@ function ThemeRow({
   locale: Locale;
   active: boolean;
   live: boolean;
-  busy: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   onSelect: () => void;
   local: boolean;
@@ -1776,7 +2276,6 @@ function ThemeRow({
         onClick={onSelect}
         aria-label={`${t("preview")}: ${localized.name}`}
         aria-pressed={active}
-        disabled={busy}
       />
       <div className="theme-row__preview" aria-hidden="true">
         <span
@@ -1833,26 +2332,53 @@ function CompanionsView({
   locale,
   selected,
   theme,
+  localCompanions,
+  projects,
+  collection,
   variant,
   reduceMotion,
   t,
   onSelect,
+  onCollectionChange,
+  onCreate,
+  onEditProject,
+  onDeleteProject,
+  onImport,
+  onExport,
+  onDelete,
   onAnchorChange,
   onAttachmentChange,
   resolveAsset,
+  resolveCompanionAsset,
   isLive,
   busy,
 }: SharedViewProps & {
   selected: CompanionDefinition | null;
   theme: ThemeDefinition;
+  localCompanions: CompanionDefinition[];
+  projects: CompanionCreatorProject[];
+  collection: CompanionCollection;
   variant: ThemeVariantName;
   reduceMotion: boolean;
   onSelect: (companion: CompanionDefinition | null) => void;
+  onCollectionChange: (collection: CompanionCollection) => void;
+  onCreate: () => void;
+  onEditProject: (project: CompanionCreatorProject) => void;
+  onDeleteProject: (projectId: string) => void;
+  onImport: () => void;
+  onExport: (companion: CompanionDefinition) => void;
+  onDelete: (companion: CompanionDefinition) => void;
   onAnchorChange: (anchor: { x: number; y: number }) => void;
   onAttachmentChange: (attachment: EntityAttachment | null) => void;
+  resolveCompanionAsset: (
+    companion: CompanionDefinition,
+    path: string,
+  ) => string;
   isLive: boolean;
   busy: boolean;
 }) {
+  const companions =
+    collection === "builtIn" ? builtinCompanions : localCompanions;
   return (
     <div className="page companions-page">
       <section className="page-heading">
@@ -1863,10 +2389,45 @@ function CompanionsView({
             {t("dragCompanion")}. {t("companionIndependence")}
           </p>
         </div>
+        <div className="page-heading__actions">
+          <button className="secondary-button" onClick={onImport}>
+            <Upload size={14} />
+            {t("importCompanion")}
+          </button>
+          <button className="primary-button" onClick={onCreate}>
+            <Plus size={14} />
+            {t("newCompanion")}
+          </button>
+        </div>
+      </section>
+      <div className="companions-toolbar">
+        <div
+          className="theme-collection-tabs"
+          role="tablist"
+          aria-label={t("companions")}
+        >
+          <button
+            role="tab"
+            aria-selected={collection === "builtIn"}
+            className={collection === "builtIn" ? "is-active" : ""}
+            onClick={() => onCollectionChange("builtIn")}
+          >
+            {t("builtInCompanions")}
+            <small>{builtinCompanions.length}</small>
+          </button>
+          <button
+            role="tab"
+            aria-selected={collection === "mine"}
+            className={collection === "mine" ? "is-active" : ""}
+            onClick={() => onCollectionChange("mine")}
+          >
+            {t("myCompanions")}
+            <small>{localCompanions.length}</small>
+          </button>
+        </div>
         <div
           className={
-            "configuration-state configuration-state--header" +
-            (isLive ? " configuration-state--live" : "")
+            "configuration-state" + (isLive ? " configuration-state--live" : "")
           }
           aria-live="polite"
         >
@@ -1877,7 +2438,42 @@ function CompanionsView({
               ? t("changesApplyInstantly")
               : t("changesReadyToApply")}
         </div>
-      </section>
+      </div>
+      {collection === "mine" && projects.length > 0 && (
+        <section className="companion-projects">
+          <div className="companion-projects__heading">
+            <div>
+              <span className="page-kicker">AUTOSAVED CREATOR PROJECTS</span>
+              <strong>{t("companionDrafts")}</strong>
+            </div>
+            <small>{projects.length}</small>
+          </div>
+          <div className="companion-projects__list">
+            {projects.map((project) => (
+              <div key={project.id} className="companion-project-card">
+                <button onClick={() => onEditProject(project)}>
+                  <span>
+                    <Film size={15} />
+                  </span>
+                  <strong>{project.name}</strong>
+                  <small>
+                    {project.source?.files.length ?? 0} {t("sourceFiles")} ·{" "}
+                    {project.frames.length} {t("frames")}
+                  </small>
+                  <ChevronRight size={14} />
+                </button>
+                <button
+                  className="icon-button"
+                  onClick={() => onDeleteProject(project.id)}
+                  aria-label={`${t("deleteDraft")}: ${project.name}`}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <div className="companions-layout">
         <section className="companion-preview-panel">
           <PreviewWorkspace
@@ -1904,7 +2500,6 @@ function CompanionsView({
             }
             onClick={() => onSelect(null)}
             aria-pressed={!selected}
-            disabled={busy}
           >
             <span className="companion-option__visual companion-option__visual--empty">
               <X size={20} />
@@ -1915,8 +2510,22 @@ function CompanionsView({
             </span>
             {!selected && <Check size={15} />}
           </button>
-          {builtinCompanions.map((item) => {
-            const copy = item.locales[locale] ?? item.locales.en;
+          {companions.length === 0 && (
+            <div className="companion-empty">
+              <FolderOpen size={22} />
+              <strong>{t("noLocalCompanions")}</strong>
+              <span>{t("noLocalCompanionsDetail")}</span>
+              <button className="primary-button" onClick={onCreate}>
+                <Plus size={14} /> {t("newCompanion")}
+              </button>
+            </div>
+          )}
+          {companions.map((item) => {
+            const copy = item.locales[locale] ??
+              item.locales.en ?? {
+                name: item.name,
+                description: item.description,
+              };
             const active = selected?.id === item.id;
             const renderer = item.entity.renderer;
             const previewSize = 64;
@@ -1939,34 +2548,64 @@ function CompanionsView({
               renderer.type === "sprite-atlas"
                 ? renderer.frameHeight * frameScale
                 : previewSize;
+            const previewPath = item.metadata.preview ?? renderer.asset;
             return (
-              <button
+              <div
                 key={item.id}
                 className={
-                  "companion-option" +
-                  (active ? " companion-option--active" : "")
+                  "companion-option-wrap" +
+                  (active ? " companion-option-wrap--active" : "")
                 }
-                onClick={() => onSelect(item)}
-                aria-pressed={active}
-                disabled={busy}
               >
-                <span className="companion-option__visual companion-option__visual--sprite">
-                  <span
-                    className="companion-option__frame"
-                    style={{
-                      width: `${frameWidth}px`,
-                      height: `${frameHeight}px`,
-                      backgroundImage: `url(${resolveAsset(theme, renderer.asset)})`,
-                      backgroundSize,
-                    }}
-                  />
-                </span>
-                <span>
-                  <strong>{copy.name}</strong>
-                  <small>{copy.description}</small>
-                </span>
-                {active ? <Check size={15} /> : <ChevronRight size={15} />}
-              </button>
+                <button
+                  className={
+                    "companion-option" +
+                    (active ? " companion-option--active" : "")
+                  }
+                  onClick={() => onSelect(item)}
+                  aria-pressed={active}
+                >
+                  <span className="companion-option__visual companion-option__visual--sprite">
+                    <span
+                      className="companion-option__frame"
+                      style={{
+                        width: `${frameWidth}px`,
+                        height: `${frameHeight}px`,
+                        backgroundImage: `url(${resolveCompanionAsset(item, previewPath)})`,
+                        backgroundSize:
+                          item.metadata.preview || renderer.type === "image"
+                            ? "contain"
+                            : backgroundSize,
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                      }}
+                    />
+                  </span>
+                  <span>
+                    <strong>{copy.name}</strong>
+                    <small>{copy.description}</small>
+                  </span>
+                  {active ? <Check size={15} /> : <ChevronRight size={15} />}
+                </button>
+                {collection === "mine" && (
+                  <div className="companion-option-actions">
+                    <button
+                      className="icon-button"
+                      onClick={() => onExport(item)}
+                      aria-label={t("exportCompanion")}
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      onClick={() => onDelete(item)}
+                      aria-label={t("deleteCompanion")}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
             );
           })}
         </section>
@@ -2776,6 +3415,8 @@ function SettingsView({
   onChooseCodexInstall,
   onUseAutomaticCodexInstall,
   onCheckForUpdates,
+  diagnosticsBusy,
+  onRunDiagnostics,
   onOpenOnboarding,
 }: {
   settings: UserSettings;
@@ -2788,6 +3429,8 @@ function SettingsView({
   onChooseCodexInstall: () => void;
   onUseAutomaticCodexInstall: () => void;
   onCheckForUpdates: () => void;
+  diagnosticsBusy: boolean;
+  onRunDiagnostics: () => void;
   onOpenOnboarding: () => void;
 }) {
   const lastChecked = (() => {
@@ -2957,6 +3600,26 @@ function SettingsView({
             {updateStatus === "checking"
               ? t("checkingForUpdates")
               : t("checkForUpdates")}
+          </button>
+        </section>
+        <section className="settings-group settings-group--row diagnostics-settings-row">
+          <div className="settings-group__title">
+            <ShieldCheck size={17} />
+            <div>
+              <h2>{t("diagnosticsTitle")}</h2>
+              <p>{t("diagnosticsDescription")}</p>
+            </div>
+          </div>
+          <button
+            className="secondary-button"
+            onClick={onRunDiagnostics}
+            disabled={diagnosticsBusy}
+          >
+            <RefreshCw
+              size={14}
+              className={diagnosticsBusy ? "is-spinning" : ""}
+            />
+            {diagnosticsBusy ? t("runningDiagnostics") : t("runDiagnostics")}
           </button>
         </section>
         <section className="trust-grid">

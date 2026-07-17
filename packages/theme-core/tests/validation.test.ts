@@ -4,9 +4,13 @@ import JSZip from "jszip";
 import {
   builtinCompanions,
   builtinThemes,
+  companionToPackage,
   composeThemeWithCompanion,
   defaultCompanionForTheme,
+  embeddedCompanionForTheme,
+  exportCompanionPackage,
   exportThemePackage,
+  importCompanionPackage,
   importThemePackage,
   isSafeArchivePath,
   nativeRefined,
@@ -14,6 +18,7 @@ import {
   pointerDirectionFrame,
   readImageDimensions,
   validateTheme,
+  validateCompanion,
 } from "../src";
 
 describe("built-in themes", () => {
@@ -94,6 +99,15 @@ describe("built-in themes", () => {
     expect(validateTheme(composed)).toEqual({ ok: true, issues: [] });
   });
 
+  it("keeps a v0.1 embedded companion available during migration", () => {
+    const legacy = structuredClone(nativeRefined);
+    legacy.scene.entities = [structuredClone(mossCompanion.entity)];
+    legacy.assets.push(...structuredClone(mossCompanion.assets));
+    const migrated = embeddedCompanionForTheme(legacy);
+    expect(migrated?.entity.id).toBe("moss-gecko");
+    expect(migrated?.assets).toHaveLength(mossCompanion.assets.length);
+  });
+
   it("recommends an intentional companion for every built-in theme", () => {
     expect(
       builtinThemes.map((theme) => defaultCompanionForTheme(theme.id)?.id),
@@ -127,11 +141,71 @@ describe("built-in themes", () => {
       expect(renderer.frameAngles, companion.id).toHaveLength(
         renderer.directions,
       );
+      expect(renderer.frameCount, companion.id).toBe(renderer.directions);
+      expect(renderer.poses?.length, companion.id).toBeGreaterThanOrEqual(4);
+      expect(
+        validateCompanion(companionToPackage(companion)),
+        companion.id,
+      ).toEqual({ ok: true, issues: [] });
       expect(validateTheme(composed), companion.id).toEqual({
         ok: true,
         issues: [],
       });
     }
+  });
+});
+
+describe("companion packages", () => {
+  it("exports and imports a licensed, data-only companion archive", async () => {
+    const webp = new Uint8Array(30);
+    webp.set(new TextEncoder().encode("RIFF"), 0);
+    webp.set(new TextEncoder().encode("WEBPVP8X"), 8);
+    webp.set([0xff, 0x00, 0x00], 24);
+    webp.set([0xff, 0x00, 0x00], 27);
+
+    const definition = companionToPackage(mossCompanion);
+    const archive = await exportCompanionPackage(definition, async () => webp);
+    const imported = await importCompanionPackage(archive);
+
+    expect(imported.companion.id).toBe("moss-gecko");
+    expect(imported.companion.entity.renderer).toMatchObject({
+      frameCount: 181,
+      neutralFrame: 0,
+    });
+    expect(imported.files.has("LICENSES.json")).toBe(true);
+  });
+
+  it("rejects invalid pose references and atlas bounds", () => {
+    const definition = companionToPackage(mossCompanion);
+    const renderer = definition.entity.renderer;
+    expect(renderer.type).toBe("sprite-atlas");
+    if (renderer.type !== "sprite-atlas" || !renderer.poses) return;
+    renderer.poses[0]!.frame = 999;
+    expect(validateCompanion(definition)).toMatchObject({ ok: false });
+  });
+
+  it("rejects undeclared files even when their type is otherwise allowed", async () => {
+    const definition = companionToPackage(mossCompanion);
+    const zip = new JSZip();
+    zip.file("companion.json", JSON.stringify(definition));
+    zip.file("LICENSES.json", "{}");
+    const webp = new Uint8Array(30);
+    webp.set(new TextEncoder().encode("RIFF"), 0);
+    webp.set(new TextEncoder().encode("WEBPVP8X"), 8);
+    for (const asset of definition.assets) zip.file(asset.path, webp);
+    zip.file("previews/undeclared.webp", webp);
+
+    await expect(
+      importCompanionPackage(await zip.generateAsync({ type: "uint8array" })),
+    ).rejects.toThrow(/undeclared file/);
+  });
+
+  it("rejects traversal hidden by ZIP path normalization", async () => {
+    const zip = new JSZip();
+    zip.file("../companion.json", "{}");
+    await expect(
+      importCompanionPackage(await zip.generateAsync({ type: "uint8array" })),
+    ).rejects.toThrow(/unsafe path|Disallowed companion archive path/);
   });
 });
 

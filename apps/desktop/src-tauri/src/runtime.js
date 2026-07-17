@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 12) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 15) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -41,6 +41,7 @@
   let activeState = null;
   let entityCleanup = null;
   let entityPositioner = null;
+  let latestRevision = 0;
 
   const finiteBetween = (value, minimum, maximum) =>
     typeof value === "number" &&
@@ -193,6 +194,13 @@
         renderer.directions >
           (renderer.framesPerPage ?? renderer.columns * renderer.rows) *
             (renderer.pages?.length ?? 1) ||
+        (renderer.frameCount !== undefined &&
+          (!Number.isInteger(renderer.frameCount) ||
+            renderer.frameCount < 4 ||
+            renderer.frameCount > 512 ||
+            renderer.frameCount >
+              (renderer.framesPerPage ?? renderer.columns * renderer.rows) *
+                (renderer.pages?.length ?? 1))) ||
         (renderer.frameAngles !== undefined &&
           (!Array.isArray(renderer.frameAngles) ||
             renderer.frameAngles.length !== renderer.directions ||
@@ -204,9 +212,61 @@
         (renderer.transitionFps !== undefined &&
           (!Number.isInteger(renderer.transitionFps) ||
             renderer.transitionFps < 12 ||
-            renderer.transitionFps > 60)))
+            renderer.transitionFps > 60)) ||
+        (renderer.followSmoothing !== undefined &&
+          !finiteBetween(renderer.followSmoothing, 0.02, 1)))
     ) {
       throw new Error("Codex Styler rejected invalid sprite atlas data");
+    }
+    if (renderer.type === "sprite-atlas" && renderer.poses !== undefined) {
+      const frameCount = renderer.frameCount ?? renderer.directions;
+      if (
+        !Array.isArray(renderer.poses) ||
+        renderer.poses.length < 4 ||
+        renderer.poses.length > 512 ||
+        renderer.poses.some(
+          (pose, index) =>
+            typeof pose?.id !== "string" ||
+            pose.id.length < 2 ||
+            !finiteBetween(pose.angle, 0, 359.999999) ||
+            !Number.isInteger(pose.frame) ||
+            pose.frame < 0 ||
+            pose.frame >= frameCount ||
+            (index > 0 && pose.angle <= renderer.poses[index - 1].angle),
+        )
+      ) {
+        throw new Error("Codex Styler rejected invalid companion poses");
+      }
+      const poseIds = new Set(renderer.poses.map((pose) => pose.id));
+      if (
+        renderer.idleClips !== undefined &&
+        (!Array.isArray(renderer.idleClips) ||
+          renderer.idleClips.length > 64 ||
+          renderer.idleClips.some(
+            (clip) =>
+              typeof clip?.id !== "string" ||
+              !Array.isArray(clip.poseIds) ||
+              clip.poseIds.length < 1 ||
+              clip.poseIds.some((id) => !poseIds.has(id)) ||
+              !Array.isArray(clip.frames) ||
+              clip.frames.length < 1 ||
+              clip.frames.some(
+                (item) =>
+                  !Number.isInteger(item?.frame) ||
+                  item.frame < 0 ||
+                  item.frame >= frameCount ||
+                  !Number.isInteger(item.durationMs) ||
+                  item.durationMs < 16 ||
+                  item.durationMs > 5000,
+              ) ||
+              !Number.isInteger(clip.minimumDelayMs) ||
+              !Number.isInteger(clip.maximumDelayMs) ||
+              clip.minimumDelayMs < 250 ||
+              clip.maximumDelayMs < clip.minimumDelayMs,
+          ))
+      ) {
+        throw new Error("Codex Styler rejected invalid idle motion clips");
+      }
     }
     if (
       (renderer.normalization !== undefined &&
@@ -235,27 +295,31 @@
     renderer.pages?.forEach(assertSafeImage);
   };
 
+  const removeEntity = () => {
+    if (pointerHandler)
+      window.removeEventListener("pointermove", pointerHandler);
+    if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    if (animationFrame !== null) cancelAnimationFrame(animationFrame);
+    entityCleanup?.();
+    pointerHandler = null;
+    resizeHandler = null;
+    animationFrame = null;
+    entityCleanup = null;
+    entityPositioner = null;
+    document.getElementById(ENTITY_ID)?.remove();
+  };
+
   const remove = () => {
     mutationObserver?.disconnect();
     mutationObserver = null;
     activeState = null;
-    if (pointerHandler)
-      window.removeEventListener("pointermove", pointerHandler);
-    if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    removeEntity();
     if (layoutResizeHandler)
       window.removeEventListener("resize", layoutResizeHandler);
-    if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     if (healthTimer !== null) clearTimeout(healthTimer);
-    entityCleanup?.();
-    pointerHandler = null;
-    resizeHandler = null;
     layoutResizeHandler = null;
-    animationFrame = null;
     healthTimer = null;
-    entityCleanup = null;
-    entityPositioner = null;
     document.getElementById(BACKDROP_ID)?.remove();
-    document.getElementById(ENTITY_ID)?.remove();
     document.getElementById(STYLE_ID)?.remove();
     document.documentElement.removeAttribute("data-codex-styler");
     document.documentElement.removeAttribute("data-codex-styler-mode");
@@ -322,7 +386,7 @@
     root?.setAttribute(APP_ROOT_ATTRIBUTE, "");
 
     const overlaySelector =
-      '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [data-radix-popper-content-wrapper]';
+      '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"], [role="alert"], [role="status"], [role="tooltip"], [data-radix-popper-content-wrapper], [data-sonner-toaster], [data-hot-toast]';
     Array.from(document.body.children).forEach((element) => {
       const overlay =
         element !== root &&
@@ -339,7 +403,7 @@
       if (element.hasAttribute(OVERLAY_ROOT_ATTRIBUTE)) return;
       const computed = getComputedStyle(element);
       element.setAttribute(OVERLAY_ROOT_ATTRIBUTE, "");
-      if (computed.zIndex === "auto") {
+      if (!computed.zIndex || computed.zIndex === "auto") {
         element.setAttribute(UNLAYERED_ROOT_ATTRIBUTE, "");
       } else {
         element.removeAttribute(UNLAYERED_ROOT_ATTRIBUTE);
@@ -1037,7 +1101,7 @@
         position: relative; z-index: 1;
       }
       html[data-codex-styler] body > [${OVERLAY_ROOT_ATTRIBUTE}][${UNLAYERED_ROOT_ATTRIBUTE}] {
-        z-index: 2;
+        z-index: 11;
       }
       html[data-codex-styler] body > [${OVERLAY_ROOT_ATTRIBUTE}][${STATIC_ROOT_ATTRIBUTE}] {
         position: relative;
@@ -1060,7 +1124,7 @@
         opacity: ${background.overlayOpacity};
       }
       #${ENTITY_ID} {
-        position: fixed; inset: 0; z-index: 2147483000; pointer-events: none;
+        position: fixed; inset: 0; z-index: 10; pointer-events: none;
         overflow: hidden; contain: strict;
       }
       #${ENTITY_ID} canvas, #${ENTITY_ID} .cs-entity-image {
@@ -1312,12 +1376,6 @@
       renderer.type === "sprite-atlas" && renderer.pages?.length
         ? renderer.pages
         : [renderer.asset];
-    const images = pageSources.map((source) => {
-      const page = new Image();
-      page.decoding = "async";
-      page.src = source;
-      return page;
-    });
     const context = canvas.getContext("2d");
     const targetFps = Math.min(
       60,
@@ -1330,9 +1388,37 @@
     );
     const frameInterval = 1000 / targetFps;
     const analyses = new Map();
-    let frame = 0;
-    let pendingFrame = 0;
+    const pageCache = new Map();
+    let pageUseCounter = 0;
+    let frame = renderer.neutralFrame ?? 0;
+    let pendingFrame = frame;
     let lastDraw = 0;
+
+    const loadPage = (pageIndex) => {
+      if (pageIndex < 0 || pageIndex >= pageSources.length) return null;
+      const cached = pageCache.get(pageIndex);
+      if (cached) {
+        cached.lastUsed = ++pageUseCounter;
+        return cached.image;
+      }
+      const image = new Image();
+      image.decoding = "async";
+      const entry = { image, lastUsed: ++pageUseCounter };
+      pageCache.set(pageIndex, entry);
+      image.addEventListener("load", () => scheduleDraw(), { once: true });
+      image.src = pageSources[pageIndex];
+      if (pageCache.size > 2) {
+        const oldest = [...pageCache.entries()]
+          .filter(([index]) => index !== pageIndex)
+          .sort(([, left], [, right]) => left.lastUsed - right.lastUsed)[0];
+        if (oldest) {
+          oldest[1].image.removeAttribute("src");
+          pageCache.delete(oldest[0]);
+          analyses.delete(oldest[0]);
+        }
+      }
+      return image;
+    };
 
     const draw = (timestamp = performance.now()) => {
       const framesPerPage =
@@ -1340,7 +1426,7 @@
           ? renderer.framesPerPage ?? renderer.columns * renderer.rows
           : 1;
       const pageIndex = Math.floor(pendingFrame / framesPerPage);
-      const image = images[pageIndex] ?? images[0];
+      const image = loadPage(pageIndex) ?? loadPage(0);
       if (!context || !image.complete || !image.naturalWidth) {
         animationFrame = null;
         return;
@@ -1411,18 +1497,97 @@
       }
       lastDraw = timestamp;
       animationFrame = null;
+      const adjacentPage =
+        pageIndex + 1 < pageSources.length ? pageIndex + 1 : pageIndex - 1;
+      if (document.visibilityState === "visible") loadPage(adjacentPage);
     };
     const scheduleDraw = () => {
       if (animationFrame === null) animationFrame = requestAnimationFrame(draw);
     };
-    images.forEach((image) => {
-      image.addEventListener("load", scheduleDraw, { once: true });
-    });
-    if (images[0]?.complete) scheduleDraw();
+    const initialFramesPerPage =
+      renderer.type === "sprite-atlas"
+        ? renderer.framesPerPage ?? renderer.columns * renderer.rows
+        : 1;
+    loadPage(Math.floor(pendingFrame / initialFramesPerPage));
+    scheduleDraw();
 
     const reduced = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
+    const directionalPoses =
+      renderer.type !== "sprite-atlas"
+        ? []
+        : renderer.poses?.length
+          ? renderer.poses
+          : renderer.frameAngles?.length === renderer.directions
+            ? renderer.frameAngles.map((angle, index) => ({
+                id: `legacy-${index}`,
+                angle: angle >= 360 ? 359.9999 : angle,
+                frame: index,
+              }))
+            : Array.from({ length: renderer.directions }, (_, index) => ({
+                id: `linear-${index}`,
+                angle: (index / renderer.directions) * 360,
+                frame: index,
+              }));
+    let activePose = directionalPoses[0] ?? null;
+    let smoothedDirection = null;
+    let idleTimer = null;
+    let idleGeneration = 0;
+
+    const cancelIdle = () => {
+      idleGeneration += 1;
+      if (idleTimer !== null) window.clearTimeout(idleTimer);
+      idleTimer = null;
+    };
+
+    const scheduleIdle = (pose) => {
+      cancelIdle();
+      if (
+        reduced ||
+        document.visibilityState !== "visible" ||
+        renderer.type !== "sprite-atlas" ||
+        !pose ||
+        !Array.isArray(renderer.idleClips)
+      ) {
+        return;
+      }
+      const clips = renderer.idleClips.filter((clip) =>
+        clip.poseIds.includes(pose.id),
+      );
+      if (clips.length === 0) return;
+      const clip = clips[Math.floor(Math.random() * clips.length)];
+      const delay =
+        clip.minimumDelayMs +
+        Math.random() * (clip.maximumDelayMs - clip.minimumDelayMs);
+      const generation = idleGeneration;
+      idleTimer = window.setTimeout(() => {
+        const play = (index) => {
+          if (
+            generation !== idleGeneration ||
+            document.visibilityState !== "visible"
+          ) {
+            return;
+          }
+          const item = clip.frames[index];
+          if (!item) {
+            pendingFrame = pose.frame;
+            scheduleDraw();
+            scheduleIdle(pose);
+            return;
+          }
+          pendingFrame = item.frame;
+          scheduleDraw();
+          idleTimer = window.setTimeout(() => play(index + 1), item.durationMs);
+        };
+        play(0);
+      }, delay);
+    };
+
+    if (reduced && renderer.type === "sprite-atlas") {
+      pendingFrame = renderer.reducedMotionFrame ?? renderer.neutralFrame ?? 0;
+      scheduleDraw();
+    }
     if (
       renderer.type === "sprite-atlas" &&
       !reduced &&
@@ -1436,34 +1601,59 @@
           event.clientX - (bounds.left + bounds.width / 2),
         );
         const normalized = (angle + Math.PI / 2 + Math.PI * 2) % (Math.PI * 2);
-        if (renderer.frameAngles?.length === renderer.directions) {
-          const degrees = (normalized * 180) / Math.PI;
-          let closest = 0;
-          let closestDistance = Number.POSITIVE_INFINITY;
-          renderer.frameAngles.forEach((frameAngle, index) => {
-            const rawDistance = Math.abs(frameAngle - degrees);
+        const degrees = (normalized * 180) / Math.PI;
+        const responsiveness = renderer.followSmoothing ?? 0.18;
+        if (smoothedDirection === null) {
+          smoothedDirection = degrees;
+        } else {
+          const currentRadians = (smoothedDirection * Math.PI) / 180;
+          const nextRadians = (degrees * Math.PI) / 180;
+          const x =
+            Math.cos(currentRadians) * (1 - responsiveness) +
+            Math.cos(nextRadians) * responsiveness;
+          const y =
+            Math.sin(currentRadians) * (1 - responsiveness) +
+            Math.sin(nextRadians) * responsiveness;
+          smoothedDirection =
+            ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+        }
+        let closest = directionalPoses[0];
+        let closestDistance = Number.POSITIVE_INFINITY;
+        directionalPoses.forEach((pose) => {
+            const rawDistance = Math.abs(pose.angle - smoothedDirection);
             const distance = Math.min(rawDistance, 360 - rawDistance);
             if (distance < closestDistance) {
-              closest = index;
+              closest = pose;
               closestDistance = distance;
             }
-          });
-          pendingFrame = closest;
-        } else {
-          pendingFrame =
-            Math.round(normalized / ((Math.PI * 2) / renderer.directions)) %
-            renderer.directions;
-        }
+        });
+        cancelIdle();
+        activePose = closest;
+        pendingFrame = closest.frame;
         scheduleDraw();
+        scheduleIdle(closest);
       };
       window.addEventListener("pointermove", pointerHandler, { passive: true });
     }
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") {
+        cancelIdle();
+        return;
+      }
+      scheduleDraw();
+      scheduleIdle(activePose);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
     resizeHandler = () => {
       position();
       scheduleDraw();
     };
     window.addEventListener("resize", resizeHandler, { passive: true });
     entityCleanup = () => {
+      cancelIdle();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      for (const entry of pageCache.values()) entry.image.removeAttribute("src");
+      pageCache.clear();
       attachmentObserver?.disconnect();
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
@@ -1615,10 +1805,54 @@
     });
   };
 
-  const apply = async (theme, variant, compatibilityMode = "auto") => {
+  const updateEntity = (entity, revision = latestRevision + 1) => {
+    if (!Number.isInteger(revision) || revision < 0) {
+      throw new Error("Codex Styler rejected an invalid configuration revision");
+    }
+    if (revision < latestRevision) {
+      return { ok: true, stale: true, revision: latestRevision };
+    }
+    if (!activeState) {
+      throw new Error("A theme must be active before updating its companion");
+    }
+    latestRevision = revision;
+    const theme = JSON.parse(JSON.stringify(activeState.theme));
+    theme.scene.entities = entity ? [entity] : [];
+    assertSafeTheme(theme, activeState.variant);
+    activeState.theme = theme;
+    removeEntity();
+    const entityRoot = document.createElement("div");
+    entityRoot.id = ENTITY_ID;
+    entityRoot.setAttribute("aria-hidden", "true");
+    document.body.appendChild(entityRoot);
+    installEntity(entityRoot, theme, activeState.variant);
+    return { ok: true, stale: false, revision };
+  };
+
+  const apply = async (
+    theme,
+    variant,
+    compatibilityMode = "auto",
+    revision = latestRevision + 1,
+  ) => {
     assertSafeTheme(theme, variant);
+    if (!Number.isInteger(revision) || revision < 0) {
+      throw new Error("Codex Styler rejected an invalid configuration revision");
+    }
+    if (revision < latestRevision) {
+      return {
+        ok: true,
+        stale: true,
+        revision: latestRevision,
+        themeId: theme.id,
+        requestedMode: compatibilityMode,
+        resolvedMode: activeState?.resolvedMode ?? "compatibility",
+        reason: null,
+      };
+    }
+    latestRevision = revision;
     if (!["auto", "compatibility", "developer"].includes(compatibilityMode)) {
-      throw new Error("Codex Styler rejected an invalid compatibility mode");
+      throw new Error("Codex Styler rejected an invalid runtime strategy");
     }
 
     const themeRequestsSemantic =
@@ -1654,6 +1888,17 @@
 
     await nextFrame();
     await nextFrame();
+    if (revision !== latestRevision) {
+      return {
+        ok: true,
+        stale: true,
+        revision: latestRevision,
+        themeId: theme.id,
+        requestedMode: compatibilityMode,
+        resolvedMode,
+        reason: null,
+      };
+    }
     const verification = verifySemanticAdapter();
     if (!verification.ok) {
       render(theme, variant, true, compatibilityMode, "compatibility");
@@ -1680,8 +1925,9 @@
   };
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 12,
+    version: 15,
     apply,
+    updateEntity,
     pause: remove,
     restore: remove,
   };
