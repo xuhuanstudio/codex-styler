@@ -16,10 +16,18 @@ under Creative Commons Attribution 4.0 International (CC BY 4.0).
 | Mochi cat calibrated direction atlas                   | Generated specifically for this project; adaptive matte, shared ground line, and seamless loop closure, 2026-07-17                                        |                              175 frames across 4 pages | CC BY 4.0 |
 | Token Thief calibrated direction atlas                 | User-provided generated video; dual-corner watermark exclusion, gray-speck cleanup, shared ground line, and non-linear direction calibration, 2026-07-17  |                              101 frames across 3 pages | CC BY 4.0 |
 | Reset God calibrated direction atlas                   | User-provided generated video; dual-corner watermark exclusion, gray-speck cleanup, shared ground line, and non-linear direction calibration, 2026-07-17  |                              100 frames across 3 pages | CC BY 4.0 |
+| README companion portraits                             | Representative frames derived from the six calibrated direction atlases; exact cell crop, normalized transparent canvas, and alpha cleanup, 2026-07-17    |                                    6 images at 480×480 | CC BY 4.0 |
+| Codex Styler manager screenshots                       | Captured from the English manager UI in matching light and dark appearances, 2026-07-17                                                                   |                                   2 images at 1320×840 | CC BY 4.0 |
 
 No source code, image, video, sprite, logo, or other asset from
 Fei-Away/Codex-Dream-Skin or xplol/KaMenisACat is redistributed by this
 repository. Those projects are implementation and style references only.
+
+Documentation screenshots of themes applied to Codex Desktop are included to
+demonstrate compatibility. Original Codex interface elements, product names,
+and trademarks visible in those screenshots remain the property of their
+respective owners and are not relicensed by this project. Codex Styler theme
+artwork and companion artwork remain covered by the project asset license.
 
 Asset dimensions, frame order, and replacement guidance are recorded in
 [docs/assets-and-replacement.md](docs/assets-and-replacement.md).
