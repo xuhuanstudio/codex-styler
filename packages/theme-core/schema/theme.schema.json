@@ -41,7 +41,11 @@
           "items": { "type": "string", "minLength": 1, "maxLength": 32 }
         },
         "homepage": { "type": "string", "format": "uri", "maxLength": 240 },
-        "preview": { "$ref": "#/$defs/assetPath" }
+        "preview": { "$ref": "#/$defs/assetPath" },
+        "recommendedCompanionId": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9.-]{2,63}$"
+        }
       }
     },
     "compatibility": {
@@ -326,16 +330,47 @@
                   "minimum": 4,
                   "maximum": 512
                 },
+                "frameCount": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 512
+                },
                 "frameAngles": {
                   "type": "array",
                   "minItems": 4,
                   "maxItems": 512,
                   "items": { "type": "number", "minimum": 0, "maximum": 360 }
                 },
+                "poses": {
+                  "type": "array",
+                  "minItems": 4,
+                  "maxItems": 512,
+                  "items": { "$ref": "#/$defs/companionPose" }
+                },
+                "idleClips": {
+                  "type": "array",
+                  "maxItems": 64,
+                  "items": { "$ref": "#/$defs/idleClip" }
+                },
+                "neutralFrame": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 511
+                },
+                "reducedMotionFrame": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 511
+                },
                 "transitionFps": {
                   "type": "integer",
                   "minimum": 12,
                   "maximum": 60
+                },
+                "followSmoothing": {
+                  "type": "number",
+                  "minimum": 0.02,
+                  "maximum": 1
                 },
                 "normalization": { "enum": ["preserve", "grounded"] },
                 "alphaThreshold": {
@@ -393,6 +428,74 @@
         "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
       }
     },
+    "companionPose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "angle", "frame"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+        },
+        "angle": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "frame": { "type": "integer", "minimum": 0, "maximum": 511 }
+      }
+    },
+    "idleClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "poseIds",
+        "frames",
+        "minimumDelayMs",
+        "maximumDelayMs"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+        },
+        "poseIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+          }
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 120,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["frame", "durationMs"],
+            "properties": {
+              "frame": { "type": "integer", "minimum": 0, "maximum": 511 },
+              "durationMs": {
+                "type": "integer",
+                "minimum": 16,
+                "maximum": 5000
+              }
+            }
+          }
+        },
+        "minimumDelayMs": {
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 120000
+        },
+        "maximumDelayMs": {
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 120000
+        }
+      }
+    },
     "asset": {
       "type": "object",
       "additionalProperties": false,
@@ -403,7 +506,7 @@
           "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
         },
         "path": { "$ref": "#/$defs/assetPath" },
-        "type": { "enum": ["background", "sprite-atlas", "preview"] },
+        "type": { "enum": ["background", "image", "sprite-atlas", "preview"] },
         "license": { "type": "string", "minLength": 1, "maxLength": 64 }
       }
     }

@@ -44,6 +44,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm theme:validate packages/theme-core/examples/minimal-theme.json
+      - run: pnpm package:validate packages/theme-core/examples/minimal-companion.json
+
+  manager-e2e:
+    name: Manager E2E and screenshots
+    runs-on: macos-15
+    env:
+      ASTRO_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @codex-styler/desktop exec playwright install chromium
+      - run: pnpm test:e2e
+      - name: Retain Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: manager-e2e-report
+          path: |
+            apps/desktop/playwright-report
+            apps/desktop/test-results
+          if-no-files-found: ignore
+          retention-days: 14
 
   rust:
     name: Rust (${{ matrix.os }})

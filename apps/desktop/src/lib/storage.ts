@@ -1,4 +1,5 @@
 import type {
+  CompanionDefinition,
   EntityAttachment,
   ThemeDefinition,
 } from "@codex-styler/theme-core";
@@ -28,6 +29,7 @@ export interface UserSettings {
 
 const settingsKey = "codex-styler.settings.v1";
 const themesKey = "codex-styler.local-themes.v1";
+const companionsKey = "codex-styler.local-companions.v1";
 
 export function loadSettings(): UserSettings {
   try {
@@ -51,7 +53,10 @@ export function loadSettings(): UserSettings {
           ? "custom"
           : "theme-default";
       const automaticUpdateChecks =
-        parsed.automaticUpdateChecks ?? parsed.manualUpdateChecks ?? true;
+        parsed.automaticUpdateChecks ??
+        (parsed.manualUpdateChecks === undefined
+          ? true
+          : !parsed.manualUpdateChecks);
       const currentSettings = { ...parsed };
       delete currentSettings.manualUpdateChecks;
       return {
@@ -102,4 +107,16 @@ export function loadLocalThemes(): ThemeDefinition[] {
 
 export function saveLocalThemes(themes: ThemeDefinition[]): void {
   localStorage.setItem(themesKey, JSON.stringify(themes));
+}
+
+export function loadLocalCompanions(): CompanionDefinition[] {
+  try {
+    return JSON.parse(localStorage.getItem(companionsKey) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+export function saveLocalCompanions(companions: CompanionDefinition[]): void {
+  localStorage.setItem(companionsKey, JSON.stringify(companions));
 }

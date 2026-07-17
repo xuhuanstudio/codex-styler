@@ -4,6 +4,33 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.1] - 2026-07-17
+
+### Added
+
+- Seven-step Companion Studio for static images, image sequences, short videos, and existing sprite atlases.
+- Visual atlas slicing, local Worker-based cleanup, shared alignment, direction-dial calibration, direction/idle/exclude tracks, motion authoring, and interactive final preview.
+- Public `codex-styler-companion-v1` Schema, validated `.codex-styler-companion` archives, app-data persistence, import/export, and package CLI validation.
+- Redacted diagnostics preview and ZIP export with installation, process, loopback, adapter, recovery, updater, and lifecycle checks.
+- Codex DOM fixtures, Playwright manager/creator E2E, and English/Chinese light/dark screenshot baselines.
+- Dedicated companion proposal, companion package bug, and Windows compatibility Issue Forms.
+
+### Changed
+
+- Separated themes, variants, companions, and companion placement in a revisioned `AppliedConfiguration`.
+- Updated companions through the entity layer without background reinjection; stale apply responses no longer override the newest selection.
+- Migrated built-in companions to calibrated poses and pose-aware idle clips while retaining legacy `frameAngles` input.
+- Added dynamic atlas paging with a 48 MiB decoded-page target and a two-page runtime LRU.
+- Renamed user compatibility choices to Enhanced and Conservative; version changes are informational and Enhanced falls back only after live health failure.
+- Expanded the preview release workflow to Beta and RC tags with monotonic updater channel rules.
+
+### Fixed
+
+- Native dialogs, toasts, menus, tooltips, settings routes, right-panel tabs, and dynamic composers remain above theme and companion layers.
+- Restart-required, applying, fallback, paused, and error states expose explicit feedback and reject duplicate or stale completion.
+- Theme recommendations no longer overwrite an explicit companion or No companion choice.
+- Large source media and project history are stored in application data rather than localStorage.
+
 ## [0.1.0-alpha.9] - 2026-07-17
 
 ### Added

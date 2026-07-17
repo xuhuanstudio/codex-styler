@@ -7,9 +7,9 @@ const zh = locale === "zh-CN";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const docsBase = base + (zh ? "/zh-cn/docs/" : "/docs/");
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.1.0-alpha.9";
-const macAsset = "Codex-Styler_0.1.0-alpha.9_aarch64-unsigned.dmg";
-const windowsAsset = "Codex-Styler_0.1.0-alpha.9_x64-unsigned-setup.exe";
+const releaseTag = "v0.2.0-beta.1";
+const macAsset = "Codex-Styler_0.2.0-beta.1_aarch64-unsigned.dmg";
+const windowsAsset = "Codex-Styler_0.2.0-beta.1_x64-unsigned-setup.exe";
 const macDownloadUrl = `${repo}/releases/download/${releaseTag}/${macAsset}`;
 const windowsDownloadUrl = `${repo}/releases/download/${releaseTag}/${windowsAsset}`;
 const copy = zh
@@ -20,10 +20,10 @@ const copy = zh
       eyebrow: "为 OPENAI CODEX DESKTOP 打造 · 非官方",
       headline: "让工作空间拥有自己的气候。",
       lead: "自定义图片背景、克制的界面材质和会回应光标的 2D 伙伴；不修改应用包，并可一键恢复官方界面。",
-      downloadMac: "下载 macOS Alpha",
+      downloadMac: "下载 macOS Beta",
       downloadWindows: "下载 Windows EXE",
       start: "阅读快速开始",
-      trust: "macOS Apple Silicon + Windows 11 x64 · 未签名 Alpha",
+      trust: "macOS Apple Silicon + Windows 11 x64 · 未签名 Beta",
     }
   : {
       title: "Codex Styler — Themes & Interactive Scenes for OpenAI Codex Desktop",
@@ -32,10 +32,10 @@ const copy = zh
       eyebrow: "FOR OPENAI CODEX DESKTOP · UNOFFICIAL",
       headline: "Give your workspace its own climate.",
       lead: "Shape image backgrounds, restrained interface materials, and a 2D companion that notices your pointer—without patching the app bundle.",
-      downloadMac: "Download macOS Alpha",
+      downloadMac: "Download macOS Beta",
       downloadWindows: "Download Windows EXE",
       start: "Read the quickstart",
-      trust: "macOS Apple Silicon + Windows 11 x64 · Unsigned Alpha",
+      trust: "macOS Apple Silicon + Windows 11 x64 · Unsigned Beta",
     };
 ---
 
@@ -66,9 +66,9 @@ const copy = zh
           <div class="app-frame-body">
             <aside>
               <strong>Codex Styler</strong>
+              <span>{zh ? "主页" : "Home"}</span>
               <span class="active">{zh ? "主题" : "Themes"}</span>
-              <span>{zh ? "创作" : "Create"}</span>
-              <span>{zh ? "我的主题" : "My Themes"}</span>
+              <span>{zh ? "伙伴" : "Companions"}</span>
               <span>{zh ? "设置" : "Settings"}</span>
             </aside>
             <div class="app-frame-preview">

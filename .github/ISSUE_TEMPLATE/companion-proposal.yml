@@ -1,0 +1,48 @@
+name: Companion proposal
+description: Propose an original, reusable 2D companion
+title: "companion: "
+labels: ["companion", "proposal", "needs-triage"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Companion name
+    validations:
+      required: true
+  - type: textarea
+    id: character
+    attributes:
+      label: Character and motion direction
+      description: Describe the silhouette, visual style, pointer directions, idle motions, and intended scale.
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Planned source
+      options:
+        - Static image
+        - Image sequence
+        - Short directional video
+        - Existing sprite atlas
+    validations:
+      required: true
+  - type: textarea
+    id: calibration
+    attributes:
+      label: Direction and motion coverage
+      description: Explain the available directions and any blink, breathing, gesture, reverse-turn, or damaged ranges.
+  - type: textarea
+    id: provenance
+    attributes:
+      label: Asset provenance and license
+      description: State who created every asset and which redistributable license can be granted.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rights
+    attributes:
+      label: Rights
+      options:
+        - label: I have the right to contribute every referenced asset under the stated license.
+          required: true

@@ -1,0 +1,320 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://xuhuanstudio.github.io/codex-styler/schema/companion-v1.json",
+  "title": "Codex Styler Companion v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "id",
+    "version",
+    "metadata",
+    "compatibility",
+    "entity",
+    "assets",
+    "locales"
+  ],
+  "properties": {
+    "format": { "const": "codex-styler-companion-v1" },
+    "id": { "$ref": "#/$defs/packageId" },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "author", "license", "tags"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "author": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "license": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "tags": {
+          "type": "array",
+          "maxItems": 12,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 32 }
+        },
+        "homepage": { "type": "string", "format": "uri", "maxLength": 240 },
+        "preview": { "$ref": "#/$defs/assetPath" }
+      }
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["styler"],
+      "properties": {
+        "styler": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["minimumVersion"],
+          "properties": {
+            "minimumVersion": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+"
+            }
+          }
+        }
+      }
+    },
+    "entity": { "$ref": "#/$defs/entity" },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/asset" }
+    },
+    "locales": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "description"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "description": { "type": "string", "minLength": 1, "maxLength": 240 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "packageId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9.-]{2,63}$"
+    },
+    "localId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,39}$"
+    },
+    "assetPath": {
+      "type": "string",
+      "pattern": "^(assets|previews)/[A-Za-z0-9._/-]+$",
+      "maxLength": 180
+    },
+    "pose": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "angle", "frame"],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "angle": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
+        "frame": { "type": "integer", "minimum": 0, "maximum": 511 }
+      }
+    },
+    "idleFrame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["frame", "durationMs"],
+      "properties": {
+        "frame": { "type": "integer", "minimum": 0, "maximum": 511 },
+        "durationMs": { "type": "integer", "minimum": 16, "maximum": 5000 }
+      }
+    },
+    "idleClip": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "poseIds",
+        "frames",
+        "minimumDelayMs",
+        "maximumDelayMs"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "poseIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/localId" }
+        },
+        "frames": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 120,
+          "items": { "$ref": "#/$defs/idleFrame" }
+        },
+        "minimumDelayMs": {
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 120000
+        },
+        "maximumDelayMs": {
+          "type": "integer",
+          "minimum": 250,
+          "maximum": 120000
+        }
+      }
+    },
+    "renderer": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "asset"],
+          "properties": {
+            "type": { "const": "image" },
+            "asset": { "$ref": "#/$defs/assetPath" },
+            "normalization": { "enum": ["preserve", "grounded"] },
+            "alphaThreshold": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "asset",
+            "pages",
+            "columns",
+            "rows",
+            "framesPerPage",
+            "frameWidth",
+            "frameHeight",
+            "directions",
+            "frameCount",
+            "poses"
+          ],
+          "properties": {
+            "type": { "const": "sprite-atlas" },
+            "asset": { "$ref": "#/$defs/assetPath" },
+            "pages": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 8,
+              "uniqueItems": true,
+              "items": { "$ref": "#/$defs/assetPath" }
+            },
+            "columns": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "rows": { "type": "integer", "minimum": 1, "maximum": 16 },
+            "framesPerPage": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 256
+            },
+            "frameWidth": { "type": "integer", "minimum": 16, "maximum": 1024 },
+            "frameHeight": {
+              "type": "integer",
+              "minimum": 16,
+              "maximum": 1024
+            },
+            "directions": { "type": "integer", "minimum": 4, "maximum": 512 },
+            "frameCount": { "type": "integer", "minimum": 4, "maximum": 512 },
+            "poses": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 512,
+              "items": { "$ref": "#/$defs/pose" }
+            },
+            "idleClips": {
+              "type": "array",
+              "maxItems": 64,
+              "items": { "$ref": "#/$defs/idleClip" }
+            },
+            "neutralFrame": { "type": "integer", "minimum": 0, "maximum": 511 },
+            "reducedMotionFrame": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 511
+            },
+            "transitionFps": {
+              "type": "integer",
+              "minimum": 12,
+              "maximum": 60
+            },
+            "followSmoothing": {
+              "type": "number",
+              "minimum": 0.02,
+              "maximum": 1
+            },
+            "normalization": { "enum": ["preserve", "grounded"] },
+            "alphaThreshold": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        }
+      ]
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "renderer",
+        "behaviors",
+        "anchor",
+        "size",
+        "opacity"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "renderer": { "$ref": "#/$defs/renderer" },
+        "behaviors": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "idle",
+              "parallax",
+              "look-at-pointer",
+              "reduce-motion-fallback"
+            ]
+          }
+        },
+        "anchor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y"],
+          "properties": {
+            "x": { "type": "number", "minimum": 0, "maximum": 100 },
+            "y": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        "attachment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["target", "edge", "align", "offset"],
+          "properties": {
+            "target": {
+              "enum": ["composer", "main-surface", "thread-summary"]
+            },
+            "edge": { "enum": ["top", "bottom"] },
+            "align": { "type": "number", "minimum": 0, "maximum": 1 },
+            "offset": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["x", "y"],
+              "properties": {
+                "x": { "type": "number", "minimum": -512, "maximum": 512 },
+                "y": { "type": "number", "minimum": -512, "maximum": 512 }
+              }
+            }
+          }
+        },
+        "size": { "type": "number", "minimum": 24, "maximum": 512 },
+        "opacity": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path", "type", "license"],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "path": { "$ref": "#/$defs/assetPath" },
+        "type": { "enum": ["image", "sprite-atlas", "preview"] },
+        "license": { "type": "string", "minLength": 1, "maxLength": 64 }
+      }
+    }
+  }
+}

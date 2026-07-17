@@ -1,4 +1,10 @@
-import type { SceneEntity, ThemeAsset, ThemeDefinition } from "./types";
+import {
+  COMPANION_FORMAT,
+  type CompanionPackageDefinition,
+  type SceneEntity,
+  type ThemeAsset,
+  type ThemeDefinition,
+} from "./types";
 import chameleonAtlas from "./moss-chameleon-atlas.json";
 import catAtlas from "./mochi-cat-atlas.json";
 import parrotAtlas from "./pico-parrot-atlas.json";
@@ -7,9 +13,13 @@ import resetGodAtlas from "./reset-god-atlas.json";
 import tokenThiefAtlas from "./token-thief-atlas.json";
 
 export interface CompanionDefinition {
+  format: typeof COMPANION_FORMAT;
   id: string;
+  version: string;
   name: string;
   description: string;
+  metadata: CompanionPackageDefinition["metadata"];
+  compatibility: CompanionPackageDefinition["compatibility"];
   entity: SceneEntity;
   assets: ThemeAsset[];
   defaultThemeIds: string[];
@@ -40,9 +50,23 @@ function calibratedCompanion(config: {
 }): CompanionDefinition {
   const renderer = config.atlas.renderer;
   return {
+    format: COMPANION_FORMAT,
     id: config.id,
+    version: "0.2.0",
     name: config.name,
     description: config.description,
+    metadata: {
+      name: config.name,
+      description: config.description,
+      author: "Codex Styler contributors",
+      license: "CC-BY-4.0",
+      tags: ["companion", "pointer-aware"],
+    },
+    compatibility: {
+      styler: {
+        minimumVersion: "0.2.0",
+      },
+    },
     entity: {
       id: config.id,
       name: config.name,
@@ -56,7 +80,21 @@ function calibratedCompanion(config: {
         frameWidth: renderer.frameWidth,
         frameHeight: renderer.frameHeight,
         directions: renderer.directions,
+        frameCount: renderer.directions,
         frameAngles: renderer.frameAngles,
+        poses: renderer.frameAngles.flatMap((angle, frame) =>
+          angle >= 360
+            ? []
+            : [
+                {
+                  id: `pose-${String(frame).padStart(3, "0")}`,
+                  angle,
+                  frame,
+                },
+              ],
+        ),
+        neutralFrame: 0,
+        reducedMotionFrame: 0,
         transitionFps: 60,
         normalization: "preserve",
         alphaThreshold: 12,
@@ -80,6 +118,38 @@ function calibratedCompanion(config: {
     })),
     defaultThemeIds: config.defaultThemeIds ?? [],
     locales: config.locales,
+  };
+}
+
+export function companionFromPackage(
+  companion: CompanionPackageDefinition,
+): CompanionDefinition {
+  return {
+    ...structuredClone(companion),
+    name: companion.metadata.name,
+    description: companion.metadata.description,
+    defaultThemeIds: [],
+  };
+}
+
+export function companionToPackage(
+  companion: CompanionDefinition,
+): CompanionPackageDefinition {
+  const entity = structuredClone(companion.entity);
+  if (entity.renderer.type === "sprite-atlas") {
+    // frameAngles is the v0.1 compatibility input. Standalone v1 companion
+    // packages express direction through explicit poses instead.
+    delete entity.renderer.frameAngles;
+  }
+  return {
+    format: COMPANION_FORMAT,
+    id: companion.id,
+    version: companion.version,
+    metadata: structuredClone(companion.metadata),
+    compatibility: structuredClone(companion.compatibility),
+    entity,
+    assets: structuredClone(companion.assets),
+    locales: structuredClone(companion.locales),
   };
 }
 
@@ -222,14 +292,60 @@ export function defaultCompanionForTheme(
   );
 }
 
+/** Keeps v0.1 themes with one embedded entity functional during migration. */
+export function embeddedCompanionForTheme(
+  theme: ThemeDefinition,
+): CompanionDefinition | null {
+  const entity = theme.scene.entities[0];
+  if (!entity) return null;
+  const rendererPaths = new Set([
+    entity.renderer.asset,
+    ...(entity.renderer.type === "sprite-atlas"
+      ? (entity.renderer.pages ?? [])
+      : []),
+  ]);
+  const assets = theme.assets.filter((asset) => rendererPaths.has(asset.path));
+  if (assets.length === 0) return null;
+  const name = entity.name || `${theme.metadata.name} companion`;
+  const description = `Legacy companion embedded in ${theme.metadata.name}.`;
+  return {
+    format: COMPANION_FORMAT,
+    id: `legacy.${theme.id}.${entity.id}`.slice(0, 96),
+    version: theme.version,
+    name,
+    description,
+    metadata: {
+      name,
+      description,
+      author: theme.metadata.author,
+      license: theme.metadata.license,
+      tags: ["companion", "legacy-embedded"],
+    },
+    compatibility: {
+      styler: { minimumVersion: "0.1.0" },
+    },
+    entity: structuredClone(entity),
+    assets: structuredClone(assets),
+    defaultThemeIds: [theme.id],
+    locales: Object.fromEntries(
+      Object.entries(theme.locales).map(([locale, copy]) => [
+        locale,
+        { name, description: `${description} ${copy.name}` },
+      ]),
+    ),
+  };
+}
+
+export interface CompanionOverrides {
+  anchor?: { x: number; y: number };
+  attachment?: SceneEntity["attachment"] | null;
+  size?: number;
+}
+
 export function composeThemeWithCompanion(
   theme: ThemeDefinition,
   companion: CompanionDefinition | null,
-  overrides?: {
-    anchor?: { x: number; y: number };
-    attachment?: SceneEntity["attachment"] | null;
-    size?: number;
-  },
+  overrides?: CompanionOverrides,
 ): ThemeDefinition {
   const composed = structuredClone(theme);
   composed.scene.entities = [];

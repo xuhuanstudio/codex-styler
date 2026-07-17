@@ -9,7 +9,7 @@ import { builtinThemes } from "@codex-styler/theme-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import {
-  applyTheme,
+  applyConfiguration,
   checkForUpdates,
   chooseCodexInstallPath,
   detectCodex,
@@ -18,18 +18,20 @@ import {
   launchCodex,
   quitCodex,
   restartApp,
+  updateCompanionConfiguration,
   validateCodexInstallPath,
   type RuntimeStatus,
 } from "./lib/runtime";
 
 const disconnectedRuntime: RuntimeStatus = {
-  state: "idle",
+  state: "disconnected",
   connected: false,
   startedByStyler: false,
   port: null,
   codexVersion: null,
   compatibility: "safe",
   message: null,
+  revision: 0,
 };
 
 const appliedRuntime: RuntimeStatus = {
@@ -40,7 +42,16 @@ const appliedRuntime: RuntimeStatus = {
   codexVersion: "26.707.72221",
   compatibility: "supported",
   message: null,
+  revision: 1,
 };
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 vi.mock("./lib/runtime", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./lib/runtime")>();
@@ -54,20 +65,22 @@ vi.mock("./lib/runtime", async (importOriginal) => {
       platform: "macos",
     }),
     getRuntimeStatus: vi.fn().mockResolvedValue({
-      state: "idle",
+      state: "disconnected",
       connected: false,
       startedByStyler: false,
       port: null,
       codexVersion: null,
       compatibility: "safe",
       message: null,
+      revision: 0,
     }),
-    applyTheme: vi.fn(),
+    applyConfiguration: vi.fn(),
+    updateCompanionConfiguration: vi.fn(),
     chooseCodexInstallPath: vi.fn(),
     launchCodex: vi.fn(),
     quitCodex: vi.fn(),
     checkForUpdates: vi.fn().mockResolvedValue({
-      currentVersion: "0.1.0-alpha.9",
+      currentVersion: "0.2.0-beta.1",
       update: null,
     }),
     downloadAndInstallUpdate: vi.fn(),
@@ -92,8 +105,10 @@ describe("Codex Styler shell", () => {
     });
     vi.mocked(getRuntimeStatus).mockReset();
     vi.mocked(getRuntimeStatus).mockResolvedValue(disconnectedRuntime);
-    vi.mocked(applyTheme).mockReset();
-    vi.mocked(applyTheme).mockResolvedValue(appliedRuntime);
+    vi.mocked(applyConfiguration).mockReset();
+    vi.mocked(applyConfiguration).mockResolvedValue(appliedRuntime);
+    vi.mocked(updateCompanionConfiguration).mockReset();
+    vi.mocked(updateCompanionConfiguration).mockResolvedValue(appliedRuntime);
     vi.mocked(launchCodex).mockReset();
     vi.mocked(launchCodex).mockResolvedValue({
       ...appliedRuntime,
@@ -113,7 +128,7 @@ describe("Codex Styler shell", () => {
     vi.mocked(validateCodexInstallPath).mockResolvedValue(true);
     vi.mocked(checkForUpdates).mockReset();
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.1.0-alpha.9",
+      currentVersion: "0.2.0-beta.1",
       update: null,
     });
     vi.mocked(downloadAndInstallUpdate).mockReset();
@@ -192,7 +207,7 @@ describe("Codex Styler shell", () => {
         name: "Restart Codex to apply this theme?",
       }),
     ).toBeInTheDocument();
-    expect(applyTheme).not.toHaveBeenCalled();
+    expect(applyConfiguration).not.toHaveBeenCalled();
   });
 
   it("uses a language dropdown with system language first", () => {
@@ -220,7 +235,9 @@ describe("Codex Styler shell", () => {
     );
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(await screen.findByText("Automatically detected")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Automatically detected"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Choose application" }));
     await waitFor(() =>
       expect(validateCodexInstallPath).toHaveBeenCalledWith(
@@ -239,7 +256,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.1.0-alpha.9")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.1")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce());
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -247,9 +264,9 @@ describe("Codex Styler shell", () => {
 
   it("downloads, installs, and restarts from the update dialog", async () => {
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.1.0-alpha.9",
+      currentVersion: "0.2.0-beta.1",
       update: {
-        version: "0.1.0-alpha.9",
+        version: "0.2.0-beta.1",
         notes: "A safer updater and corrected companion thumbnails.",
         publishedAt: "2026-07-17T08:00:00Z",
         prerelease: true,
@@ -265,7 +282,7 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     expect(
       await screen.findByRole("dialog", {
-        name: "Codex Styler 0.1.0-alpha.9",
+        name: "Codex Styler 0.2.0-beta.1",
       }),
     ).toBeInTheDocument();
     fireEvent.click(
@@ -313,13 +330,58 @@ describe("Codex Styler shell", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Preview: Nocturne Studio" }),
     );
-    await waitFor(() => expect(applyTheme).toHaveBeenCalledOnce());
-    expect((await screen.findAllByText("Live in Codex")).length).toBeGreaterThan(
-      0,
-    );
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledOnce());
+    expect(
+      (await screen.findAllByText("Live in Codex")).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.queryByRole("button", { name: "Apply to Codex" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("keeps the newest theme when rapid live selections resolve out of order", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
+    const first = deferred<RuntimeStatus>();
+    const second = deferred<RuntimeStatus>();
+    vi.mocked(applyConfiguration)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        companionMode: "theme-default",
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview: Nocturne Studio" }),
+    );
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledOnce());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview: Quiet Garden" }),
+    );
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledTimes(2));
+    second.resolve({ ...appliedRuntime, revision: 2 });
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Preview: Quiet Garden",
+        }),
+      ).toHaveAttribute("aria-pressed", "true"),
+    );
+    first.resolve({ ...appliedRuntime, revision: 1 });
+    await Promise.resolve();
+    expect(
+      screen.getByRole("button", { name: "Preview: Quiet Garden" }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("applies a companion immediately without restarting live Codex", async () => {
@@ -340,9 +402,13 @@ describe("Codex Styler shell", () => {
     expect(await screen.findByText("Connected")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Companions" }));
     fireEvent.click(screen.getByRole("button", { name: /Pico/ }));
-    await waitFor(() => expect(applyTheme).toHaveBeenCalledOnce());
-    const appliedTheme = vi.mocked(applyTheme).mock.calls[0]?.[0];
-    expect(appliedTheme?.scene.entities[0]?.id).toBe("pico-parrot");
+    await waitFor(() =>
+      expect(updateCompanionConfiguration).toHaveBeenCalledOnce(),
+    );
+    const appliedConfiguration = vi.mocked(updateCompanionConfiguration).mock
+      .calls[0]?.[0];
+    expect(appliedConfiguration?.companion?.entity.id).toBe("pico-parrot");
+    expect(applyConfiguration).not.toHaveBeenCalled();
     expect(quitCodex).not.toHaveBeenCalled();
     expect(
       await screen.findByText("Companion applied to Codex"),
@@ -375,7 +441,7 @@ describe("Codex Styler shell", () => {
     );
     await waitFor(() => expect(quitCodex).toHaveBeenCalledOnce());
     await waitFor(() => expect(launchCodex).toHaveBeenCalledOnce());
-    await waitFor(() => expect(applyTheme).toHaveBeenCalledOnce());
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledOnce());
     expect(
       screen.queryByRole("dialog", {
         name: "Restart Codex to apply this theme?",

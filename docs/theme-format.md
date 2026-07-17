@@ -6,26 +6,28 @@ The authoritative contract is [theme.schema.json](../packages/theme-core/schema/
 
 ## Manifest model
 
-| Field              | Purpose                                                                                   |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| `metadata`         | Human-readable identity, license, tags, and optional preview                              |
-| `compatibility`    | Minimum Styler version and safe/semantic Codex mode                                       |
-| `variants`         | Independent light and dark background, surface, color, motion, and shell-treatment values |
-| `scene.layers[]`   | Images, gradients, and vignettes in painter order                                         |
-| `scene.entities[]` | Renderer, anchor, size, opacity, and data-only behaviors                                  |
-| `assets[]`         | Every local file plus its type and license                                                |
-| `locales`          | Localized name and description; English is the recommended fallback                       |
+| Field              | Purpose                                                                                      |
+| ------------------ | -------------------------------------------------------------------------------------------- |
+| `metadata`         | Human-readable identity, license, tags, optional preview, and optional recommended companion |
+| `compatibility`    | Minimum Styler version and safe/semantic Codex mode                                          |
+| `variants`         | Independent light and dark background, surface, color, motion, and shell-treatment values    |
+| `scene.layers[]`   | Images, gradients, and vignettes in painter order                                            |
+| `scene.entities[]` | Renderer, anchor, size, opacity, and data-only behaviors                                     |
+| `assets[]`         | Every local file plus its type and license                                                   |
+| `locales`          | Localized name and description; English is the recommended fallback                          |
 
 ## v1 renderers and behaviors
 
 - `image`: a single local raster image;
-- `sprite-atlas`: a regular grid with 4, 8, or 16 direction frames;
+- `sprite-atlas`: one or more regular atlas pages with up to 512 calibrated logical frames;
 - `idle`: no pointer response;
 - `parallax`: constrained scene displacement;
 - `look-at-pointer`: maps the pointer angle to a sprite direction;
 - `reduce-motion-fallback`: freezes the entity at its neutral frame.
 
 Both renderers may declare `normalization: "grounded"` and an optional `alphaThreshold`. Grounded normalization analyzes the alpha bounds of every frame, applies one shared scale, centers each visible figure, and aligns all frames to one bottom baseline. It deliberately does not crop and scale each frame independently, which would introduce size changes and vertical jitter.
+
+Legacy theme entities may provide `frameAngles`; 0.2 converts each mapped frame to a calibrated pose in memory. New companions use the independent [companion format](companion-format.md), where `poses[]` and `idleClips[]` separate direction from blinking and other small motions. New theme exports do not embed the user's current global companion.
 
 An entity can remain at its percentage `anchor`, or declare an `attachment` with a semantic target (`composer`, `main-surface`, or `thread-summary`), edge, alignment, and pixel offset. The runtime observes the resolved target and repositions the entity when that surface changes size or is recreated after navigation.
 
@@ -56,6 +58,8 @@ assets/background.webp
 assets/companion-atlas.webp
 previews/cover.webp
 ```
+
+`metadata.recommendedCompanionId` is only a recommendation. An explicit user companion or **No companion** setting has higher priority, and a missing recommended package results in no companion plus an install hint.
 
 Paths are relative and use `/`. Asset references must be declared in `assets[]`; remote URLs and `data:` URLs are invalid inside a package.
 

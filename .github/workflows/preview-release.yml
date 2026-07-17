@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - "v*-alpha.*"
+      - "v*-beta.*"
+      - "v*-rc.*"
 
 permissions:
   actions: read
@@ -81,6 +83,7 @@ jobs:
           pnpm --filter @codex-styler/desktop tauri build
           --target aarch64-apple-darwin
           --bundles app,dmg
+          --config '{"bundle":{"macOS":{"signingIdentity":"-"}}}'
 
       - name: Stage and verify macOS artifacts
         shell: bash
@@ -252,6 +255,13 @@ jobs:
           echo "EXE_NAME=Codex-Styler_${version}_x64-unsigned-setup.exe" >> "$GITHUB_ENV"
           echo "WIN_UPDATER_SIG_NAME=Codex-Styler_${version}_x64-unsigned-setup.exe.sig" >> "$GITHUB_ENV"
           echo "SBOM_NAME=Codex-Styler_${version}.spdx.json" >> "$GITHUB_ENV"
+          case "$version" in
+            *-alpha.*) release_label="Alpha" ;;
+            *-beta.*) release_label="Beta" ;;
+            *-rc.*) release_label="Release Candidate" ;;
+            *) echo "Unsupported preview channel: $version" >&2; exit 1 ;;
+          esac
+          echo "RELEASE_LABEL=$release_label" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v8
         with:
@@ -325,5 +335,5 @@ jobs:
           --verify-tag
           --draft
           --prerelease
-          --title "Codex Styler ${RELEASE_VERSION} — macOS & Windows Alpha"
+          --title "Codex Styler ${RELEASE_VERSION} — macOS & Windows ${RELEASE_LABEL}"
           --notes-file ".github/release-notes/${GITHUB_REF_NAME}.md"

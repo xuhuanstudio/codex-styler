@@ -1,0 +1,58 @@
+name: Companion package bug
+description: Report an import, calibration, rendering, or export problem
+title: "companion bug: "
+labels: ["companion", "bug", "needs-triage"]
+body:
+  - type: input
+    id: styler-version
+    attributes:
+      label: Codex Styler version
+      placeholder: 0.2.0-beta.1
+    validations:
+      required: true
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Affected stage
+      options:
+        - Import
+        - Extract or atlas slice
+        - Background cleanup
+        - Shared alignment
+        - Direction calibration
+        - Idle motions
+        - Test preview
+        - Save, export, or re-import
+        - Runtime rendering
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Source characteristics
+      description: Describe file type, dimensions, duration, frame count, transparency, and background. Do not upload source media unless you have redistribution rights.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction and expected result
+      description: Include numbered steps, the expected result, and the actual result.
+    validations:
+      required: true
+  - type: textarea
+    id: package
+    attributes:
+      label: Optional package or diagnostics
+      description: Attach a redistributable .codex-styler-companion and redacted diagnostics by dragging them into this field.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy and rights
+      options:
+        - label: I removed private content, usernames, and full local paths.
+          required: true
+        - label: I have permission to share every attached asset.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true

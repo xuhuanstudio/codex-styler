@@ -1,11 +1,12 @@
 {
   "name": "@codex-styler/theme-core",
-  "version": "0.1.0-alpha.9",
+  "version": "0.2.0-beta.1",
   "private": true,
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./schema": "./schema/theme.schema.json"
+    "./schema": "./schema/theme.schema.json",
+    "./companion-schema": "./schema/companion.schema.json"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -13,7 +14,8 @@
     "lint": "node scripts/generate-validator.mjs --check && tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "generate:validator": "node scripts/generate-validator.mjs",
-    "theme:validate": "tsx src/cli.ts"
+    "theme:validate": "tsx src/cli.ts",
+    "package:validate": "tsx src/cli.ts"
   },
   "dependencies": {
     "ajv": "^8.20.0",
