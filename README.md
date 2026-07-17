@@ -9,7 +9,7 @@
 <h1 align="center">Codex Styler</h1>
 
 <p align="center">
-  <strong>Themes and interactive 2D scenes for OpenAI Codex Desktop.</strong><br />
+  <strong>An open-source Codex theme editor and Codex skin creator for OpenAI Codex Desktop.</strong><br />
   Safe, reversible, local-first, and deliberately unofficial.
 </p>
 
@@ -31,7 +31,34 @@
 > [!IMPORTANT]
 > Codex Styler is an Alpha preview. The macOS download is ad-hoc signed but not signed with an Apple Developer ID or notarized; it is not a stable release. v1 Stable remains gated on complete real-device testing, macOS notarization, and Windows code signing.
 
-![Codex Styler theme editor](docs/media/app-overview.png)
+![Gilded Grandeur Codex theme with the Reset God companion](docs/media/codex-theme-gilded-grandeur.webp)
+
+<p align="center"><sub><strong>Gilded Grandeur + Reset God</strong> — a live Codex Desktop workspace styled by Codex Styler.</sub></p>
+
+## Themes that reshape Codex
+
+Codex Styler treats a Codex theme as a coordinated visual system—not a background swap. Semantic surfaces, navigation, icons, borders, depth, motion, the composer, and an optional companion change together while the familiar Codex structure remains intact.
+
+![Merry Big Top Codex skin with the Token Thief companion](docs/media/codex-theme-merry-big-top.webp)
+
+<p align="center"><sub><strong>Merry Big Top + Token Thief</strong> — the same Codex skeleton, rebuilt with a different color, material, motion, and companion direction.</sub></p>
+
+## Meet the companions
+
+Companions are draggable, pointer-aware, and independent from themes. A built-in theme can recommend a pairing, but you can combine any companion with any visual system—or use no companion at all.
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/media/companions/moss-chameleon.webp" width="180" alt="Moss, the green chameleon Codex companion"><br><strong>Moss</strong><br><sub>Curious chameleon</sub></td>
+    <td align="center" width="33%"><img src="docs/media/companions/reset-god.webp" width="180" alt="Reset God, the gilded Codex companion"><br><strong>Reset God</strong><br><sub>Gilded calm</sub></td>
+    <td align="center" width="33%"><img src="docs/media/companions/token-thief.webp" width="180" alt="Token Thief, the circus clown Codex companion"><br><strong>Token Thief</strong><br><sub>Circus mischief</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/media/companions/pico-parrot.webp" width="180" alt="Pico, the red parrot Codex companion"><br><strong>Pico</strong><br><sub>Expressive parrot</sub></td>
+    <td align="center"><img src="docs/media/companions/puddle-frog.webp" width="180" alt="Puddle, the blue frog Codex companion"><br><strong>Puddle</strong><br><sub>Grounded frog</sub></td>
+    <td align="center"><img src="docs/media/companions/mochi-cat.webp" width="180" alt="Mochi, the orange cat Codex companion"><br><strong>Mochi</strong><br><sub>Warm orange cat</sub></td>
+  </tr>
+</table>
 
 ## Why Codex Styler
 
@@ -43,6 +70,17 @@ OpenAI Codex Desktop already includes useful appearance controls and Pets. Codex
 - **Data-only packages:** local raster assets and JSON; no scripts, arbitrary CSS, SVG, video, remote URLs, or executable fonts.
 - **Local-first:** no account, telemetry, cloud sync, or online store; optional update checks only contact GitHub Releases.
 - **Bilingual from v1:** English and Simplified Chinese in the desktop app, repository, and documentation site.
+
+### One manager, light or dark
+
+The Codex Styler manager follows the system or uses an explicit light or dark appearance. Its interface appearance is independent from the theme applied to Codex.
+
+<table>
+  <tr>
+    <td align="center" width="50%"><a href="docs/media/manager-light.webp"><img src="docs/media/manager-light.webp" alt="Codex Styler desktop manager in light mode"></a><br><sub>Light</sub></td>
+    <td align="center" width="50%"><a href="docs/media/manager-dark.webp"><img src="docs/media/manager-dark.webp" alt="Codex Styler desktop manager in dark mode"></a><br><sub>Dark</sub></td>
+  </tr>
+</table>
 
 ## Built-in themes
 
