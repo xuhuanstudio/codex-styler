@@ -2044,33 +2044,44 @@ function AtlasGridPreview({
   file?: File;
   settings: AtlasSliceSettings;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   useEffect(() => {
     if (!file) {
-      setUrl(null);
+      setDimensions({ width: 0, height: 0 });
       return;
     }
-    const nextUrl = URL.createObjectURL(file);
-    setUrl(nextUrl);
-    return () => URL.revokeObjectURL(nextUrl);
+    let active = true;
+    void createImageBitmap(file)
+      .then((bitmap) => {
+        try {
+          if (!active) return;
+          const canvas = canvasRef.current;
+          const context = canvas?.getContext("2d");
+          if (!canvas || !context) return;
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          context.clearRect(0, 0, bitmap.width, bitmap.height);
+          context.drawImage(bitmap, 0, 0);
+          setDimensions({ width: bitmap.width, height: bitmap.height });
+        } finally {
+          bitmap.close();
+        }
+      })
+      .catch(() => {
+        if (active) setDimensions({ width: 0, height: 0 });
+      });
+    return () => {
+      active = false;
+    };
   }, [file]);
   const overflow = new Set(
     atlasOverflow(dimensions.width, dimensions.height, settings),
   );
   return (
     <div className="atlas-grid-preview">
-      {url ? (
-        <img
-          src={url}
-          alt="Sprite atlas source"
-          onLoad={(event) =>
-            setDimensions({
-              width: event.currentTarget.naturalWidth,
-              height: event.currentTarget.naturalHeight,
-            })
-          }
-        />
+      {file ? (
+        <canvas ref={canvasRef} aria-label="Decoded sprite atlas source" />
       ) : (
         <span>Select an atlas image to preview its grid.</span>
       )}

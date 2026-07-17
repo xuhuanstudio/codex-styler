@@ -14,6 +14,36 @@ export const CREATOR_INPUT_LIMITS = {
   frameCount: 512,
 } as const;
 
+const VIDEO_EXTENSIONS_BY_MIME = new Map<string, ReadonlySet<string>>([
+  ["video/mp4", new Set([".mp4", ".m4v"])],
+  ["video/quicktime", new Set([".mov"])],
+  ["video/webm", new Set([".webm"])],
+]);
+
+export function assertSupportedVideoSource(file: File): void {
+  if (file.size > CREATOR_INPUT_LIMITS.videoBytes) {
+    throw new Error("Video exceeds the 250 MiB creator limit");
+  }
+  const extension = file.name
+    .slice(Math.max(0, file.name.lastIndexOf(".")))
+    .toLowerCase();
+  const mime = file.type.toLowerCase();
+  const allowedByMime = VIDEO_EXTENSIONS_BY_MIME.get(mime);
+  const extensionAllowed = [...VIDEO_EXTENSIONS_BY_MIME.values()].some(
+    (extensions) => extensions.has(extension),
+  );
+  if (!extensionAllowed) {
+    throw new Error("Choose an MP4, MOV, or WebM video file");
+  }
+  if (
+    mime &&
+    mime !== "application/octet-stream" &&
+    (!allowedByMime || !allowedByMime.has(extension))
+  ) {
+    throw new Error("The video file type does not match its extension");
+  }
+}
+
 export interface ExtractedFrame {
   id: string;
   sourceIndex: number;
@@ -164,15 +194,15 @@ export async function extractVideoFrames(
   options: { startMs: number; endMs: number; fps: number },
   onProgress?: (progress: number) => void,
 ): Promise<ExtractedFrame[]> {
-  if (file.size > CREATOR_INPUT_LIMITS.videoBytes) {
-    throw new Error("Video exceeds the 250 MiB creator limit");
-  }
+  assertSupportedVideoSource(file);
   const video = document.createElement("video");
   video.muted = true;
   video.playsInline = true;
   video.preload = "auto";
   const sourceUrl = URL.createObjectURL(file);
-  video.src = sourceUrl;
+  // The value is a freshly created local blob: URL for an allowlisted video
+  // File, never DOM text, markup, a remote URL, or package-controlled data.
+  video.src = sourceUrl; // lgtm[js/xss-through-dom]
   try {
     await waitForEvent(video, "loadedmetadata");
     if (!Number.isFinite(video.duration) || video.duration <= 0) {

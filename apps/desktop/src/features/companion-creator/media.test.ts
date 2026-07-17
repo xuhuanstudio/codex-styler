@@ -1,5 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { mattePixel, retainLargestAlphaComponent } from "./media";
+import {
+  assertSupportedVideoSource,
+  mattePixel,
+  retainLargestAlphaComponent,
+} from "./media";
+
+describe("creator video input boundary", () => {
+  it("accepts supported local video containers and rejects mismatched content types", () => {
+    expect(() =>
+      assertSupportedVideoSource(
+        new File([new Uint8Array([0])], "turn.mp4", { type: "video/mp4" }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertSupportedVideoSource(
+        new File(["<html></html>"], "turn.mp4", { type: "text/html" }),
+      ),
+    ).toThrow("does not match");
+    expect(() =>
+      assertSupportedVideoSource(
+        new File([new Uint8Array([0])], "turn.svg", { type: "video/mp4" }),
+      ),
+    ).toThrow("MP4, MOV, or WebM");
+  });
+});
 
 describe("local controllable matte", () => {
   it("makes sampled background transparent while retaining distant subject color", () => {

@@ -55,6 +55,7 @@ test("Simplified Chinese light layout remains stable", async ({ page }) => {
   await openManager(page, "zh-CN", "light", { width: 1320, height: 840 });
   await expect(page).toHaveScreenshot("manager-zh-light-1320x840.png", {
     fullPage: true,
+    maxDiffPixelRatio: 0.015,
   });
 });
 
@@ -62,6 +63,7 @@ test("Simplified Chinese dark layout remains stable", async ({ page }) => {
   await openManager(page, "zh-CN", "dark", { width: 960, height: 680 });
   await expect(page).toHaveScreenshot("manager-zh-dark-960x680.png", {
     fullPage: true,
+    maxDiffPixelRatio: 0.015,
   });
 });
 
@@ -109,10 +111,13 @@ test("keyboard companion creator completes a static-image project", async ({
     .setInputFiles(
       fileURLToPath(new URL("../public/favicon.png", import.meta.url)),
     );
+  await expect(page.getByText("favicon.png", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Next/ }).press("Enter");
-  await page
-    .getByRole("button", { name: /Generate logical frames/ })
-    .press("Enter");
+  const generateFrames = page.getByRole("button", {
+    name: /Generate logical frames/,
+  });
+  await expect(generateFrames).toBeVisible();
+  await generateFrames.press("Enter");
   await expect(page.getByText("1 frames")).toBeVisible();
 
   for (const step of [

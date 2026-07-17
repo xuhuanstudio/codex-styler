@@ -4482,7 +4482,7 @@ button:disabled {
   background: #0b0d11;
 }
 
-.atlas-grid-preview > img {
+.atlas-grid-preview > :is(img, canvas) {
   display: block;
   width: 100%;
   height: auto;
