@@ -139,7 +139,7 @@ export function App() {
   >({});
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.6");
+  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.7");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);

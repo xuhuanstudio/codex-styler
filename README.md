@@ -15,14 +15,14 @@
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.6">Download Alpha</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.7">Download Alpha</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/">Website</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/docs/getting-started/">Documentation</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/xuhuanstudio/codex-styler/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xuhuanstudio/codex-styler/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.6"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.6-2563EB?style=flat-square"></a>
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.7"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.7-2563EB?style=flat-square"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-365443?style=flat-square"></a>
   <a href="ASSET_LICENSES.md"><img alt="CC BY 4.0 assets" src="https://img.shields.io/badge/art-CC%20BY%204.0-9B6E3F?style=flat-square"></a>
   <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555D57?style=flat-square">
@@ -96,14 +96,14 @@ Companions are selected independently from themes. Native Refined, Nocturne Stud
 
 Every shipped image and sprite is original project artwork. The reference repositories are studied for ideas only; their assets and source are not redistributed.
 
-## Download Alpha 0.6
+## Download Alpha 0.7
 
-- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.6/Codex-Styler_0.1.0-alpha.6_aarch64-unsigned.dmg)**
-- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.6/Codex-Styler_0.1.0-alpha.6_x64-unsigned-setup.exe)**
+- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.7/Codex-Styler_0.1.0-alpha.7_aarch64-unsigned.dmg)**
+- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.7/Codex-Styler_0.1.0-alpha.7_x64-unsigned-setup.exe)**
 
 On macOS, open the DMG, drag Codex Styler to Applications, then Control-click the app and choose **Open** on first launch. On Windows, SmartScreen may warn because this Alpha does not yet have an Authenticode certificate; inspect the published checksum and provenance before continuing. Never disable Gatekeeper or SmartScreen globally.
 
-The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.6) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater archives, tested scope, and known limitations. Intel macOS is not included in this Alpha.
+The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.7) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater archives, tested scope, and known limitations. Intel macOS is not included in this Alpha.
 
 ## Run from source
 

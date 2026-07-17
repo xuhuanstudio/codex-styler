@@ -63,6 +63,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: apps/desktop/src-tauri
+      - uses: pnpm/action-setup@v6
+        if: runner.os == 'Windows'
+        with:
+          version: 11.4.0
+      - uses: actions/setup-node@v7
+        if: runner.os == 'Windows'
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Verify generated artifacts on Windows
+        if: runner.os == 'Windows'
+        working-directory: ${{ github.workspace }}
+        run: |
+          pnpm install --frozen-lockfile
+          node packages/theme-core/scripts/generate-validator.mjs --check
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
