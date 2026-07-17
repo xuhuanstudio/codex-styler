@@ -1,6 +1,6 @@
 [package]
 name = "codex-styler"
-version = "0.1.0-alpha.8"
+version = "0.1.0-alpha.9"
 description = "Unofficial local-first theme and interactive scene editor for OpenAI Codex Desktop"
 authors = ["Codex Styler contributors"]
 license = "Apache-2.0"
@@ -22,6 +22,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sysinfo = "0.39.6"
 tauri = { version = "2.11.5", features = [] }
+tauri-plugin-dialog = { version = "2.6.0", default-features = false }
 tauri-plugin-updater = "2.9.0"
 thiserror = "2.0"
 tokio = { version = "1.48", features = ["time", "net", "process", "sync"] }

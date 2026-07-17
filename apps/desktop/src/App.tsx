@@ -71,6 +71,7 @@ import {
 import {
   applyTheme,
   checkForUpdates,
+  chooseCodexInstallPath,
   detectCodex,
   downloadAndInstallUpdate,
   getRuntimeStatus,
@@ -79,6 +80,7 @@ import {
   quitCodex,
   restartApp,
   restoreOfficial,
+  validateCodexInstallPath,
   type AvailableUpdate,
   type CodexDetection,
   type RuntimeStatus,
@@ -106,6 +108,11 @@ type NewThemeStep = "choose" | "existing";
 type ThemeVariantName = "light" | "dark";
 type UpdateStatus = "idle" | "checking" | "current" | "error";
 type UpdateInstallStatus = "idle" | "downloading" | "installing" | "restarting";
+type ApplySuccessMessage =
+  | "configurationApplied"
+  | "themeApplied"
+  | "companionApplied"
+  | "companionPositionApplied";
 
 const initialRuntime: RuntimeStatus = {
   state: "idle",
@@ -119,6 +126,7 @@ const initialRuntime: RuntimeStatus = {
 
 export function App() {
   const [settings, setSettings] = useState<UserSettings>(loadSettings);
+  const settingsRef = useRef(settings);
   const [view, setView] = useState<View>("home");
   const [selectedTheme, setSelectedTheme] = useState<ThemeDefinition>(
     builtinThemes[0],
@@ -138,8 +146,9 @@ export function App() {
     Record<string, ThemeAssetMap>
   >({});
   const [busy, setBusy] = useState(false);
+  const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.8");
+  const [currentVersion, setCurrentVersion] = useState("0.1.0-alpha.9");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -155,7 +164,11 @@ export function App() {
   const [pendingApplication, setPendingApplication] = useState<{
     theme: ThemeDefinition;
     companion: CompanionDefinition | null;
+    settings: UserSettings;
+    preserveSelection: boolean;
+    successMessage: ApplySuccessMessage;
   } | null>(null);
+  const [restartError, setRestartError] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const backgroundImportRef = useRef<HTMLInputElement>(null);
   const [backgroundImportMode, setBackgroundImportMode] = useState<
@@ -165,6 +178,7 @@ export function App() {
   const [activeAdaptiveScheme, setActiveAdaptiveScheme] =
     useState<AdaptiveSchemeId | null>(null);
   const startupUpdateCheckRef = useRef(false);
+  const liveCompanionSyncRef = useRef<number | null>(null);
 
   const locale = resolveLocale(settings.locale);
   const t = (key: MessageKey) => translate(locale, key);
@@ -184,11 +198,18 @@ export function App() {
   };
   const resolveAsset = (theme: ThemeDefinition, path: string) =>
     themeAssetMaps[theme.id]?.[path] ?? themeAssetUrl(theme, path);
-  const explicitCompanion =
-    builtinCompanions.find((item) => item.id === settings.companionId) ?? null;
-  const companionForTheme = (theme: ThemeDefinition) => {
-    if (settings.companionMode === "disabled") return null;
-    if (settings.companionMode === "custom") return explicitCompanion;
+  const companionForTheme = (
+    theme: ThemeDefinition,
+    sourceSettings: UserSettings = settings,
+  ) => {
+    if (sourceSettings.companionMode === "disabled") return null;
+    if (sourceSettings.companionMode === "custom") {
+      return (
+        builtinCompanions.find(
+          (item) => item.id === sourceSettings.companionId,
+        ) ?? null
+      );
+    }
     return defaultCompanionForTheme(theme.id);
   };
   const selectedCompanion = companionForTheme(selectedTheme);
@@ -196,9 +217,12 @@ export function App() {
     [...builtinThemes, ...localThemes].find(
       (theme) => theme.id === settings.appliedThemeId,
     ) ?? selectedTheme;
+  const isLive = runtime.connected && runtime.state === "applied";
+  const displayedTheme = isLive ? appliedTheme : selectedTheme;
   const composeTheme = (
     theme: ThemeDefinition,
     companion: CompanionDefinition | null = companionForTheme(theme),
+    sourceSettings: UserSettings = settings,
   ) => {
     if (!companion) return composeThemeWithCompanion(theme, null);
     const overrides: {
@@ -206,22 +230,24 @@ export function App() {
       attachment?: EntityAttachment | null;
       size?: number;
     } = {
-      anchor: settings.companionAnchors[companion.id],
-      size: settings.companionSizes[companion.id],
+      anchor: sourceSettings.companionAnchors[companion.id],
+      size: sourceSettings.companionSizes[companion.id],
     };
     if (
       Object.prototype.hasOwnProperty.call(
-        settings.companionAttachments,
+        sourceSettings.companionAttachments,
         companion.id,
       )
     ) {
-      overrides.attachment = settings.companionAttachments[companion.id];
+      overrides.attachment =
+        sourceSettings.companionAttachments[companion.id];
     }
     return composeThemeWithCompanion(theme, companion, overrides);
   };
 
   useEffect(() => {
     saveSettings(settings);
+    settingsRef.current = settings;
     document.documentElement.dataset.appearance = settings.appearance;
     document.documentElement.lang = locale;
     document.documentElement.classList.toggle(
@@ -230,8 +256,20 @@ export function App() {
     );
   }, [locale, settings]);
 
+  useEffect(
+    () => () => {
+      if (liveCompanionSyncRef.current !== null) {
+        window.clearTimeout(liveCompanionSyncRef.current);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
-    void Promise.all([detectCodex(), getRuntimeStatus()]).then(
+    void Promise.all([
+      detectCodex(settingsRef.current.codexInstallPath),
+      getRuntimeStatus(),
+    ]).then(
       ([detected, status]) => {
         setDetection(detected);
         setRuntime(status);
@@ -284,39 +322,57 @@ export function App() {
   async function performApply(
     theme: ThemeDefinition,
     companion: CompanionDefinition | null = companionForTheme(theme),
+    settingsSnapshot: UserSettings = settingsRef.current,
+    options: {
+      preserveSelection?: boolean;
+      successMessage?: ApplySuccessMessage;
+    } = {},
   ) {
-    const composed = composeTheme(theme, companion);
+    const preserveSelection = options.preserveSelection ?? false;
+    const successMessage = options.successMessage ?? "configurationApplied";
+    const composed = composeTheme(theme, companion, settingsSnapshot);
     setBusy(true);
     try {
       let next = await getRuntimeStatus();
       setRuntime(next);
       if (!next.connected) {
-        const currentDetection = await detectCodex();
+        const currentDetection = await detectCodex(
+          settingsSnapshot.codexInstallPath,
+        );
         setDetection(currentDetection);
         if (currentDetection.running) {
-          setPendingApplication({ theme, companion });
+          setRestartError(null);
+          setPendingApplication({
+            theme,
+            companion,
+            settings: settingsSnapshot,
+            preserveSelection,
+            successMessage,
+          });
           return;
         }
       }
-      if (!next.connected) next = await launchCodex();
+      if (!next.connected) {
+        next = await launchCodex(settingsSnapshot.codexInstallPath);
+      }
       next = await applyTheme(
         composed,
         variant,
-        settings.runtimeStrategy,
+        settingsSnapshot.runtimeStrategy,
         resolveAsset,
       );
       setRuntime(next);
-      setSelectedTheme(theme);
+      if (!preserveSelection) setSelectedTheme(theme);
       updateSettings({ appliedThemeId: theme.id });
-      setDetection(await detectCodex());
-      setToast(t("connected"));
+      setDetection(await detectCodex(settingsSnapshot.codexInstallPath));
+      setToast(t(successMessage));
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      setRuntime({
-        ...runtime,
+      setRuntime((current) => ({
+        ...current,
         state: "error",
         message: detail,
-      });
+      }));
       setToast(`${t("applyFailed")}: ${detail}`);
     } finally {
       setBusy(false);
@@ -326,25 +382,49 @@ export function App() {
   function requestApply(
     theme: ThemeDefinition = view === "editor" ? draftTheme : selectedTheme,
     companion: CompanionDefinition | null = companionForTheme(theme),
+    settingsSnapshot: UserSettings = settingsRef.current,
+    options: {
+      preserveSelection?: boolean;
+      successMessage?: ApplySuccessMessage;
+    } = {},
   ) {
     if (needsManualRestart) {
-      setPendingApplication({ theme, companion });
+      setRestartError(null);
+      setPendingApplication({
+        theme,
+        companion,
+        settings: settingsSnapshot,
+        preserveSelection: options.preserveSelection ?? false,
+        successMessage: options.successMessage ?? "configurationApplied",
+      });
       return;
     }
-    void performApply(theme, companion);
+    void performApply(theme, companion, settingsSnapshot, options);
   }
 
   async function handleQuitAndApply() {
     if (!pendingApplication) return;
     const application = pendingApplication;
+    setRestartError(null);
     setBusy(true);
     try {
-      const detected = await quitCodex();
+      const detected = await quitCodex(application.settings.codexInstallPath);
       setDetection(detected);
       setPendingApplication(null);
-      await performApply(application.theme, application.companion);
+      setRestartError(null);
+      await performApply(
+        application.theme,
+        application.companion,
+        application.settings,
+        {
+          preserveSelection: application.preserveSelection,
+          successMessage: application.successMessage,
+        },
+      );
     } catch (error) {
       console.error(error);
+      const detail = error instanceof Error ? error.message : String(error);
+      setRestartError(detail);
       setToast(t("codexQuitFailed"));
     } finally {
       setBusy(false);
@@ -421,8 +501,43 @@ export function App() {
     }
   }
 
-  function updateSettings(patch: Partial<UserSettings>) {
-    setSettings((current) => ({ ...current, ...patch }));
+  function updateSettings(patch: Partial<UserSettings>): UserSettings {
+    const next = { ...settingsRef.current, ...patch };
+    settingsRef.current = next;
+    setSettings(next);
+    return next;
+  }
+
+  async function handleChooseCodexInstall() {
+    setInstallPathBusy(true);
+    try {
+      const platform = detection?.platform ?? navigator.platform;
+      const path = await chooseCodexInstallPath(platform.toLowerCase());
+      if (!path) return;
+      if (!(await validateCodexInstallPath(path))) {
+        setToast(t("codexPathInvalid"));
+        return;
+      }
+      updateSettings({ codexInstallPath: path });
+      setDetection(await detectCodex(path));
+      setToast(t("codexPathSaved"));
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      setToast(`${t("codexPathInvalid")}: ${detail}`);
+    } finally {
+      setInstallPathBusy(false);
+    }
+  }
+
+  async function handleUseAutomaticCodexInstall() {
+    setInstallPathBusy(true);
+    try {
+      updateSettings({ codexInstallPath: null });
+      setDetection(await detectCodex(null));
+      setToast(t("automaticDetectionRestored"));
+    } finally {
+      setInstallPathBusy(false);
+    }
   }
 
   function startWindowDrag(event: ReactMouseEvent<HTMLDivElement>) {
@@ -431,16 +546,20 @@ export function App() {
   }
 
   function chooseTheme(theme: ThemeDefinition) {
+    if (busy) return;
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
-  }
-
-  function chooseAndApplyTheme(theme: ThemeDefinition) {
-    setAdaptiveSchemes([]);
-    setActiveAdaptiveScheme(null);
-    setSelectedTheme(theme);
-    requestApply(theme, companionForTheme(theme));
+    if (isLive) {
+      void performApply(
+        theme,
+        companionForTheme(theme, settingsRef.current),
+        settingsRef.current,
+        { successMessage: "themeApplied" },
+      );
+    } else {
+      setToast(t("themePending"));
+    }
   }
 
   function updateVariant(
@@ -461,40 +580,74 @@ export function App() {
 
   function updateEntitySize(size: number) {
     if (!selectedCompanion) return;
-    updateSettings({
+    const current = settingsRef.current;
+    const next = updateSettings({
       companionSizes: {
-        ...settings.companionSizes,
+        ...current.companionSizes,
         [selectedCompanion.id]: size,
       },
     });
+    scheduleLiveCompanionSync(next);
   }
 
   function updateEntityAnchor(anchor: { x: number; y: number }) {
     if (!selectedCompanion) return;
-    updateSettings({
+    const current = settingsRef.current;
+    const next = updateSettings({
       companionAnchors: {
-        ...settings.companionAnchors,
+        ...current.companionAnchors,
         [selectedCompanion.id]: anchor,
       },
     });
+    scheduleLiveCompanionSync(next);
   }
 
   function updateEntityAttachment(attachment: EntityAttachment | null) {
     if (!selectedCompanion) return;
-    updateSettings({
+    const current = settingsRef.current;
+    const next = updateSettings({
       companionAttachments: {
-        ...settings.companionAttachments,
+        ...current.companionAttachments,
         [selectedCompanion.id]: attachment,
       },
     });
+    scheduleLiveCompanionSync(next);
   }
 
   function selectCompanion(companion: CompanionDefinition | null) {
-    updateSettings({
+    if (busy) return;
+    if (liveCompanionSyncRef.current !== null) {
+      window.clearTimeout(liveCompanionSyncRef.current);
+      liveCompanionSyncRef.current = null;
+    }
+    const next = updateSettings({
       companionMode: companion ? "custom" : "disabled",
       companionId: companion?.id ?? null,
     });
-    setToast(t("companionUpdated"));
+    if (isLive) {
+      void performApply(appliedTheme, companion, next, {
+        preserveSelection: true,
+        successMessage: "companionApplied",
+      });
+    } else {
+      setToast(t("companionPending"));
+    }
+  }
+
+  function scheduleLiveCompanionSync(nextSettings: UserSettings) {
+    if (!isLive) return;
+    if (liveCompanionSyncRef.current !== null) {
+      window.clearTimeout(liveCompanionSyncRef.current);
+    }
+    const theme = appliedTheme;
+    const companion = companionForTheme(theme, nextSettings);
+    liveCompanionSyncRef.current = window.setTimeout(() => {
+      liveCompanionSyncRef.current = null;
+      void performApply(theme, companion, nextSettings, {
+        preserveSelection: true,
+        successMessage: "companionPositionApplied",
+      });
+    }, 180);
   }
 
   function resetDraft() {
@@ -827,7 +980,11 @@ export function App() {
             ) : (
               <button onClick={() => requestApply()} disabled={busy}>
                 <Play size={13} />
-                {busy ? t("applying") : t("apply")}
+                {busy
+                  ? t("applying")
+                  : runtime.connected
+                    ? t("applyChanges")
+                    : t("startAndApply")}
               </button>
             )}
             <button
@@ -886,16 +1043,15 @@ export function App() {
         {view === "home" && (
           <HomeView
             locale={locale}
-            theme={composeTheme(appliedTheme)}
-            sourceTheme={appliedTheme}
-            companion={companionForTheme(appliedTheme)}
+            theme={composeTheme(displayedTheme)}
+            sourceTheme={displayedTheme}
+            companion={companionForTheme(displayedTheme)}
             runtime={runtime}
             runtimeStrategy={settings.runtimeStrategy}
             variant={variant}
             reduceMotion={settings.reduceMotion}
             t={t}
-            onApply={() => requestApply(appliedTheme)}
-            onEdit={() => openThemeEditor(appliedTheme)}
+            onEdit={() => openThemeEditor(displayedTheme)}
             onBrowse={() => setView("themes")}
             onCreateFromImage={() => {
               setBackgroundImportMode("create");
@@ -903,7 +1059,6 @@ export function App() {
               backgroundImportRef.current?.click();
             }}
             onCompanions={() => setView("companions")}
-            onRestore={handleRestore}
             resolveAsset={resolveAsset}
           />
         )}
@@ -919,13 +1074,15 @@ export function App() {
             reduceMotion={settings.reduceMotion}
             t={t}
             onSelect={chooseTheme}
-            onApply={chooseAndApplyTheme}
             onEdit={openThemeEditor}
             onDelete={setPendingDelete}
             onCollectionChange={changeThemeCollection}
             onNew={() => setNewThemeStep("choose")}
             onImport={() => importRef.current?.click()}
             resolveAsset={resolveAsset}
+            liveThemeId={isLive ? settings.appliedThemeId : null}
+            isLive={isLive}
+            busy={busy}
           />
         )}
 
@@ -941,6 +1098,8 @@ export function App() {
             onAnchorChange={updateEntityAnchor}
             onAttachmentChange={updateEntityAttachment}
             resolveAsset={resolveAsset}
+            isLive={isLive}
+            busy={busy}
           />
         )}
 
@@ -980,10 +1139,14 @@ export function App() {
         {view === "settings" && (
           <SettingsView
             settings={settings}
+            detection={detection}
             currentVersion={currentVersion}
             updateStatus={updateStatus}
             t={t}
             onChange={updateSettings}
+            installPathBusy={installPathBusy}
+            onChooseCodexInstall={handleChooseCodexInstall}
+            onUseAutomaticCodexInstall={handleUseAutomaticCodexInstall}
             onCheckForUpdates={() => void handleCheckForUpdates(true)}
             onOpenOnboarding={() => setShowOnboarding(true)}
           />
@@ -1091,10 +1254,18 @@ export function App() {
             </span>
             <h2 id="restart-codex-title">{t("quitCodexTitle")}</h2>
             <p>{t("quitCodexBody")}</p>
+            {restartError && (
+              <p className="confirm-dialog__error" role="alert">
+                {t("restartFailedDetail")}: {restartError}
+              </p>
+            )}
             <div className="button-row">
               <button
                 className="secondary-button"
-                onClick={() => setPendingApplication(null)}
+                onClick={() => {
+                  setPendingApplication(null);
+                  setRestartError(null);
+                }}
                 disabled={busy}
               >
                 {t("cancel")}
@@ -1104,8 +1275,12 @@ export function App() {
                 onClick={handleQuitAndApply}
                 disabled={busy}
               >
-                <RefreshCw size={14} />
-                {busy ? t("applying") : t("quitAndContinue")}
+                <RefreshCw size={14} className={busy ? "is-spinning" : ""} />
+                {busy
+                  ? t("restartingCodex")
+                  : restartError
+                    ? t("retryRestart")
+                    : t("quitAndContinue")}
               </button>
             </div>
           </section>
@@ -1221,12 +1396,10 @@ function HomeView({
   variant,
   reduceMotion,
   t,
-  onApply,
   onEdit,
   onBrowse,
   onCreateFromImage,
   onCompanions,
-  onRestore,
   resolveAsset,
 }: SharedViewProps & {
   theme: ThemeDefinition;
@@ -1236,17 +1409,16 @@ function HomeView({
   runtimeStrategy: RuntimeStrategy;
   variant: ThemeVariantName;
   reduceMotion: boolean;
-  onApply: () => void;
   onEdit: () => void;
   onBrowse: () => void;
   onCreateFromImage: () => void;
   onCompanions: () => void;
-  onRestore: () => void;
 }) {
   const copy = sourceTheme.locales[locale] ?? sourceTheme.locales.en;
   const companionCopy = companion
     ? (companion.locales[locale] ?? companion.locales.en)
     : null;
+  const setupIsLive = runtime.connected && runtime.state === "applied";
   return (
     <div className="page home-page">
       <section className="page-heading home-heading">
@@ -1268,7 +1440,9 @@ function HomeView({
 
       <section className="home-current">
         <div className="home-current__preview">
-          <span className="home-current__label">{t("currentSetup")}</span>
+          <span className="home-current__label">
+            {setupIsLive ? t("liveSetup") : t("selectedSetup")}
+          </span>
           <PreviewWorkspace
             theme={theme}
             variant={variant}
@@ -1278,7 +1452,9 @@ function HomeView({
           />
         </div>
         <div className="home-current__content">
-          <span className="home-current__eyebrow">{t("appliedTheme")}</span>
+          <span className="home-current__eyebrow">
+            {setupIsLive ? t("liveInCodex") : t("readyToApply")}
+          </span>
           <h2>{copy.name}</h2>
           <p>{copy.description}</p>
           <dl className="home-current__facts">
@@ -1296,19 +1472,22 @@ function HomeView({
             </div>
           </dl>
           <div className="button-row">
-            <button className="primary-button" onClick={onApply}>
-              <Play size={14} />
-              {t("apply")}
-            </button>
             <button className="secondary-button" onClick={onEdit}>
               {t("editTheme")}
               <ChevronRight size={15} />
             </button>
           </div>
-          <button className="home-restore" onClick={onRestore}>
-            <RotateCcw size={13} />
-            {t("restore")}
-          </button>
+          <div
+            className={
+              "configuration-state" +
+              (setupIsLive ? " configuration-state--live" : "")
+            }
+          >
+            <span />
+            {setupIsLive
+              ? t("changesApplyInstantly")
+              : t("changesReadyToApply")}
+          </div>
         </div>
       </section>
 
@@ -1352,13 +1531,15 @@ function ThemesView({
   reduceMotion,
   t,
   onSelect,
-  onApply,
   onEdit,
   onDelete,
   onCollectionChange,
   onNew,
   onImport,
   resolveAsset,
+  liveThemeId,
+  isLive,
+  busy,
 }: SharedViewProps & {
   selectedTheme: ThemeDefinition;
   previewTheme: ThemeDefinition;
@@ -1367,12 +1548,14 @@ function ThemesView({
   variant: ThemeVariantName;
   reduceMotion: boolean;
   onSelect: (theme: ThemeDefinition) => void;
-  onApply: (theme: ThemeDefinition) => void;
   onEdit: (theme: ThemeDefinition) => void;
   onDelete: (theme: ThemeDefinition) => void;
   onCollectionChange: (collection: ThemeCollection) => void;
   onNew: () => void;
   onImport: () => void;
+  liveThemeId: string | null;
+  isLive: boolean;
+  busy: boolean;
 }) {
   const themes = collection === "builtIn" ? builtinThemes : localThemes;
   const localized = selectedTheme.locales[locale] ?? selectedTheme.locales.en;
@@ -1386,6 +1569,7 @@ function ThemesView({
     previewTheme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0)
       ? t("medium")
       : t("low");
+  const selectedThemeIsLive = liveThemeId === selectedTheme.id;
   return (
     <div className="page page--themes">
       <section className="page-heading">
@@ -1451,7 +1635,13 @@ function ThemesView({
         <>
           <section className="featured-theme theme-detail-card">
             <div className="featured-theme__preview">
-              <div className="featured-theme__label">{t("selectedTheme")}</div>
+              <div className="featured-theme__label">
+                {busy
+                  ? t("applying")
+                  : selectedThemeIsLive
+                    ? t("liveInCodex")
+                    : t("previewOnly")}
+              </div>
               <PreviewWorkspace
                 theme={previewTheme}
                 variant={variant}
@@ -1479,14 +1669,22 @@ function ThemesView({
                   </strong>
                 </div>
               </div>
+              <div
+                className={
+                  "configuration-state" +
+                  (selectedThemeIsLive ? " configuration-state--live" : "")
+                }
+              >
+                <span />
+                {busy
+                  ? t("applying")
+                  : selectedThemeIsLive
+                    ? t("liveInCodex")
+                    : isLive
+                      ? t("changesApplyInstantly")
+                      : t("changesReadyToApply")}
+              </div>
               <div className="button-row">
-                <button
-                  className="primary-button"
-                  onClick={() => onApply(selectedTheme)}
-                >
-                  <Play size={14} />
-                  {t("apply")}
-                </button>
                 <button
                   className="secondary-button"
                   onClick={() => onEdit(selectedTheme)}
@@ -1522,9 +1720,10 @@ function ThemesView({
                   index={index + 1}
                   locale={locale}
                   active={selectedTheme.id === theme.id}
+                  live={liveThemeId === theme.id}
+                  busy={busy}
                   resolveAsset={resolveAsset}
                   onSelect={() => onSelect(theme)}
-                  onApply={() => onApply(theme)}
                   local={collection === "mine"}
                   onEdit={() => onEdit(theme)}
                   onDelete={() => onDelete(theme)}
@@ -1544,24 +1743,26 @@ function ThemeRow({
   index,
   locale,
   active,
+  live,
+  busy,
   resolveAsset,
   onSelect,
   local,
   onEdit,
   onDelete,
-  onApply,
   t,
 }: {
   theme: ThemeDefinition;
   index: number;
   locale: Locale;
   active: boolean;
+  live: boolean;
+  busy: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   onSelect: () => void;
   local: boolean;
   onEdit: () => void;
   onDelete: () => void;
-  onApply: () => void;
   t: (key: MessageKey) => string;
 }) {
   const localized = theme.locales[locale] ?? theme.locales.en;
@@ -1573,7 +1774,9 @@ function ThemeRow({
       <button
         className="theme-row__select"
         onClick={onSelect}
-        aria-label={`${t("selected")}: ${localized.name}`}
+        aria-label={`${t("preview")}: ${localized.name}`}
+        aria-pressed={active}
+        disabled={busy}
       />
       <div className="theme-row__preview" aria-hidden="true">
         <span
@@ -1590,6 +1793,12 @@ function ThemeRow({
         <p>{localized.description}</p>
       </div>
       <div className="theme-row__badges">
+        {live && (
+          <span className="theme-row__live">
+            <Check size={12} />
+            {t("liveInCodex")}
+          </span>
+        )}
         {defaultCompanionForTheme(theme.id) && (
           <span>
             <MousePointer2 size={12} />
@@ -1601,10 +1810,6 @@ function ThemeRow({
         </span>
       </div>
       <div className="theme-row__actions">
-        <button className="theme-row__apply" onClick={onApply}>
-          <Play size={13} />
-          {t("apply")}
-        </button>
         <button className="theme-row__action" onClick={onEdit}>
           {local ? t("editTheme") : t("customizeCopy")}
           <ChevronRight size={14} />
@@ -1635,6 +1840,8 @@ function CompanionsView({
   onAnchorChange,
   onAttachmentChange,
   resolveAsset,
+  isLive,
+  busy,
 }: SharedViewProps & {
   selected: CompanionDefinition | null;
   theme: ThemeDefinition;
@@ -1643,6 +1850,8 @@ function CompanionsView({
   onSelect: (companion: CompanionDefinition | null) => void;
   onAnchorChange: (anchor: { x: number; y: number }) => void;
   onAttachmentChange: (attachment: EntityAttachment | null) => void;
+  isLive: boolean;
+  busy: boolean;
 }) {
   return (
     <div className="page companions-page">
@@ -1653,6 +1862,20 @@ function CompanionsView({
           <p>
             {t("dragCompanion")}. {t("companionIndependence")}
           </p>
+        </div>
+        <div
+          className={
+            "configuration-state configuration-state--header" +
+            (isLive ? " configuration-state--live" : "")
+          }
+          aria-live="polite"
+        >
+          <span />
+          {busy
+            ? t("applying")
+            : isLive
+              ? t("changesApplyInstantly")
+              : t("changesReadyToApply")}
         </div>
       </section>
       <div className="companions-layout">
@@ -1680,6 +1903,8 @@ function CompanionsView({
               (!selected ? " companion-option--active" : "")
             }
             onClick={() => onSelect(null)}
+            aria-pressed={!selected}
+            disabled={busy}
           >
             <span className="companion-option__visual companion-option__visual--empty">
               <X size={20} />
@@ -1722,6 +1947,8 @@ function CompanionsView({
                   (active ? " companion-option--active" : "")
                 }
                 onClick={() => onSelect(item)}
+                aria-pressed={active}
+                disabled={busy}
               >
                 <span className="companion-option__visual companion-option__visual--sprite">
                   <span
@@ -2540,18 +2767,26 @@ function NewThemeDialog({
 
 function SettingsView({
   settings,
+  detection,
   currentVersion,
   updateStatus,
   t,
   onChange,
+  installPathBusy,
+  onChooseCodexInstall,
+  onUseAutomaticCodexInstall,
   onCheckForUpdates,
   onOpenOnboarding,
 }: {
   settings: UserSettings;
+  detection: CodexDetection | null;
   currentVersion: string;
   updateStatus: UpdateStatus;
   t: (key: MessageKey) => string;
   onChange: (patch: Partial<UserSettings>) => void;
+  installPathBusy: boolean;
+  onChooseCodexInstall: () => void;
+  onUseAutomaticCodexInstall: () => void;
   onCheckForUpdates: () => void;
   onOpenOnboarding: () => void;
 }) {
@@ -2647,6 +2882,46 @@ function SettingsView({
               ? t("automaticModeDescription")
               : t("compatibilityModeDescription")}
           </p>
+        </section>
+        <section className="settings-group codex-location-setting">
+          <div className="settings-group__title">
+            <FolderOpen size={17} />
+            <div>
+              <h2>{t("codexLocation")}</h2>
+              <p>{t("codexLocationDescription")}</p>
+            </div>
+          </div>
+          <div className="codex-location-control">
+            <div className="codex-location-path">
+              <small>
+                {settings.codexInstallPath
+                  ? t("customLocation")
+                  : t("detectedAutomatically")}
+              </small>
+              <strong title={detection?.path ?? undefined}>
+                {detection?.path ?? t("codexNotDetected")}
+              </strong>
+            </div>
+            <div className="button-row">
+              {settings.codexInstallPath && (
+                <button
+                  className="text-button"
+                  onClick={onUseAutomaticCodexInstall}
+                  disabled={installPathBusy}
+                >
+                  {t("useAutomaticDetection")}
+                </button>
+              )}
+              <button
+                className="secondary-button"
+                onClick={onChooseCodexInstall}
+                disabled={installPathBusy}
+              >
+                <FolderOpen size={14} />
+                {installPathBusy ? t("checking") : t("chooseApplication")}
+              </button>
+            </div>
+          </div>
         </section>
         <SettingToggle
           icon={<Sparkles size={17} />}

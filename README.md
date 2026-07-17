@@ -15,14 +15,14 @@
 
 <p align="center">
   <a href="README.zh-CN.md">简体中文</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.8">Download Alpha</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9">Download Alpha</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/">Website</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/docs/getting-started/">Documentation</a>
 </p>
 
 <p align="center">
   <a href="https://github.com/xuhuanstudio/codex-styler/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/xuhuanstudio/codex-styler/ci.yml?branch=main&label=CI&style=flat-square"></a>
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.8"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.8-2563EB?style=flat-square"></a>
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9"><img alt="Preview version" src="https://img.shields.io/badge/preview-v0.1.0--alpha.9-2563EB?style=flat-square"></a>
   <a href="LICENSE"><img alt="Apache-2.0" src="https://img.shields.io/badge/code-Apache--2.0-365443?style=flat-square"></a>
   <a href="ASSET_LICENSES.md"><img alt="CC BY 4.0 assets" src="https://img.shields.io/badge/art-CC%20BY%204.0-9B6E3F?style=flat-square"></a>
   <img alt="macOS and Windows" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-555D57?style=flat-square">
@@ -96,14 +96,14 @@ Companions are selected independently from themes. Native Refined, Nocturne Stud
 
 Every shipped image and sprite is original project artwork. The reference repositories are studied for ideas only; their assets and source are not redistributed.
 
-## Download Alpha 0.8
+## Download Alpha 0.9
 
-- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.8/Codex-Styler_0.1.0-alpha.8_aarch64-unsigned.dmg)**
-- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.8/Codex-Styler_0.1.0-alpha.8_x64-unsigned-setup.exe)**
+- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.9/Codex-Styler_0.1.0-alpha.9_aarch64-unsigned.dmg)**
+- **[Windows 11 / x64 — installer EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.1.0-alpha.9/Codex-Styler_0.1.0-alpha.9_x64-unsigned-setup.exe)**
 
 On macOS, open the DMG, drag Codex Styler to Applications, then Control-click the app and choose **Open** on first launch. On Windows, SmartScreen may warn because this Alpha does not yet have an Authenticode certificate; inspect the published checksum and provenance before continuing. Never disable Gatekeeper or SmartScreen globally.
 
-The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.8) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater artifacts, tested scope, and known limitations. Intel macOS is not included in this Alpha.
+The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.1.0-alpha.9) includes SHA-256 checksums, an SPDX SBOM, build attestations, updater artifacts, tested scope, and known limitations. Intel macOS is not included in this Alpha.
 
 ## Run from source
 
@@ -136,7 +136,7 @@ pnpm dev:site
 
 Codex Styler reserves a random port on <code>127.0.0.1</code>, starts the installed Codex executable with that temporary debugging port, validates the returned page target, and injects one idempotent scene root plus one style node. Restore removes both.
 
-The default **Enhanced mode** first applies the complete semantic treatment—including navigation, content surfaces, composer, dialogs, and the thread summary panel—then checks live anchors and computed styles. A different Codex version is informational, not a failure. Styler falls back only when the runtime health check detects an actual structural or rendering problem. **Conservative mode** always limits styling to the isolated background and scene layer. When Codex is already open, Styler asks for confirmation before sending a normal quit request and relaunching it; it never force-quits the process.
+The default **Enhanced mode** first applies the complete semantic treatment—including navigation, content surfaces, composer, dialogs, and the thread summary panel—then checks live anchors and computed styles. A different Codex version is informational, not a failure. Styler falls back only when the runtime health check detects an actual structural or rendering problem. **Conservative mode** always limits styling to the isolated background and scene layer. When Codex is already open, Styler asks for confirmation before restarting it. On Windows, where the packaged app may turn a normal close request into a background hide, Styler waits first and then terminates only the verified Codex UI process tree covered by that confirmation.
 
 See [the security model](docs/security-model.md), [theme package specification](docs/theme-format.md), and [security policy](SECURITY.md).
 

@@ -297,7 +297,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex is already running",
           paragraphs: [
-            "Select Apply and confirm the restart request. Styler sends a normal quit request and continues only after Codex has closed; it never force-quits the process.",
+            "Select Apply and confirm the restart request. Styler sends a normal quit request first. If the Windows package hides instead of closing, Styler then terminates only the verified Codex UI process tree covered by that confirmation.",
           ],
         },
         {
@@ -317,7 +317,7 @@ export const docs: DocPage[] = [
         {
           heading: "Codex 已经在运行",
           paragraphs: [
-            "点击应用并确认重新启动。Styler 会发送正常退出请求，并且只在 Codex 已关闭后继续；它不会强制终止进程。",
+            "点击应用并确认重新启动。Styler 会先发送正常退出请求；Windows 打包应用如果只隐藏到后台，则只结束该次确认所覆盖的、已验证 Codex 界面进程树。",
           ],
         },
         {

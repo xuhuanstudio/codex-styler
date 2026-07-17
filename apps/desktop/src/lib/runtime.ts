@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import type { ThemeDefinition } from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
 import type { RuntimeStrategy } from "./storage";
@@ -52,7 +53,9 @@ function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
 
-export async function detectCodex(): Promise<CodexDetection> {
+export async function detectCodex(
+  customPath?: string | null,
+): Promise<CodexDetection> {
   if (!isTauri()) {
     return {
       installed: true,
@@ -62,7 +65,7 @@ export async function detectCodex(): Promise<CodexDetection> {
       platform: navigator.platform,
     };
   }
-  return invoke<CodexDetection>("detect_codex");
+  return invoke<CodexDetection>("detect_codex", { customPath });
 }
 
 export async function getRuntimeStatus(): Promise<RuntimeStatus> {
@@ -70,7 +73,9 @@ export async function getRuntimeStatus(): Promise<RuntimeStatus> {
   return invoke<RuntimeStatus>("runtime_status");
 }
 
-export async function launchCodex(): Promise<RuntimeStatus> {
+export async function launchCodex(
+  customPath?: string | null,
+): Promise<RuntimeStatus> {
   if (!isTauri()) {
     return {
       ...browserStatus,
@@ -81,12 +86,40 @@ export async function launchCodex(): Promise<RuntimeStatus> {
       message: "Browser preview connection",
     };
   }
-  return invoke<RuntimeStatus>("launch_codex");
+  return invoke<RuntimeStatus>("launch_codex", { customPath });
 }
 
-export async function quitCodex(): Promise<CodexDetection> {
-  if (!isTauri()) return detectCodex();
-  return invoke<CodexDetection>("quit_codex");
+export async function quitCodex(
+  customPath?: string | null,
+): Promise<CodexDetection> {
+  if (!isTauri()) return detectCodex(customPath);
+  return invoke<CodexDetection>("quit_codex", { customPath });
+}
+
+export async function chooseCodexInstallPath(
+  platform: string,
+): Promise<string | null> {
+  if (!isTauri()) return null;
+  const selected = await open(
+    platform.toLowerCase().includes("mac")
+      ? {
+          title: "Choose the Codex or ChatGPT application",
+          directory: true,
+          multiple: false,
+        }
+      : {
+          title: "Choose Codex.exe or ChatGPT.exe",
+          directory: false,
+          multiple: false,
+          filters: [{ name: "Codex Desktop", extensions: ["exe"] }],
+        },
+  );
+  return typeof selected === "string" ? selected : null;
+}
+
+export async function validateCodexInstallPath(path: string): Promise<boolean> {
+  if (!isTauri()) return true;
+  return invoke<boolean>("validate_codex_path", { path });
 }
 
 export async function applyTheme(
@@ -134,7 +167,7 @@ export async function restoreOfficial(): Promise<RuntimeStatus> {
 
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.1.0-alpha.8", update: null };
+    return { currentVersion: "0.1.0-alpha.9", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates");
 }

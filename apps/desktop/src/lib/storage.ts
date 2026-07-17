@@ -12,6 +12,7 @@ export interface UserSettings {
   locale: LocalePreference;
   appearance: ManagerAppearance;
   runtimeStrategy: RuntimeStrategy;
+  codexInstallPath: string | null;
   appliedThemeId: string | null;
   companionMode: CompanionMode;
   companionId: string | null;
@@ -72,6 +73,7 @@ function defaultSettings(): UserSettings {
     locale: "system",
     appearance: "system",
     runtimeStrategy: "enhanced",
+    codexInstallPath: null,
     appliedThemeId: null,
     companionMode: "theme-default",
     companionId: null,
