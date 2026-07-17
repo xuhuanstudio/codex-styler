@@ -4,11 +4,11 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
-## [0.1.0-alpha.7] - 2026-07-17
+## [0.1.0-alpha.8] - 2026-07-17
 
 ### Added
 
-- Windows 11 x64 NSIS preview packaging with a directly downloadable installer EXE and a Tauri-signed updater archive.
+- Windows 11 x64 NSIS preview packaging with one directly downloadable installer EXE and its Tauri updater signature.
 - A cross-platform release assembly job that publishes macOS and Windows update entries, SHA-256 checksums, an SPDX SBOM, and provenance attestations together.
 
 ### Changed

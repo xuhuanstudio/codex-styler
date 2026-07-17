@@ -163,8 +163,7 @@ jobs:
           if (-not (Test-Path $notes)) { throw "Missing release notes: $notes" }
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "EXE_NAME=Codex-Styler_$($version)_x64-unsigned-setup.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "WIN_UPDATER_NAME=Codex-Styler_$($version)_x64.nsis.zip" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "WIN_UPDATER_SIG_NAME=Codex-Styler_$($version)_x64.nsis.zip.sig" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "WIN_UPDATER_SIG_NAME=Codex-Styler_$($version)_x64-unsigned-setup.exe.sig" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - run: pnpm install --frozen-lockfile
       - run: node scripts/verify-release-version.mjs "${{ env.RELEASE_VERSION }}"
@@ -197,25 +196,20 @@ jobs:
           $ErrorActionPreference = "Stop"
           $bundle = "apps/desktop/src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis"
           $installers = @(Get-ChildItem -Path $bundle -File -Filter "*-setup.exe")
-          $updaters = @(Get-ChildItem -Path $bundle -File -Filter "*.nsis.zip")
           if ($installers.Count -ne 1) { throw "Expected one NSIS installer, found $($installers.Count)." }
-          if ($updaters.Count -ne 1) { throw "Expected one NSIS updater archive, found $($updaters.Count)." }
-          $updaterSignature = "$($updaters[0].FullName).sig"
-          if (-not (Test-Path $updaterSignature)) { throw "Missing NSIS updater signature." }
+          $installerSignature = "$($installers[0].FullName).sig"
+          if (-not (Test-Path $installerSignature)) { throw "Missing NSIS installer updater signature." }
 
           $releaseDir = Join-Path $env:GITHUB_WORKSPACE "release-windows"
           New-Item -ItemType Directory -Path $releaseDir -Force | Out-Null
           $installerTarget = Join-Path $releaseDir $env:EXE_NAME
-          $updaterTarget = Join-Path $releaseDir $env:WIN_UPDATER_NAME
           $signatureTarget = Join-Path $releaseDir $env:WIN_UPDATER_SIG_NAME
           Copy-Item $installers[0].FullName $installerTarget
-          Copy-Item $updaters[0].FullName $updaterTarget
-          Copy-Item $updaterSignature $signatureTarget
+          Copy-Item $installerSignature $signatureTarget
 
           $header = [System.IO.File]::ReadAllBytes($installerTarget)[0..1]
           if ($header[0] -ne 0x4d -or $header[1] -ne 0x5a) { throw "Installer is not a Windows PE executable." }
           if ((Get-Item $installerTarget).Length -lt 1MB) { throw "Installer is unexpectedly small." }
-          if ((Get-Item $updaterTarget).Length -lt 1MB) { throw "Updater archive is unexpectedly small." }
           if ((Get-Item $signatureTarget).Length -eq 0) { throw "Updater signature is empty." }
           $authenticode = Get-AuthenticodeSignature $installerTarget
           Write-Host "Installer Authenticode status: $($authenticode.Status)"
@@ -224,9 +218,7 @@ jobs:
       - name: Attest Windows build provenance
         uses: actions/attest@v4
         with:
-          subject-path: |
-            ./release-windows/${{ env.EXE_NAME }}
-            ./release-windows/${{ env.WIN_UPDATER_NAME }}
+          subject-path: ./release-windows/${{ env.EXE_NAME }}
 
       - name: Retain Windows release assets
         uses: actions/upload-artifact@v7
@@ -258,8 +250,7 @@ jobs:
           echo "MAC_UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
           echo "MAC_UPDATER_SIG_NAME=Codex-Styler_${version}_aarch64.app.tar.gz.sig" >> "$GITHUB_ENV"
           echo "EXE_NAME=Codex-Styler_${version}_x64-unsigned-setup.exe" >> "$GITHUB_ENV"
-          echo "WIN_UPDATER_NAME=Codex-Styler_${version}_x64.nsis.zip" >> "$GITHUB_ENV"
-          echo "WIN_UPDATER_SIG_NAME=Codex-Styler_${version}_x64.nsis.zip.sig" >> "$GITHUB_ENV"
+          echo "WIN_UPDATER_SIG_NAME=Codex-Styler_${version}_x64-unsigned-setup.exe.sig" >> "$GITHUB_ENV"
           echo "SBOM_NAME=Codex-Styler_${version}.spdx.json" >> "$GITHUB_ENV"
 
       - uses: actions/download-artifact@v8
@@ -276,12 +267,12 @@ jobs:
           set -euo pipefail
           for asset in \
             "$DMG_NAME" "$MAC_UPDATER_NAME" "$MAC_UPDATER_SIG_NAME" \
-            "$EXE_NAME" "$WIN_UPDATER_NAME" "$WIN_UPDATER_SIG_NAME"; do
+            "$EXE_NAME" "$WIN_UPDATER_SIG_NAME"; do
             test -s "release/$asset"
           done
 
           mac_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${MAC_UPDATER_NAME}"
-          windows_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${WIN_UPDATER_NAME}"
+          windows_url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${EXE_NAME}"
           mac_signature="$(cat "release/$MAC_UPDATER_SIG_NAME")"
           windows_signature="$(cat "release/$WIN_UPDATER_SIG_NAME")"
           notes="$(cat ".github/release-notes/${GITHUB_REF_NAME}.md")"
@@ -299,7 +290,7 @@ jobs:
             '.version != "" and (.platforms | keys | sort) == ["darwin-aarch64", "windows-x86_64"] and (.platforms[] | .signature != "" and (.url | startswith("https://github.com/xuhuanstudio/codex-styler/releases/download/")))' \
             release/latest.json >/dev/null
 
-          (cd release && sha256sum "$DMG_NAME" "$MAC_UPDATER_NAME" "$EXE_NAME" "$WIN_UPDATER_NAME" > SHA256SUMS.txt)
+          (cd release && sha256sum "$DMG_NAME" "$MAC_UPDATER_NAME" "$EXE_NAME" > SHA256SUMS.txt)
           gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" \
             --jq '.sbom' > "release/$SBOM_NAME"
           jq -e \
