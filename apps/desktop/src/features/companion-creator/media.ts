@@ -28,7 +28,11 @@ const VIDEO_EXTENSIONS_BY_MIME = new Map<string, ReadonlySet<string>>([
   ["application/x-quicktime", new Set([".mov"])],
   ["video/webm", new Set([".webm"])],
 ]);
-const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+const IMAGE_EXTENSIONS_BY_MIME = new Map<string, ReadonlySet<string>>([
+  ["image/png", new Set([".png"])],
+  ["image/jpeg", new Set([".jpg", ".jpeg"])],
+  ["image/webp", new Set([".webp"])],
+]);
 
 function fileExtension(file: File): string {
   const dot = file.name.lastIndexOf(".");
@@ -46,9 +50,17 @@ function isVideoSource(file: File): boolean {
 }
 
 function isImageSource(file: File): boolean {
+  const mime = file.type.toLowerCase();
+  const extension = fileExtension(file);
+  const allowedByMime = IMAGE_EXTENSIONS_BY_MIME.get(mime);
+  const extensionAllowed = [...IMAGE_EXTENSIONS_BY_MIME.values()].some(
+    (extensions) => extensions.has(extension),
+  );
+  if (!extensionAllowed) return false;
   return (
-    file.type.toLowerCase().startsWith("image/") ||
-    IMAGE_EXTENSIONS.has(fileExtension(file))
+    !mime ||
+    mime === "application/octet-stream" ||
+    Boolean(allowedByMime?.has(extension))
   );
 }
 

@@ -1,0 +1,87 @@
+.settings-page {
+  width: min(1180px, calc(100% - 44px));
+  padding-bottom: 34px;
+}
+
+.settings-layout {
+  display: flex;
+  min-width: 0;
+  align-content: start;
+  max-height: none;
+  overflow: visible;
+  padding: 0;
+  background: transparent;
+}
+
+.settings-layout .settings-group {
+  border-color: var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+  box-shadow: 0 1px 2px rgba(18, 24, 36, 0.025);
+}
+
+.settings-layout .settings-group h2 {
+  margin-bottom: 5px;
+  font-size: var(--type-label);
+  line-height: 1.35;
+}
+
+.settings-layout .settings-group p {
+  font-size: var(--type-meta);
+  line-height: 1.55;
+}
+
+.settings-layout .ui-select select,
+.settings-layout .segmented-control button,
+.settings-layout :where(.primary-button, .secondary-button, .text-button) {
+  font-size: var(--type-body);
+}
+
+@media (max-width: 1120px) {
+  .settings-layout .settings-group--split {
+    grid-template-columns: minmax(170px, 1fr) minmax(160px, 220px);
+  }
+}
+
+@media (max-width: 760px) {
+  .settings-layout {
+    max-height: none;
+    padding: 16px;
+  }
+
+  .settings-layout .settings-group--split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/*
+ * Continuous settings flow: preserve the denser, easier-to-scan structure of
+ * the original screen while keeping the newer typography and controls.
+ */
+.settings-page {
+  width: min(930px, calc(100% - 44px));
+}
+
+.settings-layout--continuous {
+  display: flex;
+  max-height: none;
+  flex-direction: column;
+  gap: 10px;
+  overflow: visible;
+  padding: 0 0 34px;
+}
+
+.settings-layout--continuous > .text-button {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+@media (max-width: 760px) {
+  .settings-page {
+    width: min(100% - 24px, 930px);
+  }
+
+  .settings-layout--continuous {
+    padding: 0 0 24px;
+  }
+}

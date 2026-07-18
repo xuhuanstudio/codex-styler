@@ -62,6 +62,7 @@ export interface AppliedConfiguration {
   companionOverrides?: CompanionOverrides;
   variant: "light" | "dark";
   runtimeStrategy: RuntimeStrategy;
+  reduceMotion: boolean;
   revision: number;
 }
 
@@ -186,10 +187,13 @@ export async function applyConfiguration(
   configuration: AppliedConfiguration,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
 ): Promise<RuntimeStatus> {
-  const compiled = composeThemeWithCompanion(
-    configuration.theme,
-    configuration.companion,
-    configuration.companionOverrides,
+  const compiled = prepareMotionPreference(
+    composeThemeWithCompanion(
+      configuration.theme,
+      configuration.companion,
+      configuration.companionOverrides,
+    ),
+    configuration.reduceMotion,
   );
   return applyTheme(
     compiled,
@@ -225,12 +229,41 @@ export async function updateCompanionConfiguration(
   configuration: AppliedConfiguration,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
 ): Promise<RuntimeStatus> {
-  const compiled = composeThemeWithCompanion(
-    configuration.theme,
-    configuration.companion,
-    configuration.companionOverrides,
+  const compiled = prepareMotionPreference(
+    composeThemeWithCompanion(
+      configuration.theme,
+      configuration.companion,
+      configuration.companionOverrides,
+    ),
+    configuration.reduceMotion,
   );
   return updateCompanion(compiled, resolveAsset, configuration.revision);
+}
+
+export function prepareMotionPreference(
+  theme: ThemeDefinition,
+  reduceMotion: boolean,
+): ThemeDefinition {
+  if (!reduceMotion) return theme;
+  const reduced = structuredClone(theme);
+  for (const visual of Object.values(reduced.variants)) {
+    visual.motion.intensity = 0;
+    visual.motion.parallax = 0;
+  }
+  for (const entity of reduced.scene.entities) {
+    entity.behaviors = entity.behaviors.filter(
+      (behavior) =>
+        behavior !== "idle" &&
+        behavior !== "parallax" &&
+        behavior !== "look-at-pointer",
+    );
+    if (entity.renderer.type === "sprite-atlas") {
+      entity.renderer.neutralFrame =
+        entity.renderer.reducedMotionFrame ?? entity.renderer.neutralFrame ?? 0;
+      delete entity.renderer.idleClips;
+    }
+  }
+  return reduced;
 }
 
 export async function pauseTheme(): Promise<RuntimeStatus> {
@@ -255,7 +288,7 @@ export async function checkForUpdates(
   locale: "en" | "zh-CN",
 ): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.2.0-beta.2", update: null };
+    return { currentVersion: "0.2.0-beta.3", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates", { locale });
 }

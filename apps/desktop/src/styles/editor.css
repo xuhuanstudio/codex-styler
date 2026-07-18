@@ -1,0 +1,225 @@
+.editor-header {
+  min-height: 72px;
+  padding: 12px 18px;
+}
+
+.editor-header__actions {
+  min-width: 0;
+}
+
+.editor-save-state {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  color: var(--text-tertiary);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.editor-save-state > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.editor-save-state[data-dirty="true"] {
+  color: #bb7428;
+}
+
+.editor-more-actions {
+  position: relative;
+}
+
+.editor-more-actions__menu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 7px);
+  right: 0;
+  width: 190px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+  box-shadow: var(--shadow-flyout);
+}
+
+.editor-more-actions__menu button {
+  display: flex;
+  width: 100%;
+  min-height: var(--control-compact);
+  align-items: center;
+  gap: 9px;
+  padding: 0 9px;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.editor-more-actions__menu button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.editor-layout {
+  grid-template-columns:
+    var(--editor-layers-width, 220px) 5px minmax(430px, 1fr) 5px
+    var(--editor-inspector-width, 300px);
+}
+
+.panel-resizer {
+  position: relative;
+  z-index: 4;
+  cursor: col-resize;
+  background: var(--surface-subtle);
+}
+
+.panel-resizer::after {
+  position: absolute;
+  top: 50%;
+  left: 1px;
+  width: 3px;
+  height: 32px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  content: "";
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--motion-standard) var(--ease-standard);
+}
+
+.panel-resizer:hover::after {
+  opacity: 1;
+}
+
+.panel-resizer:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -1px;
+}
+
+.panel-resizer:focus-visible::after {
+  opacity: 1;
+  background: var(--accent);
+}
+
+.layers-panel,
+.inspector {
+  border: 0;
+}
+
+.layer-stack {
+  overflow-y: auto;
+}
+
+.layer-stack__group-label {
+  margin: 10px 8px 4px;
+  color: var(--text-tertiary);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.layer-item--scene {
+  margin-left: 8px;
+}
+
+.layer-item--pairing {
+  margin-top: 8px;
+  border-top-color: var(--border-subtle);
+}
+
+.canvas-toolbar {
+  min-height: 46px;
+  padding: 0 10px 0 14px;
+}
+
+.canvas-toolbar__controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.canvas-toolbar__controls .ui-select {
+  min-width: 138px;
+}
+
+.canvas-toolbar__controls .ui-select select {
+  min-height: 30px;
+  padding-left: 9px;
+  font-size: 8px;
+}
+
+.canvas-zoom-control {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.canvas-zoom-control button {
+  min-height: 26px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.canvas-zoom-control button.is-active {
+  color: var(--text-primary);
+  background: var(--surface-base);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.canvas-stage[data-preview-zoom="actual"] {
+  display: block;
+  overflow: auto;
+  padding: 22px;
+}
+
+.canvas-stage[data-preview-zoom="actual"] .workspace-preview {
+  width: 1280px;
+  height: 760px;
+  min-height: 760px;
+}
+
+.inspector .ui-select-field {
+  margin: 0 14px 14px;
+}
+
+@media (max-width: 1120px) {
+  .editor-focus-toggle span,
+  .editor-save-state {
+    display: none;
+  }
+
+  .editor-layout {
+    grid-template-columns: 190px 5px minmax(0, 1fr);
+  }
+
+  .panel-resizer--inspector {
+    display: none;
+  }
+}
+
+@media (max-width: 980px) {
+  .panel-resizer {
+    display: none;
+  }
+
+  .editor-layout {
+    grid-template-columns: 178px minmax(0, 1fr);
+  }
+
+  .canvas-toolbar__controls .ui-select {
+    min-width: 112px;
+  }
+}

@@ -4,6 +4,34 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.3] - 2026-07-18
+
+### Added
+
+- Compact master-detail theme and companion libraries, a current-configuration Home, and focused theme and companion workspaces.
+- Persisted workspace preferences for focus mode, panel widths, and preview scenarios.
+- Theme Editor previews for Home, Task, Settings, Dialog, and Right panel scenarios, plus regression screenshots at the compact supported size.
+
+### Changed
+
+- Consolidated selection, runtime, draft, and asynchronous operation state behind a revision-aware application session reducer and command flow.
+- Restored the original continuous, compact Settings flow while retaining modern controls and normalized typography, focus states, spacing, and responsive behavior.
+- Split design tokens, primitives, libraries, workspaces, Settings, typography, and responsive rules into maintainable style layers; heavy editors and archive code remain separately loaded.
+- Split Home, theme and companion libraries, Settings, Theme Editor, creator media previews, calibration status, and interactive stages out of the application shell without changing their workflows.
+
+### Fixed
+
+- The Home workspace preview now grows with taller windows instead of remaining compressed into an overly wide strip, while the compact 960 × 680 layout keeps its dedicated height.
+- Cached Codex sessions are now health-checked; externally closing or reopening Codex clears the stale Connected state and routes the next apply through the managed restart flow.
+- Windows restart helpers stay hidden, target only verified process-tree roots, and launch Microsoft Store Codex packages through their registered application identity instead of an access-restricted executable path.
+- Locally encoded companion assets now use the extension that matches their actual bytes: supported WebViews keep WebP, while PNG fallbacks are packaged as PNG instead of failing installation as mislabeled `.webp` files.
+- Explicit Restore official actions are no longer discarded by stale-response protection.
+- Theme Editor panels remain usable at 960 × 680 while resizers are intentionally hidden where there is insufficient room.
+- Native creator drops preserve Windows and macOS file names, MIME types, and binary view bounds, while invalid bridge responses now surface a recoverable error.
+- Codex light/dark variants, Enhanced/Conservative strategy changes, and reduced-motion preferences now persist and apply immediately to a live Codex session.
+- Background image layers now control opacity, blend mode, and capped parallax on the actual runtime background instead of being discarded as duplicates.
+- The previously applied theme and variant are restored as the initial selection after Styler restarts.
+
 ## [0.2.0-beta.2] - 2026-07-18
 
 ### Added

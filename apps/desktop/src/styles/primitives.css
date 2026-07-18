@@ -1,0 +1,183 @@
+:where(button, input, select, textarea) {
+  border-radius: var(--radius-sm);
+}
+
+:where(button, input, select, textarea):focus-visible {
+  outline-color: var(--focus-ring);
+}
+
+:where(.primary-button, .secondary-button, .text-button) {
+  min-height: var(--control-default);
+  transition:
+    transform var(--motion-micro) var(--ease-standard),
+    color var(--motion-standard) var(--ease-standard),
+    border-color var(--motion-standard) var(--ease-standard),
+    background var(--motion-standard) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard);
+}
+
+:where(.primary-button, .secondary-button):active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+.icon-button {
+  min-width: var(--control-compact);
+  min-height: var(--control-compact);
+}
+
+.variant-switch button,
+.editor-back,
+.panel-title button,
+.inspector-close {
+  min-width: var(--control-compact);
+  min-height: var(--control-compact);
+}
+
+.ui-select {
+  position: relative;
+  display: grid;
+  min-width: 172px;
+}
+
+.ui-select-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.ui-select-field__label {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 620;
+}
+
+.ui-select-field__hint {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.ui-select-field--compact .ui-select select {
+  min-height: var(--control-compact);
+}
+
+.ui-select select {
+  width: 100%;
+  min-height: var(--control-default);
+  padding: 0 36px 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-base);
+  appearance: none;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-standard) var(--ease-standard),
+    background var(--motion-standard) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard);
+}
+
+.ui-select:hover select {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border-strong));
+  background: var(--surface-hover);
+}
+
+.ui-select > svg {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  pointer-events: none;
+  color: var(--text-tertiary);
+  transform: translateY(-50%);
+}
+
+.ui-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.ui-tabs > button {
+  min-height: var(--control-compact);
+  padding: 0 13px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--motion-standard) var(--ease-standard),
+    background var(--motion-standard) var(--ease-standard),
+    box-shadow var(--motion-standard) var(--ease-standard);
+}
+
+.ui-tabs > button:hover {
+  color: var(--text-primary);
+}
+
+.ui-tabs > button[aria-selected="true"],
+.ui-tabs > button.is-active {
+  color: var(--text-primary);
+  background: var(--surface-base);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.status-badge {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-base) 82%, transparent);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+}
+
+.status-badge[data-state="applied"] {
+  color: #13734a;
+  border-color: color-mix(in srgb, #1ba66a 30%, transparent);
+  background: color-mix(in srgb, #1ba66a 10%, var(--surface-base));
+}
+
+input.visually-hidden[type="file"][aria-hidden="true"] {
+  display: none;
+}
+
+:root[data-appearance="dark"] .status-badge[data-state="applied"] {
+  color: #7bdfae;
+}
+
+.professional-focus :where(.app-sidebar, .app-topbar) {
+  transition:
+    width var(--motion-panel) var(--ease-emphasized),
+    opacity var(--motion-standard) var(--ease-standard),
+    transform var(--motion-panel) var(--ease-emphasized);
+}
+
+.app[data-focus-workspace="true"] {
+  grid-template-columns: 0 minmax(0, 1fr);
+}
+
+.app[data-focus-workspace="true"] .app-sidebar {
+  width: var(--sidebar);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(calc(var(--sidebar) * -1));
+}
+
+.app[data-focus-workspace="true"] .app-topbar {
+  display: none;
+}
+
+.app[data-focus-workspace="true"] .editor-page,
+.app[data-focus-workspace="true"] .companion-creator {
+  min-height: 100vh;
+}

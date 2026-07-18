@@ -24,13 +24,15 @@ The roadmap is organized by evidence gates, not calendar promises.
 - calibrated poses, pose-aware idle clips, paged atlas packing, 48 MiB decoded-page target, and two-page runtime LRU;
 - six built-in companions migrated to the calibrated runtime model.
 
-### Gate 3: Creator Experience — refined for Beta 2
+### Gate 3: Creator Experience — refined for Beta 3
 
 - seven-step Companion Studio with autosave, recovery, undo/redo, step reset, and project reset;
 - visual atlas grid, direction dial, exact angle binding, direction curve, idle and exclusion tracks;
 - reverse/exclude tools, calibration warnings, pointer test, drag/snap behavior, and reduced-motion output;
 - Built-in / My Companions library with create, edit draft, import, export, delete, and dedicated portraits;
 - English and Simplified Chinese creator layouts and keyboard-accessible direction controls.
+- compact master-detail theme and companion libraries, focused editor workspaces, and consistent application status;
+- multi-scenario theme previews, persisted editor workspace preferences, and a compact continuous Settings experience.
 
 ### Gate 4: Beta Hardening — in progress
 
@@ -45,8 +47,9 @@ The roadmap is organized by evidence gates, not calendar promises.
 
 1. `v0.2.0-beta.1`: functionally complete Creator Beta; macOS local validation; Windows CI build marked as awaiting community validation.
 2. `v0.2.0-beta.2`: Companion Studio refinement, safer import and editing, corrected portraits, and localized pre-download update notes.
-3. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
-4. `v0.2.0`: only when RC evidence supports it.
+3. `v0.2.0-beta.3`: professional product-coherence pass for application state, resource libraries, focused workspaces, Settings, typography, and responsive visual regression.
+4. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
+5. `v0.2.0`: only when RC evidence supports it.
 
 ## v1 Stable
 

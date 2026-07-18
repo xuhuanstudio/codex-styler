@@ -13,9 +13,12 @@ import {
   Command,
   GitBranch,
   MoreHorizontal,
+  PanelRight,
   Plus,
   Search,
   Send,
+  Settings,
+  SlidersHorizontal,
   Sparkles,
 } from "lucide-react";
 import {
@@ -24,6 +27,7 @@ import {
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import type { Locale } from "../lib/i18n";
+import type { PreviewScenario } from "../lib/storage";
 import { readableColor } from "../lib/contrast";
 import { drawSpriteFrame } from "../lib/sprite-normalization";
 
@@ -34,6 +38,7 @@ interface PreviewWorkspaceProps {
   reduceMotion: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
   compact?: boolean;
+  scenario?: PreviewScenario;
   onEntityAnchorChange?: (anchor: { x: number; y: number }) => void;
   onEntityAttachmentChange?: (attachment: EntityAttachment | null) => void;
 }
@@ -45,6 +50,7 @@ export function PreviewWorkspace({
   reduceMotion,
   resolveAsset,
   compact = false,
+  scenario = "task",
   onEntityAnchorChange,
   onEntityAttachmentChange,
 }: PreviewWorkspaceProps) {
@@ -62,6 +68,10 @@ export function PreviewWorkspace({
   const backgroundImage = visual.background.image
     ? resolveAsset(theme, visual.background.image)
     : undefined;
+  const backgroundLayer = theme.scene.layers.find(
+    (layer) =>
+      layer.type === "image" && layer.asset === visual.background.image,
+  );
   const entityImage = entity
     ? resolveAsset(theme, entity.renderer.asset)
     : undefined;
@@ -132,6 +142,19 @@ export function PreviewWorkspace({
   }, [direction, entity, spriteReady]);
 
   useEffect(() => {
+    if (
+      !reduceMotion &&
+      visual.motion.intensity > 0 &&
+      (visual.motion.parallax ?? 0) > 0
+    ) {
+      return;
+    }
+    previewRef.current
+      ?.querySelectorAll<HTMLElement>("[data-scene-parallax]")
+      .forEach((layer) => layer.style.removeProperty("transform"));
+  }, [reduceMotion, visual.motion.intensity, visual.motion.parallax]);
+
+  useEffect(() => {
     const element = entityRef.current;
     const preview = previewRef.current;
     const attachment = entity?.attachment;
@@ -198,6 +221,34 @@ export function PreviewWorkspace({
   );
 
   function handlePointer(event: MouseEvent<HTMLDivElement>) {
+    const previewBounds = previewRef.current?.getBoundingClientRect();
+    if (previewBounds && !reduceMotion) {
+      const x =
+        (event.clientX - previewBounds.left) /
+          Math.max(1, previewBounds.width) -
+        0.5;
+      const y =
+        (event.clientY - previewBounds.top) /
+          Math.max(1, previewBounds.height) -
+        0.5;
+      previewRef.current
+        ?.querySelectorAll<HTMLElement>("[data-scene-parallax]")
+        .forEach((layer) => {
+          const authoredDepth = Number(layer.dataset.sceneParallax || 0);
+          const cappedDepth =
+            Math.sign(authoredDepth) *
+            Math.min(
+              Math.abs(authoredDepth),
+              Math.max(0, visual.motion.parallax ?? 0),
+            );
+          const depth = cappedDepth * visual.motion.intensity;
+          if (depth === 0) {
+            layer.style.removeProperty("transform");
+            return;
+          }
+          layer.style.transform = `translate(${-x * depth}px, ${-y * depth}px) scale(1.015)`;
+        });
+    }
     if (
       !entity ||
       dragging ||
@@ -304,8 +355,47 @@ export function PreviewWorkspace({
       data-layout={visual.appearance.layout ?? "native"}
       data-icon-style={visual.appearance.iconStyle ?? "native"}
       data-decorations={visual.appearance.decorations ?? "none"}
+      data-preview-scenario={scenario}
+      role="group"
+      aria-label={isChinese ? "Codex 主题预览" : "Codex theme preview"}
     >
-      <div className="workspace-preview__backdrop" />
+      <div
+        className="workspace-preview__backdrop"
+        data-layer-id={backgroundLayer?.id}
+        data-scene-parallax={backgroundLayer?.parallax}
+        style={
+          backgroundLayer
+            ? ({
+                opacity: backgroundLayer.opacity,
+                mixBlendMode: backgroundLayer.blendMode,
+              } as CSSProperties)
+            : undefined
+        }
+      />
+      {theme.scene.layers.map((layer) => {
+        if (layer.type === "image" && layer.asset === visual.background.image) {
+          return null;
+        }
+        const layerImage =
+          layer.type === "image" && layer.asset
+            ? resolveAsset(theme, layer.asset)
+            : undefined;
+        return (
+          <div
+            key={layer.id}
+            className={`workspace-preview__scene-layer workspace-preview__scene-layer--${layer.type}`}
+            data-layer-id={layer.id}
+            data-scene-parallax={layer.parallax}
+            style={
+              {
+                opacity: layer.opacity,
+                mixBlendMode: layer.blendMode,
+                backgroundImage: layerImage ? `url(${layerImage})` : undefined,
+              } as CSSProperties
+            }
+          />
+        );
+      })}
       <div className="workspace-preview__overlay" />
       <div className="workspace-preview__chrome">
         <aside className="workspace-sidebar">
@@ -314,30 +404,33 @@ export function PreviewWorkspace({
             <i />
             <i />
           </div>
-          <button className="workspace-switcher">
+          <button className="workspace-switcher" tabIndex={-1}>
             <span className="workspace-mini-mark">
               <Command size={11} />
             </span>
             <span>{isChinese ? "我的工作区" : "My workspace"}</span>
             <ChevronDown size={11} />
           </button>
-          <button className="workspace-new-task">
+          <button className="workspace-new-task" tabIndex={-1}>
             <Plus size={12} />
             <span>{isChinese ? "新任务" : "New task"}</span>
           </button>
           <div className="workspace-section-label">
             {isChinese ? "最近" : "RECENT"}
           </div>
-          <button className="workspace-task workspace-task--active">
+          <button
+            className="workspace-task workspace-task--active"
+            tabIndex={-1}
+          >
             <span>
               {isChinese ? "主题架构与安全模型" : "Theme architecture & safety"}
             </span>
             <MoreHorizontal size={11} />
           </button>
-          <button className="workspace-task">
+          <button className="workspace-task" tabIndex={-1}>
             <span>{isChinese ? "文档站元数据" : "Documentation metadata"}</span>
           </button>
-          <button className="workspace-task">
+          <button className="workspace-task" tabIndex={-1}>
             <span>
               {isChinese ? "互动场景渲染器" : "Interactive scene renderer"}
             </span>
@@ -352,69 +445,165 @@ export function PreviewWorkspace({
           <header className="workspace-header">
             <div>
               <strong>
-                {isChinese
-                  ? "主题架构与安全模型"
-                  : "Theme architecture & safety"}
+                {scenario === "home"
+                  ? isChinese
+                    ? "新任务"
+                    : "New task"
+                  : scenario === "settings"
+                    ? isChinese
+                      ? "设置"
+                      : "Settings"
+                    : scenario === "dialog"
+                      ? isChinese
+                        ? "工作区"
+                        : "Workspace"
+                      : scenario === "right-panel"
+                        ? isChinese
+                          ? "审查更改"
+                          : "Review changes"
+                        : isChinese
+                          ? "主题架构与安全模型"
+                          : "Theme architecture & safety"}
               </strong>
               <span className="workspace-branch">
                 <GitBranch size={10} />
                 main
               </span>
             </div>
-            <button className="workspace-header-action">
+            <button className="workspace-header-action" tabIndex={-1}>
               <Sparkles size={12} />
               {isChinese ? "本地预览" : "Local preview"}
             </button>
           </header>
 
-          <section className="workspace-conversation">
-            <div className="workspace-note">
-              <div className="workspace-note__icon">
-                <Check size={12} />
-              </div>
-              <div>
+          <section className="workspace-conversation" data-scenario={scenario}>
+            {scenario === "home" ? (
+              <div className="workspace-home-state">
+                <Sparkles size={18} />
                 <strong>
-                  {isChinese ? "方案已建立" : "Foundation is in place"}
+                  {isChinese ? "我们应该构建什么？" : "What should we build?"}
                 </strong>
-                <p>
-                  {isChinese
-                    ? "主题保持纯数据，互动层不会接管任何点击事件。"
-                    : "Themes remain data-only and the scene never captures clicks."}
-                </p>
-              </div>
-            </div>
-
-            <div className="workspace-message">
-              <span className="workspace-avatar">CS</span>
-              <div>
-                <strong>Codex Styler</strong>
-                <p>
-                  {isChinese
-                    ? "接下来把背景、表面和行为组合成可恢复的运行时。"
-                    : "Next, compose background, surfaces, and behavior into a reversible runtime."}
-                </p>
-                <div className="workspace-code-lines" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
+                <div className="workspace-home-grid">
+                  {[
+                    isChinese ? "探索代码" : "Explore code",
+                    isChinese ? "构建功能" : "Build feature",
+                    isChinese ? "审查更改" : "Review changes",
+                    isChinese ? "修复问题" : "Fix issue",
+                  ].map((label) => (
+                    <span key={label}>{label}</span>
+                  ))}
                 </div>
               </div>
-            </div>
+            ) : scenario === "settings" ? (
+              <div className="workspace-settings-state">
+                <nav>
+                  <span className="is-active">
+                    <Settings size={11} />
+                    {isChinese ? "通用" : "General"}
+                  </span>
+                  <span>
+                    <SlidersHorizontal size={11} />
+                    {isChinese ? "外观" : "Appearance"}
+                  </span>
+                  <span>
+                    <Sparkles size={11} />
+                    {isChinese ? "个性化" : "Personalization"}
+                  </span>
+                </nav>
+                <div>
+                  <strong>
+                    {isChinese ? "应用设置" : "Application settings"}
+                  </strong>
+                  <span />
+                  <span />
+                  <span />
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="workspace-note">
+                  <div className="workspace-note__icon">
+                    <Check size={12} />
+                  </div>
+                  <div>
+                    <strong>
+                      {isChinese ? "方案已建立" : "Foundation is in place"}
+                    </strong>
+                    <p>
+                      {isChinese
+                        ? "主题保持纯数据，互动层不会接管任何点击事件。"
+                        : "Themes remain data-only and the scene never captures clicks."}
+                    </p>
+                  </div>
+                </div>
+                <div className="workspace-message">
+                  <span className="workspace-avatar">CS</span>
+                  <div>
+                    <strong>Codex Styler</strong>
+                    <p>
+                      {isChinese
+                        ? "接下来把背景、表面和行为组合成可恢复的运行时。"
+                        : "Next, compose background, surfaces, and behavior into a reversible runtime."}
+                    </p>
+                    <div className="workspace-code-lines" aria-hidden="true">
+                      <i />
+                      <i />
+                      <i />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </section>
 
-          <footer className="workspace-composer">
-            <div className="workspace-composer__field" ref={composerRef}>
-              <span>
-                {isChinese
-                  ? "让 Codex 继续完善这个主题…"
-                  : "Ask Codex to refine this theme…"}
-              </span>
-              <button>
-                <Send size={12} />
-              </button>
-            </div>
-          </footer>
+          {scenario !== "settings" && (
+            <footer className="workspace-composer">
+              <div className="workspace-composer__field" ref={composerRef}>
+                <span>
+                  {isChinese
+                    ? "让 Codex 继续完善这个主题…"
+                    : "Ask Codex to refine this theme…"}
+                </span>
+                <button tabIndex={-1} aria-label={isChinese ? "发送" : "Send"}>
+                  <Send size={12} />
+                </button>
+              </div>
+            </footer>
+          )}
+
+          {scenario === "right-panel" && (
+            <aside className="workspace-right-panel">
+              <div>
+                <PanelRight size={12} />
+                <strong>{isChinese ? "更改" : "Changes"}</strong>
+              </div>
+              <span />
+              <span />
+              <span />
+              <span />
+            </aside>
+          )}
         </main>
+
+        {scenario === "dialog" && (
+          <div className="workspace-dialog-layer">
+            <div>
+              <Settings size={16} />
+              <strong>
+                {isChinese ? "确认应用主题" : "Apply this theme?"}
+              </strong>
+              <p>
+                {isChinese
+                  ? "当前 Codex 会话将立即更新。"
+                  : "The current Codex session will update immediately."}
+              </p>
+              <span>
+                <i />
+                <i />
+              </span>
+            </div>
+          </div>
+        )}
 
         {entity && (
           <div

@@ -1,7 +1,7 @@
 :root {
   font-family:
-    "Avenir Next", "Segoe UI Variable Text", "SF Pro Text", "PingFang SC",
-    "Microsoft YaHei", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "SF Pro Text",
+    "PingFang SC", "Microsoft YaHei", sans-serif;
   color: #18191c;
   background: #f3f4f6;
   font-synthesis: none;
@@ -2586,15 +2586,65 @@ button:disabled {
   position: absolute;
   z-index: 2;
   top: 50%;
-  right: 10px;
-  display: flex;
-  gap: 5px;
+  right: 9px;
   transform: translateY(-50%);
 }
 
-.companion-option-actions .icon-button {
-  width: 30px;
-  min-height: 30px;
+.companion-option-actions > summary {
+  display: grid;
+  width: var(--control-compact);
+  height: var(--control-compact);
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  list-style: none;
+}
+
+.companion-option-actions > summary::-webkit-details-marker {
+  display: none;
+}
+
+.companion-option-actions[open] > summary,
+.companion-option-actions > summary:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.companion-option-actions > div {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 5px);
+  right: 0;
+  width: 184px;
+  padding: 5px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+  box-shadow: var(--shadow-flyout);
+}
+
+.companion-option-actions > div button {
+  display: flex;
+  width: 100%;
+  min-height: var(--control-compact);
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.companion-option-actions > div button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.companion-option-actions > div button.is-danger {
+  color: #c54848;
 }
 
 .companion-empty {
@@ -5726,11 +5776,18 @@ button:disabled {
   background-size: 20px 20px;
 }
 
-.source-media-preview :is(img, video) {
+.source-media-preview :is(img, video, canvas) {
   display: block;
   width: 100%;
   height: 390px;
   object-fit: contain;
+}
+
+.source-media-preview canvas {
+  max-width: 100%;
+  max-height: 390px;
+  width: auto;
+  height: auto;
 }
 
 .source-media-preview--video {
@@ -7893,8 +7950,13 @@ button:disabled {
     height: 340px;
   }
 
-  .source-media-preview :is(img, video) {
+  .source-media-preview :is(img, video, canvas) {
     height: 340px;
+  }
+
+  .source-media-preview canvas {
+    max-height: 340px;
+    height: auto;
   }
 
   .source-media-preview--video > video {

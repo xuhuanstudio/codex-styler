@@ -88,6 +88,51 @@ impl AppRuntime {
             revision: self.revision,
         }
     }
+
+    pub fn invalidate_connection(&mut self, state: RuntimeState, message: impl Into<String>) {
+        self.state = state;
+        self.connected = false;
+        self.started_by_styler = false;
+        self.port = None;
+        self.websocket_url = None;
+        self.child_id = None;
+        self.codex_version = None;
+        self.compatibility = Compatibility::Safe;
+        self.message = Some(message.into());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AppRuntime, Compatibility, RuntimeState};
+
+    #[test]
+    fn invalidating_a_stale_session_clears_every_connection_marker() {
+        let mut runtime = AppRuntime {
+            state: RuntimeState::Applied,
+            connected: true,
+            started_by_styler: true,
+            port: Some(43123),
+            websocket_url: Some("ws://127.0.0.1:43123/devtools/page/1".into()),
+            child_id: Some(1234),
+            codex_version: Some("26.707.72221".into()),
+            compatibility: Compatibility::Supported,
+            revision: 9,
+            ..Default::default()
+        };
+
+        runtime.invalidate_connection(RuntimeState::Disconnected, "Session ended");
+
+        assert_eq!(runtime.state, RuntimeState::Disconnected);
+        assert!(!runtime.connected);
+        assert!(!runtime.started_by_styler);
+        assert_eq!(runtime.port, None);
+        assert_eq!(runtime.websocket_url, None);
+        assert_eq!(runtime.child_id, None);
+        assert_eq!(runtime.codex_version, None);
+        assert_eq!(runtime.compatibility, Compatibility::Safe);
+        assert_eq!(runtime.revision, 9);
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]

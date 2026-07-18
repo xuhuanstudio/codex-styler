@@ -17,3 +17,10 @@ pub enum StylerError {
     #[error("Codex rejected the runtime expression: {0}")]
     Runtime(String),
 }
+
+impl StylerError {
+    pub fn is_connection_loss(&self) -> bool {
+        matches!(self, Self::WebSocket(_))
+            || matches!(self, Self::Runtime(message) if message.contains("socket closed"))
+    }
+}

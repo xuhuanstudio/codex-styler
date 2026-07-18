@@ -630,11 +630,28 @@ async fn quit_codex(
 }
 
 #[tauri::command]
-fn runtime_status(state: State<'_, Mutex<AppRuntime>>) -> RuntimeStatus {
-    state
+async fn runtime_status(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStatus, String> {
+    let websocket_url = state.lock().ok().and_then(|runtime| {
+        runtime
+            .connected
+            .then(|| runtime.websocket_url.clone())
+            .flatten()
+    });
+    if let Some(websocket_url) = websocket_url
+        && cdp::probe(&websocket_url).await.is_err()
+        && let Ok(mut runtime) = state.lock()
+        && runtime.websocket_url.as_deref() == Some(websocket_url.as_str())
+    {
+        runtime.invalidate_connection(
+            model::RuntimeState::Disconnected,
+            "The previous Codex connection is no longer available",
+        );
+        runtime.record("connection-health", "disconnected", 0);
+    }
+    Ok(state
         .lock()
         .map(|runtime| runtime.status())
-        .unwrap_or_else(|_| RuntimeStatus::error("Runtime state is unavailable"))
+        .unwrap_or_else(|_| RuntimeStatus::error("Runtime state is unavailable")))
 }
 
 #[tauri::command]
@@ -643,10 +660,28 @@ async fn launch_codex(
     custom_path: Option<String>,
 ) -> Result<RuntimeStatus, String> {
     let started_at = Instant::now();
-    if let Ok(runtime) = state.lock()
-        && runtime.connected
-    {
-        return Ok(runtime.status());
+    let cached_websocket = state.lock().ok().and_then(|runtime| {
+        runtime
+            .connected
+            .then(|| runtime.websocket_url.clone())
+            .flatten()
+    });
+    if let Some(websocket_url) = cached_websocket {
+        if cdp::probe(&websocket_url).await.is_ok()
+            && let Ok(runtime) = state.lock()
+            && runtime.websocket_url.as_deref() == Some(websocket_url.as_str())
+        {
+            return Ok(runtime.status());
+        }
+        if let Ok(mut runtime) = state.lock()
+            && runtime.websocket_url.as_deref() == Some(websocket_url.as_str())
+        {
+            runtime.invalidate_connection(
+                model::RuntimeState::Disconnected,
+                "The previous Codex connection is no longer available",
+            );
+            runtime.record("connection-health", "disconnected", 0);
+        }
     }
 
     let detection = codex::detect_codex(custom_path.as_deref().map(std::path::Path::new))
@@ -741,9 +776,28 @@ async fn apply_theme(
         revision,
     );
 
-    let response = cdp::evaluate(&websocket_url, &expression)
-        .await
-        .map_err(|error| error.to_string())?;
+    let response = match cdp::evaluate(&websocket_url, &expression).await {
+        Ok(response) => response,
+        Err(error) => {
+            let detail = error.to_string();
+            if let Ok(mut runtime) = state.lock()
+                && revision == runtime.revision
+            {
+                if error.is_connection_loss() {
+                    runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+                } else {
+                    runtime.state = model::RuntimeState::Error;
+                    runtime.message = Some(detail.clone());
+                }
+                runtime.record(
+                    "apply-configuration",
+                    "error",
+                    started_at.elapsed().as_millis() as u64,
+                );
+            }
+            return Err(detail);
+        }
+    };
 
     let outcome = response.pointer("/result/result/value");
     let resolved_mode = outcome
@@ -812,9 +866,25 @@ async fn update_companion(
         "window.__CODEX_STYLER_RUNTIME__?.updateEntity({}, {});",
         entity_json, revision,
     );
-    cdp::evaluate(&websocket_url, &expression)
-        .await
-        .map_err(|error| error.to_string())?;
+    if let Err(error) = cdp::evaluate(&websocket_url, &expression).await {
+        let detail = error.to_string();
+        if let Ok(mut runtime) = state.lock()
+            && revision == runtime.revision
+        {
+            if error.is_connection_loss() {
+                runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+            } else {
+                runtime.state = model::RuntimeState::Error;
+                runtime.message = Some(detail.clone());
+            }
+            runtime.record(
+                "update-companion",
+                "error",
+                started_at.elapsed().as_millis() as u64,
+            );
+        }
+        return Err(detail);
+    }
     let mut runtime = state
         .lock()
         .map_err(|_| "Runtime state is unavailable".to_string())?;
@@ -844,9 +914,21 @@ async fn pause_theme(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStatu
         .clone()
         .ok_or_else(|| "Codex is not connected".to_string())?;
 
-    cdp::evaluate(&websocket_url, "window.__CODEX_STYLER_RUNTIME__?.pause();")
-        .await
-        .map_err(|error| error.to_string())?;
+    if let Err(error) =
+        cdp::evaluate(&websocket_url, "window.__CODEX_STYLER_RUNTIME__?.pause();").await
+    {
+        let detail = error.to_string();
+        if let Ok(mut runtime) = state.lock() {
+            if error.is_connection_loss() {
+                runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+            } else {
+                runtime.state = model::RuntimeState::Error;
+                runtime.message = Some(detail.clone());
+            }
+            runtime.record("pause", "error", 0);
+        }
+        return Err(detail);
+    }
 
     let mut runtime = state
         .lock()
@@ -864,13 +946,24 @@ async fn restore_official(state: State<'_, Mutex<AppRuntime>>) -> Result<Runtime
         .websocket_url
         .clone();
 
-    if let Some(url) = websocket_url {
-        let _ = cdp::evaluate(&url, "window.__CODEX_STYLER_RUNTIME__?.restore();").await;
-    }
+    let connection_alive = if let Some(url) = websocket_url {
+        cdp::evaluate(&url, "window.__CODEX_STYLER_RUNTIME__?.restore();")
+            .await
+            .is_ok()
+    } else {
+        false
+    };
 
     let mut runtime = state
         .lock()
         .map_err(|_| "Runtime state is unavailable".to_string())?;
+    if !connection_alive {
+        runtime.invalidate_connection(
+            model::RuntimeState::Disconnected,
+            "All Codex Styler runtime nodes were removed; the previous connection is no longer available",
+        );
+        return Ok(runtime.status());
+    }
     runtime.state = if runtime.connected {
         model::RuntimeState::Connected
     } else {

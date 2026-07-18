@@ -6,16 +6,18 @@ import {
   Film,
   FolderOpen,
   Image,
-  Languages,
   Layers3,
   Leaf,
   LockKeyhole,
+  MoreHorizontal,
   Monitor,
   Moon,
   MousePointer2,
   PawPrint,
   Palette,
   PanelRightOpen,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   Plus,
@@ -37,6 +39,7 @@ import {
   embeddedCompanionForTheme,
   type CompanionDefinition,
   type EntityAttachment,
+  type SceneLayer,
   type ThemeDefinition,
   type ThemeVariant,
 } from "@codex-styler/theme-core";
@@ -45,10 +48,12 @@ import {
   Suspense,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
   type CSSProperties,
   type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from "react";
@@ -56,6 +61,8 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BrandMark } from "./components/BrandMark";
 import { Onboarding } from "./components/Onboarding";
 import { PreviewWorkspace } from "./components/PreviewWorkspace";
+import { SelectField } from "./components/ui/SelectField";
+import { StatusBadge } from "./components/ui/StatusBadge";
 import type { CompanionCreatorProject } from "./features/companion-creator/model";
 import {
   deleteCompanionProject,
@@ -65,19 +72,20 @@ import {
   resolveLocale,
   translate,
   type Locale,
-  type LocalePreference,
   type MessageKey,
 } from "./lib/i18n";
 import {
   loadLocalThemes,
   loadLocalCompanions,
   loadSettings,
+  loadWorkspaceUiPreferences,
   saveLocalCompanions,
   saveLocalThemes,
   saveSettings,
-  type ManagerAppearance,
+  saveWorkspaceUiPreferences,
   type RuntimeStrategy,
   type UserSettings,
+  type WorkspaceUiPreferences,
 } from "./lib/storage";
 import {
   applyConfiguration,
@@ -134,13 +142,23 @@ import {
   openWindowsCompatibilityIssue,
   type DiagnosticsReport,
 } from "./lib/diagnostics";
+import {
+  appSessionReducer,
+  createInitialAppSession,
+  type ThemeVariantName,
+} from "./lib/app-session";
+import { SettingsView } from "./features/settings/SettingsView";
+import { HomeView } from "./features/home/HomeView";
+import { ThemesView, type ThemeCollection } from "./features/themes/ThemesView";
+import {
+  CompanionsView,
+  type CompanionCollection,
+} from "./features/companions/CompanionsView";
+import { ThemeEditorView } from "./features/theme-editor/ThemeEditorView";
 
 type View =
   "home" | "themes" | "companions" | "settings" | "editor" | "companion-editor";
-type ThemeCollection = "builtIn" | "mine";
-type CompanionCollection = "builtIn" | "mine";
 type NewThemeStep = "choose" | "existing";
-type ThemeVariantName = "light" | "dark";
 type UpdateStatus = "idle" | "checking" | "current" | "error";
 type UpdateInstallStatus = "idle" | "downloading" | "installing" | "restarting";
 type ApplySuccessMessage =
@@ -162,23 +180,73 @@ const initialRuntime: RuntimeStatus = {
   revision: 0,
 };
 
+function isRuntimeConnectionFailure(message: string): boolean {
+  return /debugging socket|connection refused|socket closed|not connected|connection is no longer available|probe timed out/i.test(
+    message,
+  );
+}
+
+function initialCompanionForTheme(
+  theme: ThemeDefinition,
+  settings: UserSettings,
+  localCompanions: CompanionDefinition[],
+): CompanionDefinition | null {
+  if (settings.companionMode === "disabled") return null;
+  const companions = [...builtinCompanions, ...localCompanions];
+  if (settings.companionMode === "custom") {
+    return companions.find((item) => item.id === settings.companionId) ?? null;
+  }
+  const recommendedId = theme.metadata.recommendedCompanionId;
+  return (
+    (recommendedId
+      ? companions.find((item) => item.id === recommendedId)
+      : null) ??
+    embeddedCompanionForTheme(theme) ??
+    defaultCompanionForTheme(theme.id)
+  );
+}
+
 export function App() {
   const [settings, setSettings] = useState<UserSettings>(loadSettings);
-  const settingsRef = useRef(settings);
-  const [view, setView] = useState<View>("home");
-  const [selectedTheme, setSelectedTheme] = useState<ThemeDefinition>(
-    builtinThemes[0],
-  );
-  const [draftTheme, setDraftTheme] = useState<ThemeDefinition>(() =>
-    structuredClone(builtinThemes[0]),
-  );
-  const [variant, setVariant] = useState<ThemeVariantName>("dark");
-  const [runtime, setRuntime] = useState<RuntimeStatus>(initialRuntime);
-  const [detection, setDetection] = useState<CodexDetection | null>(null);
   const [localThemes, setLocalThemes] =
     useState<ThemeDefinition[]>(loadLocalThemes);
   const [localCompanions, setLocalCompanions] =
     useState<CompanionDefinition[]>(loadLocalCompanions);
+  const [uiPreferences, setUiPreferences] = useState<WorkspaceUiPreferences>(
+    loadWorkspaceUiPreferences,
+  );
+  const settingsRef = useRef(settings);
+  const [view, setView] = useState<View>("home");
+  const initialTheme =
+    [...builtinThemes, ...localThemes].find(
+      (theme) => theme.id === settings.appliedThemeId,
+    ) ?? builtinThemes[0];
+  const [session, dispatchSession] = useReducer(
+    appSessionReducer,
+    createInitialAppSession(
+      initialTheme,
+      initialRuntime,
+      initialCompanionForTheme(initialTheme, settings, localCompanions),
+      undefined,
+      settings.themeVariant,
+    ),
+  );
+  const selectedTheme = session.selection.theme;
+  const variant = session.selection.variant;
+  const runtime = session.runtime;
+  const setRuntime = (
+    next: RuntimeStatus | ((current: RuntimeStatus) => RuntimeStatus),
+  ) => {
+    if (typeof next === "function") {
+      dispatchSession({ type: "runtime/update", update: next });
+    } else {
+      dispatchSession({ type: "runtime/replace", runtime: next });
+    }
+  };
+  const [draftTheme, setDraftTheme] = useState<ThemeDefinition>(() =>
+    structuredClone(initialTheme),
+  );
+  const [detection, setDetection] = useState<CodexDetection | null>(null);
   const [themeCollection, setThemeCollection] =
     useState<ThemeCollection>("builtIn");
   const [companionCollection, setCompanionCollection] =
@@ -198,7 +266,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.2");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.3");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -220,6 +288,7 @@ export function App() {
     theme: ThemeDefinition;
     companion: CompanionDefinition | null;
     settings: UserSettings;
+    variant: ThemeVariantName;
     preserveSelection: boolean;
     successMessage: ApplySuccessMessage;
   } | null>(null);
@@ -274,7 +343,7 @@ export function App() {
       defaultCompanionForTheme(theme.id)
     );
   };
-  const selectedCompanion = companionForTheme(selectedTheme);
+  const selectedCompanion = session.selection.companion;
   const resolveAsset = (theme: ThemeDefinition, path: string) => {
     const companion = companionForTheme(theme);
     return (
@@ -341,6 +410,26 @@ export function App() {
     }
     return overrides;
   };
+  const selectCompanionInSession = (
+    companion: CompanionDefinition | null,
+    sourceSettings: UserSettings = settingsRef.current,
+  ) => {
+    dispatchSession({
+      type: "selection/companion",
+      companion,
+      companionOverrides: companionOverridesFor(companion, sourceSettings),
+    });
+  };
+  const setSelectedTheme = (
+    theme: ThemeDefinition,
+    sourceSettings: UserSettings = settingsRef.current,
+  ) => {
+    dispatchSession({ type: "selection/theme", theme });
+    selectCompanionInSession(
+      companionForTheme(theme, sourceSettings),
+      sourceSettings,
+    );
+  };
   const composeTheme = (
     theme: ThemeDefinition,
     companion: CompanionDefinition | null = companionForTheme(theme),
@@ -364,6 +453,26 @@ export function App() {
     );
   }, [locale, settings]);
 
+  useEffect(() => {
+    saveWorkspaceUiPreferences(uiPreferences);
+  }, [uiPreferences]);
+
+  useEffect(() => {
+    selectCompanionInSession(
+      companionForTheme(selectedTheme, settings),
+      settings,
+    );
+  }, [
+    localCompanions,
+    selectedTheme.id,
+    selectedTheme.metadata.recommendedCompanionId,
+    settings.companionAnchors,
+    settings.companionAttachments,
+    settings.companionId,
+    settings.companionMode,
+    settings.companionSizes,
+  ]);
+
   useEffect(
     () => () => {
       if (liveCompanionSyncRef.current !== null) {
@@ -381,6 +490,51 @@ export function App() {
       syncDetection(detected, status);
     });
   }, []);
+
+  useEffect(() => {
+    if (
+      !runtime.connected ||
+      runtime.state === "applying" ||
+      runtime.state === "launching"
+    ) {
+      return;
+    }
+    let disposed = false;
+    let checking = false;
+    const reconcile = async () => {
+      if (checking) return;
+      checking = true;
+      try {
+        const status = await getRuntimeStatus();
+        if (disposed) return;
+        if (status.connected) {
+          setRuntime(status);
+          return;
+        }
+        const detected = await detectCodex(
+          settingsRef.current.codexInstallPath,
+        );
+        if (!disposed) syncDetection(detected, status);
+      } catch (error) {
+        console.warn("Could not refresh the Codex runtime connection", error);
+      } finally {
+        checking = false;
+      }
+    };
+    const onFocus = () => void reconcile();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void reconcile();
+    };
+    const interval = window.setInterval(() => void reconcile(), 4_000);
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [runtime.connected, runtime.state]);
 
   useEffect(() => {
     void listCompanionProjects()
@@ -414,6 +568,7 @@ export function App() {
 
   useEffect(() => {
     setDraftTheme(structuredClone(selectedTheme));
+    dispatchSession({ type: "draft/theme-dirty", dirty: false });
   }, [selectedTheme]);
 
   useEffect(() => {
@@ -463,6 +618,47 @@ export function App() {
     });
   }
 
+  async function recoverRuntimeFailure(detail: string, revision: number) {
+    if (!isRuntimeConnectionFailure(detail)) {
+      setRuntime((current) => ({
+        ...current,
+        state: "error",
+        message: detail,
+        revision,
+      }));
+      return;
+    }
+    try {
+      const [status, detected] = await Promise.all([
+        getRuntimeStatus(),
+        detectCodex(settingsRef.current.codexInstallPath),
+      ]);
+      if (revision !== applyRevisionRef.current) return;
+      syncDetection(detected, {
+        ...status,
+        state: "error",
+        connected: false,
+        startedByStyler: false,
+        port: null,
+        compatibility: "safe",
+        message: detail,
+        revision: Math.max(status.revision, revision),
+      });
+    } catch {
+      if (revision !== applyRevisionRef.current) return;
+      setRuntime((current) => ({
+        ...current,
+        state: "error",
+        connected: false,
+        startedByStyler: false,
+        port: null,
+        compatibility: "safe",
+        message: detail,
+        revision,
+      }));
+    }
+  }
+
   async function performApply(
     theme: ThemeDefinition,
     companion: CompanionDefinition | null = companionForTheme(theme),
@@ -470,12 +666,15 @@ export function App() {
     options: {
       preserveSelection?: boolean;
       successMessage?: ApplySuccessMessage;
+      variant?: ThemeVariantName;
     } = {},
   ) {
     const revision = ++applyRevisionRef.current;
     const preserveSelection = options.preserveSelection ?? false;
     const successMessage = options.successMessage ?? "configurationApplied";
+    const variantSnapshot = options.variant ?? settingsSnapshot.themeVariant;
     setBusy(true);
+    dispatchSession({ type: "operation/start", revision, phase: "applying" });
     setRuntime((current) => ({
       ...current,
       state: "applying",
@@ -503,6 +702,7 @@ export function App() {
             theme,
             companion,
             settings: settingsSnapshot,
+            variant: variantSnapshot,
             preserveSelection,
             successMessage,
           });
@@ -521,8 +721,9 @@ export function App() {
             companion,
             settingsSnapshot,
           ),
-          variant,
+          variant: variantSnapshot,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
+          reduceMotion: settingsSnapshot.reduceMotion,
           revision,
         },
         resolveAsset,
@@ -533,14 +734,13 @@ export function App() {
       updateSettings({ appliedThemeId: theme.id });
       syncDetection(await detectCodex(settingsSnapshot.codexInstallPath));
       setToast(t(successMessage));
+      dispatchSession({ type: "operation/complete", revision });
     } catch (error) {
       if (revision !== applyRevisionRef.current) return;
       const detail = error instanceof Error ? error.message : String(error);
-      setRuntime((current) => ({
-        ...current,
-        state: "error",
-        message: detail,
-      }));
+      await recoverRuntimeFailure(detail, revision);
+      if (revision !== applyRevisionRef.current) return;
+      dispatchSession({ type: "operation/error", revision, message: detail });
       setToast(`${t("applyFailed")}: ${detail}`);
     } finally {
       if (revision === applyRevisionRef.current) setBusy(false);
@@ -555,6 +755,7 @@ export function App() {
   ) {
     const revision = ++applyRevisionRef.current;
     setBusy(true);
+    dispatchSession({ type: "operation/start", revision, phase: "applying" });
     setRuntime((current) => ({
       ...current,
       state: "applying",
@@ -570,8 +771,9 @@ export function App() {
             companion,
             settingsSnapshot,
           ),
-          variant,
+          variant: settingsSnapshot.themeVariant,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
+          reduceMotion: settingsSnapshot.reduceMotion,
           revision,
         },
         resolveAsset,
@@ -579,14 +781,13 @@ export function App() {
       if (revision !== applyRevisionRef.current) return;
       setRuntime(next);
       setToast(t(successMessage));
+      dispatchSession({ type: "operation/complete", revision });
     } catch (error) {
       if (revision !== applyRevisionRef.current) return;
       const detail = error instanceof Error ? error.message : String(error);
-      setRuntime((current) => ({
-        ...current,
-        state: "error",
-        message: detail,
-      }));
+      await recoverRuntimeFailure(detail, revision);
+      if (revision !== applyRevisionRef.current) return;
+      dispatchSession({ type: "operation/error", revision, message: detail });
       setToast(`${t("applyFailed")}: ${detail}`);
     } finally {
       if (revision === applyRevisionRef.current) setBusy(false);
@@ -600,6 +801,7 @@ export function App() {
     options: {
       preserveSelection?: boolean;
       successMessage?: ApplySuccessMessage;
+      variant?: ThemeVariantName;
     } = {},
   ) {
     if (needsManualRestart) {
@@ -608,6 +810,7 @@ export function App() {
         theme,
         companion,
         settings: settingsSnapshot,
+        variant: options.variant ?? settingsSnapshot.themeVariant,
         preserveSelection: options.preserveSelection ?? false,
         successMessage: options.successMessage ?? "configurationApplied",
       });
@@ -633,6 +836,7 @@ export function App() {
         {
           preserveSelection: application.preserveSelection,
           successMessage: application.successMessage,
+          variant: application.variant,
         },
       );
     } catch (error) {
@@ -646,11 +850,20 @@ export function App() {
   }
 
   async function handlePause() {
-    setRuntime(await pauseTheme());
+    try {
+      setRuntime(await pauseTheme());
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      await recoverRuntimeFailure(detail, applyRevisionRef.current);
+      setToast(`${t("applyFailed")}: ${detail}`);
+    }
   }
 
   async function handleRestore() {
-    setRuntime(await restoreOfficial());
+    dispatchSession({
+      type: "runtime/reset",
+      runtime: await restoreOfficial(),
+    });
     setToast(t("restore"));
   }
 
@@ -722,6 +935,25 @@ export function App() {
     return next;
   }
 
+  function handleSettingsChange(patch: Partial<UserSettings>) {
+    const next = updateSettings(patch);
+    const affectsRuntime =
+      Object.prototype.hasOwnProperty.call(patch, "runtimeStrategy") ||
+      Object.prototype.hasOwnProperty.call(patch, "reduceMotion");
+    if (isLive && affectsRuntime) {
+      void performApply(
+        appliedTheme,
+        companionForTheme(appliedTheme, next),
+        next,
+        {
+          preserveSelection: true,
+          successMessage: "configurationApplied",
+          variant: next.themeVariant,
+        },
+      );
+    }
+  }
+
   async function handleChooseCodexInstall() {
     setInstallPathBusy(true);
     try {
@@ -782,7 +1014,30 @@ export function App() {
         theme,
         companionForTheme(theme, settingsRef.current),
         settingsRef.current,
-        { successMessage: "themeApplied" },
+        {
+          successMessage: "themeApplied",
+          variant: settingsRef.current.themeVariant,
+        },
+      );
+    } else {
+      setToast(t("themePending"));
+    }
+  }
+
+  function chooseVariant(nextVariant: ThemeVariantName) {
+    if (nextVariant === settingsRef.current.themeVariant) return;
+    const next = updateSettings({ themeVariant: nextVariant });
+    dispatchSession({ type: "selection/variant", variant: nextVariant });
+    if (isLive) {
+      void performApply(
+        appliedTheme,
+        companionForTheme(appliedTheme, next),
+        next,
+        {
+          preserveSelection: true,
+          successMessage: "themeApplied",
+          variant: nextVariant,
+        },
       );
     } else {
       setToast(t("themePending"));
@@ -794,6 +1049,7 @@ export function App() {
     key: string,
     value: number | string,
   ) {
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
     setDraftTheme((current) => {
       const next = structuredClone(current);
       const target = next.variants[variant][section] as unknown as Record<
@@ -805,6 +1061,63 @@ export function App() {
     });
   }
 
+  function addSceneLayer(type: "image" | "gradient" | "vignette") {
+    setDraftTheme((current) => {
+      if (current.scene.layers.length >= 8) return current;
+      const next = structuredClone(current);
+      const suffix = `${Date.now().toString(36)}-${next.scene.layers.length + 1}`;
+      const image = next.variants[variant].background.image;
+      next.scene.layers.push({
+        id: `${type}-${suffix}`.slice(0, 39),
+        type,
+        ...(type === "image" && image ? { asset: image } : {}),
+        opacity: type === "vignette" ? 0.3 : type === "gradient" ? 0.22 : 0.7,
+        blendMode: type === "vignette" ? "multiply" : "normal",
+        parallax: type === "image" ? 5 : 0,
+      });
+      return next;
+    });
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+  }
+
+  function updateSceneLayer(
+    layerId: string,
+    patch: Partial<ThemeDefinition["scene"]["layers"][number]>,
+  ) {
+    setDraftTheme((current) => {
+      const next = structuredClone(current);
+      const layer = next.scene.layers.find((item) => item.id === layerId);
+      if (!layer) return current;
+      Object.assign(layer, patch);
+      return next;
+    });
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+  }
+
+  function removeSceneLayer(layerId: string) {
+    setDraftTheme((current) => ({
+      ...structuredClone(current),
+      scene: {
+        ...structuredClone(current.scene),
+        layers: current.scene.layers.filter((item) => item.id !== layerId),
+      },
+    }));
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+  }
+
+  function setRecommendedCompanion(companionId: string | null) {
+    setDraftTheme((current) => {
+      const next = structuredClone(current);
+      if (companionId) {
+        next.metadata.recommendedCompanionId = companionId;
+      } else {
+        delete next.metadata.recommendedCompanionId;
+      }
+      return next;
+    });
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+  }
+
   function updateEntitySize(size: number) {
     if (!selectedCompanion) return;
     const current = settingsRef.current;
@@ -813,6 +1126,10 @@ export function App() {
         ...current.companionSizes,
         [selectedCompanion.id]: size,
       },
+    });
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
     });
     scheduleLiveCompanionSync(next);
   }
@@ -826,6 +1143,10 @@ export function App() {
         [selectedCompanion.id]: anchor,
       },
     });
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    });
     scheduleLiveCompanionSync(next);
   }
 
@@ -837,6 +1158,10 @@ export function App() {
         ...current.companionAttachments,
         [selectedCompanion.id]: attachment,
       },
+    });
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
     });
     scheduleLiveCompanionSync(next);
   }
@@ -850,6 +1175,7 @@ export function App() {
       companionMode: companion ? "custom" : "disabled",
       companionId: companion?.id ?? null,
     });
+    selectCompanionInSession(companion, next);
     if (isLive) {
       void performCompanionUpdate(
         appliedTheme,
@@ -882,6 +1208,7 @@ export function App() {
 
   function resetDraft() {
     setDraftTheme(structuredClone(selectedTheme));
+    dispatchSession({ type: "draft/theme-dirty", dirty: false });
     setToast(t("resetTheme"));
   }
 
@@ -1141,6 +1468,7 @@ export function App() {
 
   function selectAdaptiveScheme(scheme: AdaptiveScheme) {
     setActiveAdaptiveScheme(scheme.id);
+    dispatchSession({ type: "draft/theme-dirty", dirty: true });
     setDraftTheme((current) => ({
       ...structuredClone(current),
       variants: structuredClone(scheme.variants),
@@ -1177,6 +1505,8 @@ export function App() {
 
   async function saveDraftTheme() {
     setBusy(true);
+    const revision = applyRevisionRef.current;
+    dispatchSession({ type: "operation/start", revision, phase: "saving" });
     try {
       const assetMap = draftTheme.assets.length
         ? await persistThemeCopy(draftTheme, resolveAsset)
@@ -1193,10 +1523,17 @@ export function App() {
       saveLocalThemes(next);
       setSelectedTheme(structuredClone(draftTheme));
       setToast(t("themeSaved"));
+      dispatchSession({ type: "draft/theme-dirty", dirty: false });
+      dispatchSession({ type: "operation/complete", revision });
       return true;
     } catch (error) {
       console.error(error);
       setToast(themePersistenceMessage(error));
+      dispatchSession({
+        type: "operation/error",
+        revision,
+        message: error instanceof Error ? error.message : String(error),
+      });
       return false;
     } finally {
       setBusy(false);
@@ -1250,9 +1587,16 @@ export function App() {
       : view === "companion-editor"
         ? "companions"
         : view;
+  const focusWorkspace =
+    uiPreferences.focusMode &&
+    (view === "editor" || view === "companion-editor");
 
   return (
-    <div className="app" data-manager-theme={appTheme}>
+    <div
+      className={"app" + (focusWorkspace ? " professional-focus" : "")}
+      data-manager-theme={appTheme}
+      data-focus-workspace={focusWorkspace ? "true" : "false"}
+    >
       <aside className="app-sidebar">
         <div className="app-brand">
           <BrandMark />
@@ -1290,16 +1634,13 @@ export function App() {
               }
             />
             <strong>{t(configurationStateKey)}</strong>
-            <small
-              className="configuration-status-pill"
-              data-state={configurationState}
-            >
+            <StatusBadge state={configurationState}>
               {runtime.connected
                 ? t("connected")
                 : needsManualRestart
                   ? t("codexRunning")
                   : t("disconnected")}
-            </small>
+            </StatusBadge>
           </div>
           <span>
             {runtime.connected
@@ -1364,18 +1705,18 @@ export function App() {
                 : t("unknownCompatibility")}
           </div>
           <div className="preview-variant-control">
-            <span>{t("codexPreview")}</span>
-            <div className="variant-switch" aria-label={t("codexPreview")}>
+            <span>{t("codexAppearance")}</span>
+            <div className="variant-switch" aria-label={t("codexAppearance")}>
               <button
                 className={variant === "light" ? "is-active" : ""}
-                onClick={() => setVariant("light")}
+                onClick={() => chooseVariant("light")}
                 aria-label={t("light")}
               >
                 <Sun size={14} />
               </button>
               <button
                 className={variant === "dark" ? "is-active" : ""}
-                onClick={() => setVariant("dark")}
+                onClick={() => chooseVariant("dark")}
                 aria-label={t("dark")}
               >
                 <Moon size={14} />
@@ -1494,18 +1835,21 @@ export function App() {
         )}
 
         {view === "editor" && (
-          <CreateView
+          <ThemeEditorView
             theme={composeTheme(draftTheme)}
             variant={variant}
             locale={locale}
             reduceMotion={settings.reduceMotion}
             t={t}
             onUpdateVariant={updateVariant}
-            onUpdateEntitySize={updateEntitySize}
-            onUpdateEntityAnchor={updateEntityAnchor}
-            onUpdateEntityAttachment={updateEntityAttachment}
-            onSetCompanion={selectCompanion}
-            companion={selectedCompanion}
+            onAddSceneLayer={addSceneLayer}
+            onUpdateSceneLayer={updateSceneLayer}
+            onRemoveSceneLayer={removeSceneLayer}
+            companions={allCompanions}
+            recommendedCompanionId={
+              draftTheme.metadata.recommendedCompanionId ?? null
+            }
+            onSetRecommendedCompanion={setRecommendedCompanion}
             onBack={() => {
               setThemeCollection("mine");
               setView("themes");
@@ -1523,6 +1867,11 @@ export function App() {
             onSelectAdaptiveScheme={selectAdaptiveScheme}
             resolveAsset={resolveAsset}
             busy={busy}
+            dirty={session.draft.themeDirty}
+            uiPreferences={uiPreferences}
+            onUiPreferencesChange={(patch) =>
+              setUiPreferences((current) => ({ ...current, ...patch }))
+            }
           />
         )}
 
@@ -1533,7 +1882,7 @@ export function App() {
             currentVersion={currentVersion}
             updateStatus={updateStatus}
             t={t}
-            onChange={updateSettings}
+            onChange={handleSettingsChange}
             installPathBusy={installPathBusy}
             onChooseCodexInstall={handleChooseCodexInstall}
             onUseAutomaticCodexInstall={handleUseAutomaticCodexInstall}
@@ -1550,6 +1899,8 @@ export function App() {
         type="file"
         className="visually-hidden"
         accept=".codex-styler-theme"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={handleImport}
       />
       <input
@@ -1557,6 +1908,8 @@ export function App() {
         type="file"
         className="visually-hidden"
         accept="image/png,image/jpeg,image/webp"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={handleBackgroundImport}
       />
       <input
@@ -1564,6 +1917,8 @@ export function App() {
         type="file"
         className="visually-hidden"
         accept=".codex-styler-companion"
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={handleCompanionImport}
       />
 
@@ -1906,1431 +2261,6 @@ interface SharedViewProps {
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
 }
 
-function HomeView({
-  locale,
-  theme,
-  sourceTheme,
-  companion,
-  runtime,
-  runtimeStrategy,
-  variant,
-  reduceMotion,
-  t,
-  onEdit,
-  onBrowse,
-  onCreateFromImage,
-  onCompanions,
-  resolveAsset,
-}: SharedViewProps & {
-  theme: ThemeDefinition;
-  sourceTheme: ThemeDefinition;
-  companion: CompanionDefinition | null;
-  runtime: RuntimeStatus;
-  runtimeStrategy: RuntimeStrategy;
-  variant: ThemeVariantName;
-  reduceMotion: boolean;
-  onEdit: () => void;
-  onBrowse: () => void;
-  onCreateFromImage: () => void;
-  onCompanions: () => void;
-}) {
-  const copy = sourceTheme.locales[locale] ?? sourceTheme.locales.en;
-  const companionCopy = companion
-    ? (companion.locales[locale] ?? companion.locales.en)
-    : null;
-  const setupIsLive =
-    runtime.connected &&
-    (runtime.state === "applied" || runtime.state === "fallback");
-  return (
-    <div className="page home-page">
-      <section className="page-heading home-heading">
-        <div>
-          <span className="page-kicker">WORKSPACE CONTROL</span>
-          <h1>{t("homeTitle")}</h1>
-          <p>{t("homeDescription")}</p>
-        </div>
-        <div className="home-heading__status">
-          <span className={setupIsLive ? "is-live" : ""} />
-          <div>
-            <small>{t("codexAppearance")}</small>
-            <strong>
-              {runtime.state === "fallback"
-                ? t("statusFallback")
-                : setupIsLive
-                  ? t("themeActive")
-                  : runtime.state === "error"
-                    ? t("statusError")
-                    : runtime.state === "paused"
-                      ? t("statusPaused")
-                      : t("ready")}
-            </strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="home-current">
-        <div className="home-current__preview">
-          <span className="home-current__label">
-            {setupIsLive ? t("liveSetup") : t("selectedSetup")}
-          </span>
-          <PreviewWorkspace
-            theme={theme}
-            variant={variant}
-            locale={locale}
-            reduceMotion={reduceMotion}
-            resolveAsset={resolveAsset}
-          />
-        </div>
-        <div className="home-current__content">
-          <span className="home-current__eyebrow">
-            {setupIsLive ? t("liveInCodex") : t("readyToApply")}
-          </span>
-          <h2>{copy.name}</h2>
-          <p>{copy.description}</p>
-          <dl className="home-current__facts">
-            <div>
-              <dt>{t("companion")}</dt>
-              <dd>{companionCopy?.name ?? t("noCompanion")}</dd>
-            </div>
-            <div>
-              <dt>{t("runtimeStrategy")}</dt>
-              <dd>
-                {runtimeStrategy === "enhanced"
-                  ? t("automaticMode")
-                  : t("compatibilityMode")}
-              </dd>
-            </div>
-          </dl>
-          <div className="button-row">
-            <button className="secondary-button" onClick={onEdit}>
-              {t("editTheme")}
-              <ChevronRight size={15} />
-            </button>
-          </div>
-          <div
-            className={
-              "configuration-state" +
-              (setupIsLive ? " configuration-state--live" : "")
-            }
-          >
-            <span />
-            {setupIsLive
-              ? t("changesApplyInstantly")
-              : t("changesReadyToApply")}
-          </div>
-        </div>
-      </section>
-
-      <section className="home-actions" aria-label={t("quickActions")}>
-        <button onClick={onBrowse}>
-          <span>
-            <Palette size={18} />
-          </span>
-          <strong>{t("browseThemes")}</strong>
-          <small>{t("browseThemesDetail")}</small>
-          <ChevronRight size={15} />
-        </button>
-        <button onClick={onCreateFromImage}>
-          <span>
-            <Image size={18} />
-          </span>
-          <strong>{t("createFromImage")}</strong>
-          <small>{t("createFromImageDetail")}</small>
-          <ChevronRight size={15} />
-        </button>
-        <button onClick={onCompanions}>
-          <span>
-            <PawPrint size={18} />
-          </span>
-          <strong>{t("chooseCompanion")}</strong>
-          <small>{t("chooseCompanionDetail")}</small>
-          <ChevronRight size={15} />
-        </button>
-      </section>
-    </div>
-  );
-}
-
-function ThemesView({
-  locale,
-  selectedTheme,
-  previewTheme,
-  localThemes,
-  collection,
-  variant,
-  reduceMotion,
-  t,
-  onSelect,
-  onEdit,
-  onDelete,
-  onCollectionChange,
-  onNew,
-  onImport,
-  resolveAsset,
-  liveThemeId,
-  isLive,
-  busy,
-}: SharedViewProps & {
-  selectedTheme: ThemeDefinition;
-  previewTheme: ThemeDefinition;
-  localThemes: ThemeDefinition[];
-  collection: ThemeCollection;
-  variant: ThemeVariantName;
-  reduceMotion: boolean;
-  onSelect: (theme: ThemeDefinition) => void;
-  onEdit: (theme: ThemeDefinition) => void;
-  onDelete: (theme: ThemeDefinition) => void;
-  onCollectionChange: (collection: ThemeCollection) => void;
-  onNew: () => void;
-  onImport: () => void;
-  liveThemeId: string | null;
-  isLive: boolean;
-  busy: boolean;
-}) {
-  const themes = collection === "builtIn" ? builtinThemes : localThemes;
-  const localized = selectedTheme.locales[locale] ?? selectedTheme.locales.en;
-  const selectedIndex =
-    themes.findIndex((theme) => theme.id === selectedTheme.id) + 1;
-  const performance =
-    previewTheme.scene.entities.length > 0 ||
-    Object.values(previewTheme.variants).some((item) =>
-      Boolean(item.background.image),
-    ) ||
-    previewTheme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0)
-      ? t("medium")
-      : t("low");
-  const selectedThemeIsLive = liveThemeId === selectedTheme.id;
-  return (
-    <div className="page page--themes">
-      <section className="page-heading">
-        <div>
-          <span className="page-kicker">VISUAL SYSTEM LIBRARY</span>
-          <h1>{t("themeLibrary")}</h1>
-          <p>{t("themeLibraryDetail")}</p>
-        </div>
-        <div className="page-heading__actions">
-          <button className="secondary-button" onClick={onImport}>
-            <Upload size={14} />
-            {t("importTheme")}
-          </button>
-          <button className="primary-button" onClick={onNew}>
-            <Plus size={14} />
-            {t("newTheme")}
-          </button>
-        </div>
-      </section>
-
-      <div
-        className="theme-collection-tabs"
-        role="tablist"
-        aria-label={t("themes")}
-      >
-        <button
-          role="tab"
-          aria-selected={collection === "builtIn"}
-          className={collection === "builtIn" ? "is-active" : ""}
-          onClick={() => onCollectionChange("builtIn")}
-        >
-          {t("builtInThemes")}
-          <small>{builtinThemes.length}</small>
-        </button>
-        <button
-          role="tab"
-          aria-selected={collection === "mine"}
-          className={collection === "mine" ? "is-active" : ""}
-          onClick={() => onCollectionChange("mine")}
-        >
-          {t("myThemes")}
-          <small>{localThemes.length}</small>
-        </button>
-      </div>
-
-      {themes.length === 0 ? (
-        <section className="empty-state theme-empty-state">
-          <span className="empty-state__icon">
-            <FolderOpen size={25} />
-          </span>
-          <h2>{t("noLocalThemesTitle")}</h2>
-          <p>{t("noLocalThemes")}</p>
-          <div className="button-row">
-            <button className="primary-button" onClick={onNew}>
-              <Plus size={14} /> {t("newTheme")}
-            </button>
-            <button className="secondary-button" onClick={onImport}>
-              <Upload size={14} /> {t("importTheme")}
-            </button>
-          </div>
-        </section>
-      ) : (
-        <>
-          <section className="featured-theme theme-detail-card">
-            <div className="featured-theme__preview">
-              <div className="featured-theme__label">
-                {busy
-                  ? t("applying")
-                  : selectedThemeIsLive
-                    ? t("liveInCodex")
-                    : t("previewOnly")}
-              </div>
-              <PreviewWorkspace
-                theme={previewTheme}
-                variant={variant}
-                locale={locale}
-                reduceMotion={reduceMotion}
-                resolveAsset={resolveAsset}
-              />
-            </div>
-            <div className="featured-theme__copy">
-              <span>
-                THEME {String(Math.max(1, selectedIndex)).padStart(2, "0")} /{" "}
-                {localized.name.toUpperCase()}
-              </span>
-              <h2>{localized.name}</h2>
-              <p>{localized.description}</p>
-              <div className="theme-facts">
-                <div>
-                  <small>{t("performance")}</small>
-                  <strong>{performance}</strong>
-                </div>
-                <div>
-                  <small>{t("interactive")}</small>
-                  <strong>
-                    {previewTheme.scene.entities.length ? "Pointer" : "—"}
-                  </strong>
-                </div>
-              </div>
-              <div
-                className={
-                  "configuration-state" +
-                  (selectedThemeIsLive ? " configuration-state--live" : "")
-                }
-              >
-                <span />
-                {busy
-                  ? t("applying")
-                  : selectedThemeIsLive
-                    ? t("liveInCodex")
-                    : isLive
-                      ? t("changesApplyInstantly")
-                      : t("changesReadyToApply")}
-              </div>
-              <div className="button-row">
-                <button
-                  className="secondary-button"
-                  onClick={() => onEdit(selectedTheme)}
-                >
-                  {collection === "builtIn"
-                    ? t("customizeCopy")
-                    : t("editTheme")}
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <section className="theme-index">
-            <div className="section-heading">
-              <div>
-                <span>THEME INDEX</span>
-                <h2>
-                  {collection === "builtIn"
-                    ? t("builtInThemes")
-                    : t("myThemes")}
-                </h2>
-              </div>
-              <span className="section-count">
-                {themes.length} {t("themesCount")}
-              </span>
-            </div>
-            <div className="theme-list">
-              {themes.map((theme, index) => (
-                <ThemeRow
-                  key={theme.id}
-                  theme={theme}
-                  index={index + 1}
-                  locale={locale}
-                  active={selectedTheme.id === theme.id}
-                  live={liveThemeId === theme.id}
-                  resolveAsset={resolveAsset}
-                  onSelect={() => onSelect(theme)}
-                  local={collection === "mine"}
-                  onEdit={() => onEdit(theme)}
-                  onDelete={() => onDelete(theme)}
-                  t={t}
-                />
-              ))}
-            </div>
-          </section>
-        </>
-      )}
-    </div>
-  );
-}
-
-function ThemeRow({
-  theme,
-  index,
-  locale,
-  active,
-  live,
-  resolveAsset,
-  onSelect,
-  local,
-  onEdit,
-  onDelete,
-  t,
-}: {
-  theme: ThemeDefinition;
-  index: number;
-  locale: Locale;
-  active: boolean;
-  live: boolean;
-  resolveAsset: (theme: ThemeDefinition, path: string) => string;
-  onSelect: () => void;
-  local: boolean;
-  onEdit: () => void;
-  onDelete: () => void;
-  t: (key: MessageKey) => string;
-}) {
-  const localized = theme.locales[locale] ?? theme.locales.en;
-  const preview = theme.metadata.preview
-    ? resolveAsset(theme, theme.metadata.preview)
-    : undefined;
-  return (
-    <article className={"theme-row" + (active ? " theme-row--active" : "")}>
-      <button
-        className="theme-row__select"
-        onClick={onSelect}
-        aria-label={`${t("preview")}: ${localized.name}`}
-        aria-pressed={active}
-      />
-      <div className="theme-row__preview" aria-hidden="true">
-        <span
-          style={{
-            backgroundColor: theme.variants.dark.background.color,
-            backgroundImage: preview ? "url(" + preview + ")" : undefined,
-          }}
-        />
-        <small>{String(index).padStart(2, "0")}</small>
-      </div>
-      <div className="theme-row__copy">
-        <span>{theme.metadata.tags.slice(0, 3).join(" · ").toUpperCase()}</span>
-        <h3>{localized.name}</h3>
-        <p>{localized.description}</p>
-      </div>
-      <div className="theme-row__badges">
-        {live && (
-          <span className="theme-row__live">
-            <Check size={12} />
-            {t("liveInCodex")}
-          </span>
-        )}
-        {defaultCompanionForTheme(theme.id) && (
-          <span>
-            <MousePointer2 size={12} />
-            {t("interactive")}
-          </span>
-        )}
-        <span>
-          {theme.compatibility.codex.mode === "safe" ? "SAFE" : "SEMANTIC"}
-        </span>
-      </div>
-      <div className="theme-row__actions">
-        <button className="theme-row__action" onClick={onEdit}>
-          {local ? t("editTheme") : t("customizeCopy")}
-          <ChevronRight size={14} />
-        </button>
-        {local && (
-          <button
-            className="theme-row__delete"
-            onClick={onDelete}
-            title={t("deleteTheme")}
-            aria-label={`${t("deleteTheme")}: ${localized.name}`}
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
-      </div>
-    </article>
-  );
-}
-
-function CompanionsView({
-  locale,
-  selected,
-  theme,
-  localCompanions,
-  projects,
-  collection,
-  variant,
-  reduceMotion,
-  t,
-  onSelect,
-  onCollectionChange,
-  onCreate,
-  onEditProject,
-  onDeleteProject,
-  onImport,
-  onExport,
-  onDelete,
-  onAnchorChange,
-  onAttachmentChange,
-  resolveAsset,
-  resolveCompanionAsset,
-  isLive,
-  busy,
-}: SharedViewProps & {
-  selected: CompanionDefinition | null;
-  theme: ThemeDefinition;
-  localCompanions: CompanionDefinition[];
-  projects: CompanionCreatorProject[];
-  collection: CompanionCollection;
-  variant: ThemeVariantName;
-  reduceMotion: boolean;
-  onSelect: (companion: CompanionDefinition | null) => void;
-  onCollectionChange: (collection: CompanionCollection) => void;
-  onCreate: () => void;
-  onEditProject: (project: CompanionCreatorProject) => void;
-  onDeleteProject: (projectId: string) => void;
-  onImport: () => void;
-  onExport: (companion: CompanionDefinition) => void;
-  onDelete: (companion: CompanionDefinition) => void;
-  onAnchorChange: (anchor: { x: number; y: number }) => void;
-  onAttachmentChange: (attachment: EntityAttachment | null) => void;
-  resolveCompanionAsset: (
-    companion: CompanionDefinition,
-    path: string,
-  ) => string;
-  isLive: boolean;
-  busy: boolean;
-}) {
-  const companions =
-    collection === "builtIn" ? builtinCompanions : localCompanions;
-  return (
-    <div className="page companions-page">
-      <section className="page-heading">
-        <div>
-          <span className="page-kicker">INDEPENDENT SCENE ENTITIES</span>
-          <h1>{t("companions")}</h1>
-          <p>
-            {t("dragCompanion")}. {t("companionIndependence")}
-          </p>
-        </div>
-        <div className="page-heading__actions">
-          <button className="secondary-button" onClick={onImport}>
-            <Upload size={14} />
-            {t("importCompanion")}
-          </button>
-          <button className="primary-button" onClick={onCreate}>
-            <Plus size={14} />
-            {t("newCompanion")}
-          </button>
-        </div>
-      </section>
-      <div className="companions-toolbar">
-        <div
-          className="theme-collection-tabs"
-          role="tablist"
-          aria-label={t("companions")}
-        >
-          <button
-            role="tab"
-            aria-selected={collection === "builtIn"}
-            className={collection === "builtIn" ? "is-active" : ""}
-            onClick={() => onCollectionChange("builtIn")}
-          >
-            {t("builtInCompanions")}
-            <small>{builtinCompanions.length}</small>
-          </button>
-          <button
-            role="tab"
-            aria-selected={collection === "mine"}
-            className={collection === "mine" ? "is-active" : ""}
-            onClick={() => onCollectionChange("mine")}
-          >
-            {t("myCompanions")}
-            <small>{localCompanions.length}</small>
-          </button>
-        </div>
-        <div
-          className={
-            "configuration-state" + (isLive ? " configuration-state--live" : "")
-          }
-          aria-live="polite"
-        >
-          <span />
-          {busy
-            ? t("applying")
-            : isLive
-              ? t("changesApplyInstantly")
-              : t("changesReadyToApply")}
-        </div>
-      </div>
-      {collection === "mine" && projects.length > 0 && (
-        <section className="companion-projects">
-          <div className="companion-projects__heading">
-            <div>
-              <span className="page-kicker">AUTOSAVED CREATOR PROJECTS</span>
-              <strong>{t("companionDrafts")}</strong>
-            </div>
-            <small>{projects.length}</small>
-          </div>
-          <div className="companion-projects__list">
-            {projects.map((project) => (
-              <div key={project.id} className="companion-project-card">
-                <button onClick={() => onEditProject(project)}>
-                  <span>
-                    <Film size={15} />
-                  </span>
-                  <strong>{project.name}</strong>
-                  <small>
-                    {project.source?.files.length ?? 0} {t("sourceFiles")} ·{" "}
-                    {project.frames.length} {t("frames")}
-                  </small>
-                  <ChevronRight size={14} />
-                </button>
-                <button
-                  className="icon-button"
-                  onClick={() => onDeleteProject(project.id)}
-                  aria-label={`${t("deleteDraft")}: ${project.name}`}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-      <div className="companions-layout">
-        <section className="companion-preview-panel">
-          <PreviewWorkspace
-            theme={theme}
-            variant={variant}
-            locale={locale}
-            reduceMotion={reduceMotion}
-            resolveAsset={resolveAsset}
-            onEntityAnchorChange={onAnchorChange}
-            onEntityAttachmentChange={onAttachmentChange}
-          />
-          {selected && (
-            <span className="drag-hint">
-              <MousePointer2 size={13} />
-              {t("dragCompanion")}
-            </span>
-          )}
-        </section>
-        <section className="companion-list" aria-label={t("companions")}>
-          <button
-            className={
-              "companion-option" +
-              (!selected ? " companion-option--active" : "")
-            }
-            onClick={() => onSelect(null)}
-            aria-pressed={!selected}
-          >
-            <span className="companion-option__visual companion-option__visual--empty">
-              <X size={20} />
-            </span>
-            <span>
-              <strong>{t("noCompanion")}</strong>
-              <small>{t("themeOnly")}</small>
-            </span>
-            {!selected && <Check size={15} />}
-          </button>
-          {companions.length === 0 && (
-            <div className="companion-empty">
-              <FolderOpen size={22} />
-              <strong>{t("noLocalCompanions")}</strong>
-              <span>{t("noLocalCompanionsDetail")}</span>
-              <button className="primary-button" onClick={onCreate}>
-                <Plus size={14} /> {t("newCompanion")}
-              </button>
-            </div>
-          )}
-          {companions.map((item) => {
-            const copy = item.locales[locale] ??
-              item.locales.en ?? {
-                name: item.name,
-                description: item.description,
-              };
-            const active = selected?.id === item.id;
-            const renderer = item.entity.renderer;
-            const previewSize = 64;
-            const hasDedicatedPortrait = Boolean(item.metadata.preview);
-            const fallbackFrame =
-              renderer.type === "sprite-atlas"
-                ? Math.max(
-                    0,
-                    Math.min(
-                      (renderer.frameCount ?? renderer.directions) - 1,
-                      renderer.neutralFrame ?? renderer.reducedMotionFrame ?? 0,
-                    ),
-                  )
-                : 0;
-            const framesPerPage =
-              renderer.type === "sprite-atlas"
-                ? (renderer.framesPerPage ?? renderer.columns * renderer.rows)
-                : 1;
-            const pageIndex = Math.floor(fallbackFrame / framesPerPage);
-            const frameOnPage = fallbackFrame % framesPerPage;
-            const frameScale =
-              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
-                ? Math.min(
-                    previewSize / renderer.frameWidth,
-                    previewSize / renderer.frameHeight,
-                  )
-                : 1;
-            const backgroundSize =
-              renderer.type === "sprite-atlas"
-                ? `${renderer.columns * renderer.frameWidth * frameScale}px ${renderer.rows * renderer.frameHeight * frameScale}px`
-                : "contain";
-            const frameWidth =
-              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
-                ? renderer.frameWidth * frameScale
-                : previewSize;
-            const frameHeight =
-              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
-                ? renderer.frameHeight * frameScale
-                : previewSize;
-            const previewPath =
-              item.metadata.preview ??
-              (renderer.type === "sprite-atlas"
-                ? (renderer.pages?.[pageIndex] ?? renderer.asset)
-                : renderer.asset);
-            const backgroundPosition =
-              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
-                ? `${-(frameOnPage % renderer.columns) * renderer.frameWidth * frameScale}px ${-Math.floor(frameOnPage / renderer.columns) * renderer.frameHeight * frameScale}px`
-                : "center";
-            return (
-              <div
-                key={item.id}
-                className={
-                  "companion-option-wrap" +
-                  (active ? " companion-option-wrap--active" : "")
-                }
-              >
-                <button
-                  className={
-                    "companion-option" +
-                    (active ? " companion-option--active" : "")
-                  }
-                  onClick={() => onSelect(item)}
-                  aria-pressed={active}
-                >
-                  <span className="companion-option__visual companion-option__visual--sprite">
-                    <span
-                      className="companion-option__frame"
-                      data-preview-source={
-                        hasDedicatedPortrait
-                          ? "portrait"
-                          : renderer.type === "sprite-atlas"
-                            ? "neutral-frame"
-                            : "image"
-                      }
-                      style={{
-                        width: `${frameWidth}px`,
-                        height: `${frameHeight}px`,
-                        backgroundImage: `url(${resolveCompanionAsset(item, previewPath)})`,
-                        backgroundSize:
-                          item.metadata.preview || renderer.type === "image"
-                            ? "contain"
-                            : backgroundSize,
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition,
-                      }}
-                    />
-                  </span>
-                  <span>
-                    <strong>{copy.name}</strong>
-                    <small>{copy.description}</small>
-                  </span>
-                  {active ? <Check size={15} /> : <ChevronRight size={15} />}
-                </button>
-                {collection === "mine" && (
-                  <div className="companion-option-actions">
-                    <button
-                      className="icon-button"
-                      onClick={() => onExport(item)}
-                      aria-label={t("exportCompanion")}
-                    >
-                      <Download size={14} />
-                    </button>
-                    <button
-                      className="icon-button"
-                      onClick={() => onDelete(item)}
-                      aria-label={t("deleteCompanion")}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </section>
-      </div>
-    </div>
-  );
-}
-
-function CreateView({
-  theme,
-  variant,
-  locale,
-  reduceMotion,
-  t,
-  onUpdateVariant,
-  onUpdateEntitySize,
-  onUpdateEntityAnchor,
-  onUpdateEntityAttachment,
-  onSetCompanion,
-  companion,
-  onBack,
-  onReset,
-  onSave,
-  onApply,
-  onExport,
-  onImportBackground,
-  adaptiveSchemes,
-  activeAdaptiveScheme,
-  onSelectAdaptiveScheme,
-  resolveAsset,
-  busy,
-}: SharedViewProps & {
-  theme: ThemeDefinition;
-  variant: ThemeVariantName;
-  reduceMotion: boolean;
-  onUpdateVariant: (
-    section: "background" | "appearance" | "motion",
-    key: string,
-    value: number | string,
-  ) => void;
-  onUpdateEntitySize: (size: number) => void;
-  onUpdateEntityAnchor: (anchor: { x: number; y: number }) => void;
-  onUpdateEntityAttachment: (attachment: EntityAttachment | null) => void;
-  onSetCompanion: (companion: CompanionDefinition | null) => void;
-  companion: CompanionDefinition | null;
-  onBack: () => void;
-  onReset: () => void;
-  onSave: () => void;
-  onApply: () => void;
-  onExport: () => void;
-  onImportBackground: () => void;
-  adaptiveSchemes: AdaptiveScheme[];
-  activeAdaptiveScheme: AdaptiveSchemeId | null;
-  onSelectAdaptiveScheme: (scheme: AdaptiveScheme) => void;
-  busy: boolean;
-}) {
-  const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [activeLayer, setActiveLayer] = useState<
-    "background" | "surfaces" | "motion" | "companion"
-  >("background");
-  const [addMenuOpen, setAddMenuOpen] = useState(false);
-  const visual = theme.variants[variant];
-  const entity = theme.scene.entities[0];
-  return (
-    <div className="editor-page">
-      <header className="editor-header">
-        <div className="editor-header__identity">
-          <button
-            className="editor-back"
-            onClick={onBack}
-            aria-label={t("backToThemes")}
-          >
-            <ChevronRight size={16} />
-          </button>
-          <div>
-            <span>
-              {t("themes")} / {t("editTheme")}
-            </span>
-            <h1>{theme.locales[locale]?.name ?? theme.metadata.name}</h1>
-          </div>
-        </div>
-        <div className="editor-header__actions">
-          <button className="secondary-button" onClick={onReset}>
-            <RotateCcw size={14} />
-            {t("reset")}
-          </button>
-          <button
-            className="secondary-button inspector-toggle"
-            onClick={() => setInspectorOpen(true)}
-          >
-            <PanelRightOpen size={14} />
-            {t("appearance")}
-          </button>
-          <button className="secondary-button" onClick={onExport}>
-            <Download size={14} />
-            {t("exportTheme")}
-          </button>
-          <button className="secondary-button" onClick={onSave} disabled={busy}>
-            <Check size={14} />
-            {busy ? t("saving") : t("save")}
-          </button>
-          <button className="primary-button" onClick={onApply} disabled={busy}>
-            <Play size={14} />
-            {busy ? t("applying") : t("apply")}
-          </button>
-        </div>
-      </header>
-
-      <div className="editor-layout">
-        <aside className="layers-panel">
-          <div className="panel-title">
-            <span>{t("layers")}</span>
-            <div className="layer-add">
-              <button
-                aria-label={t("addLayer")}
-                onClick={() => setAddMenuOpen((open) => !open)}
-              >
-                <Plus size={14} />
-              </button>
-              {addMenuOpen && (
-                <div className="layer-add__menu" role="menu">
-                  {builtinCompanions.map((item) => (
-                    <button
-                      key={item.id}
-                      role="menuitem"
-                      onClick={() => {
-                        onSetCompanion(item);
-                        setActiveLayer("companion");
-                        setAddMenuOpen(false);
-                      }}
-                    >
-                      <PawPrint size={13} />
-                      <span>{item.locales[locale]?.name ?? item.name}</span>
-                      {companion?.id === item.id && <Check size={12} />}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-          <div className="layer-stack">
-            <button
-              className={
-                "layer-item" +
-                (activeLayer === "background" ? " layer-item--active" : "")
-              }
-              onClick={() => setActiveLayer("background")}
-              aria-label={t("background")}
-            >
-              <span className="layer-icon">
-                <Image size={15} />
-              </span>
-              <span>
-                <strong>{t("background")}</strong>
-                <small>{t("backgroundLayer")}</small>
-              </span>
-              <Layers3 size={13} />
-            </button>
-            <button
-              className={
-                "layer-item" +
-                (activeLayer === "surfaces" ? " layer-item--active" : "")
-              }
-              onClick={() => setActiveLayer("surfaces")}
-              aria-label={t("surfaces")}
-            >
-              <span className="layer-icon">
-                <Sparkles size={15} />
-              </span>
-              <span>
-                <strong>{t("surfaces")}</strong>
-                <small>{t("surfaceLayer")}</small>
-              </span>
-              <Layers3 size={13} />
-            </button>
-            <button
-              className={
-                "layer-item" +
-                (activeLayer === "motion" ? " layer-item--active" : "")
-              }
-              onClick={() => setActiveLayer("motion")}
-              aria-label={t("motion")}
-            >
-              <span className="layer-icon">
-                <Sparkles size={15} />
-              </span>
-              <span>
-                <strong>{t("motion")}</strong>
-                <small>{t("motionLayer")}</small>
-              </span>
-              <Layers3 size={13} />
-            </button>
-            {entity && (
-              <button
-                className={
-                  "layer-item" +
-                  (activeLayer === "companion" ? " layer-item--active" : "")
-                }
-                onClick={() => setActiveLayer("companion")}
-                aria-label={t("companion")}
-              >
-                <span className="layer-icon layer-icon--green">
-                  <Leaf size={15} />
-                </span>
-                <span>
-                  <strong>{entity.name}</strong>
-                  <small>Sprite · pointer</small>
-                </span>
-                <Layers3 size={13} />
-              </button>
-            )}
-          </div>
-          <button
-            className="layers-save-button"
-            onClick={onSave}
-            disabled={busy}
-          >
-            <Check size={14} />
-            {busy ? t("saving") : t("saveTheme")}
-          </button>
-          <div className="layers-panel__note">
-            <ShieldCheck size={14} />
-            <p>{t("safePreview")}</p>
-          </div>
-        </aside>
-
-        <section className="editor-canvas">
-          <div className="canvas-toolbar">
-            <span>
-              <Monitor size={13} />
-              {t("livePreview")}
-            </span>
-            <span>1280 × 760</span>
-          </div>
-          <div className="canvas-stage">
-            <PreviewWorkspace
-              theme={theme}
-              variant={variant}
-              locale={locale}
-              reduceMotion={reduceMotion}
-              resolveAsset={resolveAsset}
-              onEntityAnchorChange={onUpdateEntityAnchor}
-              onEntityAttachmentChange={onUpdateEntityAttachment}
-            />
-          </div>
-        </section>
-
-        <aside
-          className={"inspector" + (inspectorOpen ? " inspector--open" : "")}
-          aria-label={t("appearance")}
-        >
-          <div className="panel-title">
-            <span>{t("appearance")}</span>
-            <div className="inspector-heading-actions">
-              <small>{variant.toUpperCase()}</small>
-              <button
-                className="inspector-close"
-                onClick={() => setInspectorOpen(false)}
-                aria-label="Close inspector"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          </div>
-          {activeLayer === "background" && (
-            <InspectorSection
-              title={t("background")}
-              icon={<Image size={14} />}
-            >
-              <button
-                className="adaptive-import-button"
-                onClick={onImportBackground}
-                disabled={busy}
-              >
-                <Upload size={15} />
-                <span>
-                  <strong>{t("importBackground")}</strong>
-                  <small>PNG, JPEG, WebP · 20 MiB</small>
-                </span>
-              </button>
-              <div className="adaptive-intro">
-                <strong>{t("imageAdaptiveTitle")}</strong>
-                <p>{t("imageAdaptiveBody")}</p>
-              </div>
-              {adaptiveSchemes.length > 0 && (
-                <div className="adaptive-schemes">
-                  {adaptiveSchemes.map((scheme) => {
-                    const labelKey =
-                      scheme.id === "cinematic"
-                        ? "adaptiveCinematic"
-                        : scheme.id === "soft"
-                          ? "adaptiveSoft"
-                          : scheme.id === "vivid"
-                            ? "adaptiveVivid"
-                            : "adaptiveBalanced";
-                    const active = activeAdaptiveScheme === scheme.id;
-                    return (
-                      <button
-                        key={scheme.id}
-                        className={
-                          "adaptive-scheme" +
-                          (active ? " adaptive-scheme--active" : "")
-                        }
-                        onClick={() => onSelectAdaptiveScheme(scheme)}
-                      >
-                        <span className="adaptive-scheme__swatches">
-                          {scheme.swatches.map((color) => (
-                            <i key={color} style={{ background: color }} />
-                          ))}
-                        </span>
-                        <span>{t(labelKey)}</span>
-                        {active && <Check size={13} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-              <ColorControl
-                label={t("overlay")}
-                value={visual.background.overlay}
-                onChange={(value) =>
-                  onUpdateVariant("background", "overlay", value)
-                }
-              />
-              <RangeControl
-                label={t("brightness")}
-                value={visual.background.brightness}
-                min={0.2}
-                max={2}
-                step={0.01}
-                display={Math.round(visual.background.brightness * 100) + "%"}
-                onChange={(value) =>
-                  onUpdateVariant("background", "brightness", value)
-                }
-              />
-              <RangeControl
-                label={t("blur")}
-                value={visual.background.blur}
-                min={0}
-                max={40}
-                step={1}
-                display={visual.background.blur + "px"}
-                onChange={(value) =>
-                  onUpdateVariant("background", "blur", value)
-                }
-              />
-              <RangeControl
-                label={t("overlay")}
-                value={visual.background.overlayOpacity}
-                min={0}
-                max={1}
-                step={0.01}
-                display={
-                  Math.round(visual.background.overlayOpacity * 100) + "%"
-                }
-                onChange={(value) =>
-                  onUpdateVariant("background", "overlayOpacity", value)
-                }
-              />
-            </InspectorSection>
-          )}
-          {activeLayer === "surfaces" && (
-            <InspectorSection
-              title={t("surfaces")}
-              icon={<Layers3 size={14} />}
-            >
-              <label className="inspector-select-control">
-                <span>{t("layoutTreatment")}</span>
-                <select
-                  value={visual.appearance.layout ?? "native"}
-                  onChange={(event) =>
-                    onUpdateVariant("appearance", "layout", event.target.value)
-                  }
-                >
-                  <option value="native">{t("layoutNative")}</option>
-                  <option value="editorial">{t("layoutEditorial")}</option>
-                  <option value="immersive">{t("layoutImmersive")}</option>
-                </select>
-              </label>
-              <label className="inspector-select-control">
-                <span>{t("iconTreatment")}</span>
-                <select
-                  value={visual.appearance.iconStyle ?? "native"}
-                  onChange={(event) =>
-                    onUpdateVariant(
-                      "appearance",
-                      "iconStyle",
-                      event.target.value,
-                    )
-                  }
-                >
-                  <option value="native">{t("iconNative")}</option>
-                  <option value="contained">{t("iconContained")}</option>
-                  <option value="themed">{t("iconThemed")}</option>
-                </select>
-              </label>
-              <label className="inspector-select-control">
-                <span>{t("decorationTreatment")}</span>
-                <select
-                  value={visual.appearance.decorations ?? "none"}
-                  onChange={(event) =>
-                    onUpdateVariant(
-                      "appearance",
-                      "decorations",
-                      event.target.value,
-                    )
-                  }
-                >
-                  <option value="none">{t("decorationNone")}</option>
-                  <option value="subtle">{t("decorationSubtle")}</option>
-                  <option value="expressive">
-                    {t("decorationExpressive")}
-                  </option>
-                </select>
-              </label>
-              <p className="inspector-mode-note">{t("semanticControlsHint")}</p>
-              <ColorControl
-                label="Accent"
-                value={visual.appearance.accent}
-                onChange={(value) =>
-                  onUpdateVariant("appearance", "accent", value)
-                }
-              />
-              <RangeControl
-                label={t("surfaceOpacity")}
-                value={visual.appearance.surfaceOpacity}
-                min={0}
-                max={1}
-                step={0.01}
-                display={
-                  Math.round(visual.appearance.surfaceOpacity * 100) + "%"
-                }
-                onChange={(value) =>
-                  onUpdateVariant("appearance", "surfaceOpacity", value)
-                }
-              />
-              <RangeControl
-                label={t("radius")}
-                value={visual.appearance.radius}
-                min={0}
-                max={32}
-                step={1}
-                display={visual.appearance.radius + "px"}
-                onChange={(value) =>
-                  onUpdateVariant("appearance", "radius", value)
-                }
-              />
-              <div className="contrast-note">
-                <ShieldCheck size={14} />
-                <span>
-                  <strong>{t("contrastProtected")}</strong>
-                  <small>{t("contrastProtectedBody")}</small>
-                </span>
-              </div>
-            </InspectorSection>
-          )}
-          {activeLayer === "motion" && (
-            <InspectorSection title={t("motion")} icon={<Sparkles size={14} />}>
-              <div className="motion-recipes" aria-label={t("motionStyle")}>
-                {[
-                  { id: "none", intensity: 0, parallax: 0, fps: 30 },
-                  { id: "calm", intensity: 0.25, parallax: 4, fps: 30 },
-                  { id: "fluid", intensity: 0.5, parallax: 8, fps: 30 },
-                  { id: "expressive", intensity: 0.8, parallax: 14, fps: 60 },
-                ].map((recipe) => {
-                  const active =
-                    Math.abs(visual.motion.intensity - recipe.intensity) <
-                      0.01 && visual.motion.parallax === recipe.parallax;
-                  const label =
-                    recipe.id === "none"
-                      ? t("motionNone")
-                      : recipe.id === "calm"
-                        ? t("motionCalm")
-                        : recipe.id === "expressive"
-                          ? t("motionExpressive")
-                          : t("motionFluid");
-                  return (
-                    <button
-                      key={recipe.id}
-                      className={active ? "is-active" : ""}
-                      onClick={() => {
-                        onUpdateVariant(
-                          "motion",
-                          "intensity",
-                          recipe.intensity,
-                        );
-                        onUpdateVariant("motion", "parallax", recipe.parallax);
-                        onUpdateVariant("motion", "targetFps", recipe.fps);
-                      }}
-                    >
-                      <span />
-                      {label}
-                      {active && <Check size={12} />}
-                    </button>
-                  );
-                })}
-              </div>
-              <p className="inspector-mode-note">{t("motionDescription")}</p>
-              <RangeControl
-                label={t("motionIntensity")}
-                value={visual.motion.intensity}
-                min={0}
-                max={1}
-                step={0.01}
-                display={Math.round(visual.motion.intensity * 100) + "%"}
-                onChange={(value) =>
-                  onUpdateVariant("motion", "intensity", value)
-                }
-              />
-              <RangeControl
-                label={t("parallaxDepth")}
-                value={visual.motion.parallax}
-                min={0}
-                max={20}
-                step={1}
-                display={visual.motion.parallax + "px"}
-                onChange={(value) =>
-                  onUpdateVariant("motion", "parallax", value)
-                }
-              />
-            </InspectorSection>
-          )}
-          {activeLayer === "companion" && (
-            <InspectorSection
-              title={t("companion")}
-              icon={<PawPrint size={14} />}
-            >
-              {entity && (
-                <>
-                  <label className="inspector-select-control">
-                    <span>{t("attachTo")}</span>
-                    <select
-                      value={entity.attachment?.target ?? "free"}
-                      onChange={(event) => {
-                        const target = event.target.value;
-                        if (target === "free") {
-                          onUpdateEntityAttachment(null);
-                          return;
-                        }
-                        onUpdateEntityAttachment({
-                          target: target as EntityAttachment["target"],
-                          edge: "top",
-                          align: 0.82,
-                          offset: { x: 0, y: 3 },
-                        });
-                      }}
-                    >
-                      <option value="composer">{t("composerEdge")}</option>
-                      <option value="main-surface">{t("workspaceEdge")}</option>
-                      <option value="free">{t("freePosition")}</option>
-                    </select>
-                  </label>
-                  <RangeControl
-                    label={t("companionSize")}
-                    value={entity.size}
-                    min={48}
-                    max={240}
-                    step={1}
-                    display={entity.size + "px"}
-                    onChange={onUpdateEntitySize}
-                  />
-                  <p className="inspector-help">
-                    <MousePointer2 size={13} />
-                    {t("dragCompanion")}
-                  </p>
-                  <button
-                    className="danger-text-button"
-                    onClick={() => onSetCompanion(null)}
-                  >
-                    <Trash2 size={13} />
-                    {t("removeCompanion")}
-                  </button>
-                </>
-              )}
-            </InspectorSection>
-          )}
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function InspectorSection({
-  title,
-  icon,
-  children,
-}: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="inspector-section">
-      <h3>
-        {icon}
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
-function RangeControl({
-  label,
-  value,
-  min,
-  max,
-  step,
-  display,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  display: string;
-  onChange: (value: number) => void;
-}) {
-  const percentage = ((value - min) / (max - min)) * 100;
-  return (
-    <label className="range-control">
-      <span>
-        <strong>{label}</strong>
-        <small>{display}</small>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        style={{ "--range-progress": percentage + "%" } as CSSProperties}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </label>
-  );
-}
-
-function ColorControl({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <label className="color-control">
-      <span>
-        <strong>{label}</strong>
-        <small>{value.toUpperCase()}</small>
-      </span>
-      <span className="color-control__field">
-        <i style={{ background: value }} />
-        <input
-          type="color"
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-        />
-      </span>
-    </label>
-  );
-}
-
 function NewThemeDialog({
   step,
   themes,
@@ -3460,317 +2390,5 @@ function NewThemeDialog({
         </footer>
       </section>
     </div>
-  );
-}
-
-function SettingsView({
-  settings,
-  detection,
-  currentVersion,
-  updateStatus,
-  t,
-  onChange,
-  installPathBusy,
-  onChooseCodexInstall,
-  onUseAutomaticCodexInstall,
-  onCheckForUpdates,
-  diagnosticsBusy,
-  onRunDiagnostics,
-  onOpenOnboarding,
-}: {
-  settings: UserSettings;
-  detection: CodexDetection | null;
-  currentVersion: string;
-  updateStatus: UpdateStatus;
-  t: (key: MessageKey) => string;
-  onChange: (patch: Partial<UserSettings>) => void;
-  installPathBusy: boolean;
-  onChooseCodexInstall: () => void;
-  onUseAutomaticCodexInstall: () => void;
-  onCheckForUpdates: () => void;
-  diagnosticsBusy: boolean;
-  onRunDiagnostics: () => void;
-  onOpenOnboarding: () => void;
-}) {
-  const lastChecked = (() => {
-    if (!settings.lastUpdateCheckAt) return t("neverChecked");
-    const date = new Date(settings.lastUpdateCheckAt);
-    if (Number.isNaN(date.getTime())) return t("neverChecked");
-    return new Intl.DateTimeFormat(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
-    }).format(date);
-  })();
-  return (
-    <div className="page settings-page">
-      <section className="page-heading">
-        <div>
-          <span className="page-kicker">LOCAL PREFERENCES</span>
-          <h1>{t("settings")}</h1>
-          <p>{t("privacyBody")}</p>
-        </div>
-      </section>
-      <div className="settings-layout">
-        <section className="settings-group settings-group--split">
-          <div className="settings-group__title">
-            <Languages size={17} />
-            <div>
-              <h2>{t("language")}</h2>
-              <p>{t("languageDescription")}</p>
-            </div>
-          </div>
-          <div className="settings-group__control">
-            <label className="select-control">
-              <select
-                value={settings.locale}
-                onChange={(event) =>
-                  onChange({ locale: event.target.value as LocalePreference })
-                }
-              >
-                <option value="system">{t("systemLanguage")}</option>
-                <option value="en">English</option>
-                <option value="zh-CN">简体中文</option>
-              </select>
-              <ChevronRight size={14} aria-hidden="true" />
-            </label>
-          </div>
-        </section>
-        <section className="settings-group settings-group--split">
-          <div className="settings-group__title">
-            <Palette size={17} />
-            <div>
-              <h2>{t("managerAppearance")}</h2>
-              <p>{t("managerAppearanceDescription")}</p>
-            </div>
-          </div>
-          <div className="settings-group__control">
-            <SegmentedControl
-              value={settings.appearance}
-              options={[
-                {
-                  value: "system",
-                  label: t("system"),
-                  icon: <Monitor size={13} />,
-                },
-                {
-                  value: "light",
-                  label: t("light"),
-                  icon: <Sun size={13} />,
-                },
-                {
-                  value: "dark",
-                  label: t("dark"),
-                  icon: <Moon size={13} />,
-                },
-              ]}
-              onChange={(value) =>
-                onChange({ appearance: value as ManagerAppearance })
-              }
-            />
-          </div>
-        </section>
-        <section className="settings-group settings-group--split">
-          <div className="settings-group__title">
-            <ShieldCheck size={17} />
-            <div>
-              <h2>{t("runtimeStrategy")}</h2>
-              <p>{t("runtimeStrategyDescription")}</p>
-            </div>
-          </div>
-          <div className="settings-group__control">
-            <label className="select-control">
-              <select
-                value={settings.runtimeStrategy}
-                onChange={(event) =>
-                  onChange({
-                    runtimeStrategy: event.target.value as RuntimeStrategy,
-                  })
-                }
-              >
-                <option value="enhanced">{t("automaticMode")}</option>
-                <option value="conservative">{t("compatibilityMode")}</option>
-              </select>
-              <ChevronRight size={14} aria-hidden="true" />
-            </label>
-            <p className="settings-mode-note">
-              {settings.runtimeStrategy === "enhanced"
-                ? t("automaticModeDescription")
-                : t("compatibilityModeDescription")}
-            </p>
-          </div>
-        </section>
-        <section className="settings-group codex-location-setting">
-          <div className="settings-group__title">
-            <FolderOpen size={17} />
-            <div>
-              <h2>{t("codexLocation")}</h2>
-              <p>{t("codexLocationDescription")}</p>
-            </div>
-          </div>
-          <div className="codex-location-control">
-            <div className="codex-location-path">
-              <small>
-                {settings.codexInstallPath
-                  ? t("customLocation")
-                  : t("detectedAutomatically")}
-              </small>
-              <strong title={detection?.path ?? undefined}>
-                {detection?.path ?? t("codexNotDetected")}
-              </strong>
-            </div>
-            <div className="button-row">
-              {settings.codexInstallPath && (
-                <button
-                  className="text-button"
-                  onClick={onUseAutomaticCodexInstall}
-                  disabled={installPathBusy}
-                >
-                  {t("useAutomaticDetection")}
-                </button>
-              )}
-              <button
-                className="secondary-button"
-                onClick={onChooseCodexInstall}
-                disabled={installPathBusy}
-              >
-                <FolderOpen size={14} />
-                {installPathBusy ? t("checking") : t("chooseApplication")}
-              </button>
-            </div>
-          </div>
-        </section>
-        <SettingToggle
-          icon={<Sparkles size={17} />}
-          title={t("reduceMotion")}
-          description={t("reduceMotionDescription")}
-          checked={settings.reduceMotion}
-          onChange={(checked) => onChange({ reduceMotion: checked })}
-        />
-        <SettingToggle
-          icon={<RefreshCw size={17} />}
-          title={t("automaticUpdateChecks")}
-          description={t("automaticUpdateChecksDescription")}
-          checked={settings.automaticUpdateChecks}
-          onChange={(checked) => onChange({ automaticUpdateChecks: checked })}
-        />
-        <section className="settings-group settings-group--row update-settings-row">
-          <div className="update-settings-row__version">
-            <small>{t("currentVersion")}</small>
-            <strong>Codex Styler {currentVersion}</strong>
-            <span>
-              {t("lastChecked")}: {lastChecked}
-            </span>
-          </div>
-          <button
-            className="secondary-button"
-            onClick={onCheckForUpdates}
-            disabled={updateStatus === "checking"}
-          >
-            <RefreshCw
-              size={14}
-              className={updateStatus === "checking" ? "is-spinning" : ""}
-            />
-            {updateStatus === "checking"
-              ? t("checkingForUpdates")
-              : t("checkForUpdates")}
-          </button>
-        </section>
-        <section className="settings-group settings-group--row diagnostics-settings-row">
-          <div className="settings-group__title">
-            <ShieldCheck size={17} />
-            <div>
-              <h2>{t("diagnosticsTitle")}</h2>
-              <p>{t("diagnosticsDescription")}</p>
-            </div>
-          </div>
-          <button
-            className="secondary-button"
-            onClick={onRunDiagnostics}
-            disabled={diagnosticsBusy}
-          >
-            <RefreshCw
-              size={14}
-              className={diagnosticsBusy ? "is-spinning" : ""}
-            />
-            {diagnosticsBusy ? t("runningDiagnostics") : t("runDiagnostics")}
-          </button>
-        </section>
-        <section className="trust-grid">
-          <article>
-            <LockKeyhole size={20} />
-            <h3>{t("privacyTitle")}</h3>
-            <p>{t("privacyBody")}</p>
-          </article>
-          <article>
-            <ShieldCheck size={20} />
-            <h3>{t("compatibilityTitle")}</h3>
-            <p>{t("compatibilityBody")}</p>
-          </article>
-        </section>
-        <button className="text-button" onClick={onOpenOnboarding}>
-          {t("openOnboarding")}
-          <ChevronRight size={14} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SegmentedControl({
-  value,
-  options,
-  onChange,
-}: {
-  value: string;
-  options: Array<{ value: string; label: string; icon?: ReactNode }>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="segmented-control">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          className={value === option.value ? "is-active" : ""}
-          onClick={() => onChange(option.value)}
-        >
-          {option.icon}
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SettingToggle({
-  icon,
-  title,
-  description,
-  checked,
-  onChange,
-}: {
-  icon: ReactNode;
-  title: string;
-  description: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-}) {
-  return (
-    <section className="settings-group settings-group--row">
-      <div className="settings-group__title">
-        {icon}
-        <div>
-          <h2>{title}</h2>
-          <p>{description}</p>
-        </div>
-      </div>
-      <button
-        className={"toggle" + (checked ? " toggle--on" : "")}
-        onClick={() => onChange(!checked)}
-        role="switch"
-        aria-checked={checked}
-      >
-        <span />
-      </button>
-    </section>
   );
 }

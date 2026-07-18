@@ -197,10 +197,7 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    const applyButtons = screen.getAllByRole("button", {
-      name: "Apply to Codex",
-    });
-    fireEvent.click(applyButtons.at(-1)!);
+    fireEvent.click(screen.getByRole("button", { name: "Apply draft" }));
 
     expect(
       await screen.findByRole("dialog", {
@@ -216,6 +213,38 @@ describe("Codex Styler shell", () => {
     const language = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
     expect(language.options[0]?.value).toBe("system");
     expect(language.options[0]?.textContent).toBe("Follow system language");
+  });
+
+  it("keeps all settings in the original compact continuous flow", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Language" })).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Manager appearance" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Runtime compatibility" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", {
+        name: "Automatically check for updates",
+      }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Diagnostics & compatibility" }),
+    ).toBeVisible();
+    expect(screen.queryByText("CODEX & COMPATIBILITY")).not.toBeInTheDocument();
+  });
+
+  it("keeps hidden import controls out of keyboard navigation", () => {
+    const { container } = render(<App />);
+    const fileInputs =
+      container.querySelectorAll<HTMLInputElement>('input[type="file"]');
+    expect(fileInputs).toHaveLength(3);
+    fileInputs.forEach((input) => {
+      expect(input).toHaveAttribute("tabindex", "-1");
+      expect(input).toHaveAttribute("aria-hidden", "true");
+    });
   });
 
   it("requests update notes in the selected application language", async () => {
@@ -265,7 +294,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.2")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.3")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -360,6 +389,104 @@ describe("Codex Styler shell", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("restores the persisted applied theme as the initial selection", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
+    const nocturne = builtinThemes.find(
+      (theme) => theme.metadata.name === "Nocturne Studio",
+    )!;
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: nocturne.id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+
+    expect(
+      screen.getByRole("button", { name: "Preview: Nocturne Studio" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("persists and applies a Codex light variant immediately when live", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Light" }));
+
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledOnce());
+    expect(vi.mocked(applyConfiguration).mock.calls[0]?.[0]).toMatchObject({
+      variant: "light",
+      reduceMotion: false,
+    });
+    expect(
+      JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}"),
+    ).toMatchObject({ themeVariant: "light" });
+  });
+
+  it("reapplies live runtime compatibility and reduced-motion settings", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
+    vi.mocked(applyConfiguration).mockImplementation(async (configuration) => ({
+      ...appliedRuntime,
+      revision: configuration.revision,
+    }));
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    const strategy = screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+    fireEvent.change(strategy, { target: { value: "conservative" } });
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledOnce());
+    expect(vi.mocked(applyConfiguration).mock.calls[0]?.[0]).toMatchObject({
+      runtimeStrategy: "conservative",
+      reduceMotion: false,
+    });
+
+    fireEvent.click(screen.getByRole("switch", { name: "Reduce motion" }));
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(applyConfiguration).mock.calls[1]?.[0]).toMatchObject({
+      runtimeStrategy: "conservative",
+      reduceMotion: true,
+    });
+  });
+
   it("keeps the newest theme when rapid live selections resolve out of order", async () => {
     vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
     const first = deferred<RuntimeStatus>();
@@ -403,6 +530,76 @@ describe("Codex Styler shell", () => {
     expect(
       screen.getByRole("button", { name: "Preview: Quiet Garden" }),
     ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("invalidates a stale connected badge when Codex is reopened externally", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValueOnce(appliedRuntime);
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+
+    vi.mocked(getRuntimeStatus).mockResolvedValue(disconnectedRuntime);
+    fireEvent(window, new Event("focus"));
+
+    expect(
+      await screen.findByRole("button", { name: "Restart and apply" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+    expect(screen.getByText("Codex is already running")).toBeInTheDocument();
+  });
+
+  it("recovers from a refused debugging socket with the restart flow", async () => {
+    vi.mocked(getRuntimeStatus)
+      .mockResolvedValueOnce(appliedRuntime)
+      .mockResolvedValueOnce(appliedRuntime)
+      .mockResolvedValueOnce(disconnectedRuntime);
+    vi.mocked(applyConfiguration).mockRejectedValueOnce(
+      new Error(
+        "Could not open the Codex debugging socket: IO error: Connection refused",
+      ),
+    );
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview: Nocturne Studio" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Restart and apply" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Connected")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+    expect(
+      screen.getByRole("dialog", {
+        name: "Restart Codex to apply this theme?",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("applies a companion immediately without restarting live Codex", async () => {
@@ -531,7 +728,9 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
     fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
     expect(screen.getByText("Contrast protected")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Reset" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
+    expect(screen.getByRole("menuitem", { name: "Reset" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
       { target: { value: "immersive" } },
@@ -548,11 +747,49 @@ describe("Codex Styler shell", () => {
     expect(preview).toHaveAttribute("data-icon-style", "themed");
     expect(preview).toHaveAttribute("data-decorations", "expressive");
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }));
-    expect(screen.getByRole("menuitem", { name: /Moss/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Gradient layer" }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitem", { name: "Gradient layer" }));
+    expect(
+      screen.getByRole("button", { name: /gradient-/i }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Motion" }));
     expect(
       screen.getByRole("button", { name: /Expressive/ }),
     ).toBeInTheDocument();
+  });
+
+  it("resizes editor panels with the keyboard and keeps recommendations independent", async () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        ...JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}"),
+        companionMode: "custom",
+        companionId: "moss-gecko",
+      }),
+    );
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+
+    const layersSeparator = await screen.findByRole("separator", {
+      name: "Scene layers",
+    });
+    expect(layersSeparator).toHaveAttribute("aria-valuenow", "220");
+    fireEvent.keyDown(layersSeparator, { key: "ArrowRight" });
+    expect(layersSeparator).toHaveAttribute("aria-valuenow", "228");
+
+    expect(screen.getByLabelText("Moss")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recommended pairing" }),
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Recommended pairing" }),
+      { target: { value: "pico-parrot" } },
+    );
+    expect(screen.getByLabelText("Moss")).toBeInTheDocument();
   });
 
   it("keeps theme creation inside the theme library", () => {
@@ -588,8 +825,9 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("tab", { name: /^My Themes/ }));
     fireEvent.click(
-      screen.getByRole("button", { name: "Delete theme: Theme to delete" }),
+      screen.getByRole("button", { name: "More actions: Theme to delete" }),
     );
+    fireEvent.click(screen.getByRole("menuitem", { name: "Delete theme" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Delete theme" }));
     await waitFor(() =>

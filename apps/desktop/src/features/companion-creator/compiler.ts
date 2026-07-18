@@ -33,7 +33,59 @@ function canvasBlob(
 }
 
 function bytes(blob: Blob): Promise<Uint8Array> {
-  return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+  if (typeof blob.arrayBuffer === "function") {
+    return blob.arrayBuffer().then((buffer) => new Uint8Array(buffer));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(new Uint8Array(reader.result as ArrayBuffer));
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("Could not read encoded image bytes"));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+type RasterExtension = "png" | "jpg" | "webp";
+
+interface EncodedCanvasAsset {
+  bytes: Uint8Array;
+  extension: RasterExtension;
+}
+
+export function rasterExtensionForBytes(
+  value: Uint8Array,
+): RasterExtension | null {
+  if (
+    value.length > 8 &&
+    value[0] === 0x89 &&
+    value[1] === 0x50 &&
+    value[2] === 0x4e &&
+    value[3] === 0x47
+  ) {
+    return "png";
+  }
+  if (value.length > 3 && value[0] === 0xff && value[1] === 0xd8) {
+    return "jpg";
+  }
+  if (
+    value.length > 12 &&
+    String.fromCharCode(...value.slice(0, 4)) === "RIFF" &&
+    String.fromCharCode(...value.slice(8, 12)) === "WEBP"
+  ) {
+    return "webp";
+  }
+  return null;
+}
+
+async function encodedCanvasAsset(
+  canvas: HTMLCanvasElement,
+): Promise<EncodedCanvasAsset> {
+  const encoded = await bytes(await canvasBlob(canvas));
+  const extension = rasterExtensionForBytes(encoded);
+  if (!extension) {
+    throw new Error("The locally encoded companion image has an unknown type");
+  }
+  return { bytes: encoded, extension };
 }
 
 function slug(value: string): string {
@@ -103,7 +155,7 @@ export function expandMotionFrames<T>(
 async function portraitAsset(
   frame: ExtractedFrame,
   crop: FrameBounds,
-): Promise<Uint8Array> {
+): Promise<EncodedCanvasAsset> {
   const bitmap = await createImageBitmap(frame.blob);
   const size = 256;
   const canvas = document.createElement("canvas");
@@ -126,7 +178,7 @@ async function portraitAsset(
     height,
   );
   bitmap.close();
-  return bytes(await canvasBlob(canvas));
+  return encodedCanvasAsset(canvas);
 }
 
 export interface CompiledCompanion {
@@ -162,18 +214,15 @@ export async function compileCompanion(
     : `local.${slug(project.name)}-${project.id.slice(-8).toLowerCase()}`;
   const entityId = slug(project.name);
   const files = new Map<string, Uint8Array>();
-  const previewPath = "previews/portrait.webp";
-  files.set(
-    previewPath,
-    await portraitAsset(
-      frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!,
-      crop,
-    ),
+  const portrait = await portraitAsset(
+    frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!,
+    crop,
   );
+  const previewPath = `previews/portrait.${portrait.extension}`;
+  files.set(previewPath, portrait.bytes);
 
   if (activeLogicalFrames.length === 1) {
     const frame = frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!;
-    const path = "assets/companion.webp";
     const bitmap = await createImageBitmap(frame.blob);
     const canvas = document.createElement("canvas");
     canvas.width = Math.ceil(crop.width);
@@ -192,11 +241,13 @@ export async function compileCompanion(
       canvas.height,
     );
     bitmap.close();
-    files.set(path, await bytes(await canvasBlob(canvas)));
+    const encoded = await encodedCanvasAsset(canvas);
+    const path = `assets/companion.${encoded.extension}`;
+    files.set(path, encoded.bytes);
     const definition: CompanionPackageDefinition = {
       format: COMPANION_FORMAT,
       id,
-      version: "0.2.0-beta.2",
+      version: "0.2.0-beta.3",
       metadata: {
         name: project.name,
         description: project.description.trim(),
@@ -278,13 +329,13 @@ export async function compileCompanion(
       );
       bitmap.close();
     }
-    const blob = await canvasBlob(canvas);
-    if (blob.size > encodedFileLimit) {
+    const encoded = await encodedCanvasAsset(canvas);
+    if (encoded.bytes.byteLength > encodedFileLimit) {
       throw new Error("An atlas page exceeds the 20 MiB package limit");
     }
-    const path = `assets/atlas-${page + 1}.webp`;
+    const path = `assets/atlas-${page + 1}.${encoded.extension}`;
     pagePaths.push(path);
-    files.set(path, await bytes(blob));
+    files.set(path, encoded.bytes);
   }
 
   const direction = calibrateDirections(
@@ -381,7 +432,7 @@ export async function compileCompanion(
   const definition: CompanionPackageDefinition = {
     format: COMPANION_FORMAT,
     id,
-    version: "0.2.0-beta.2",
+    version: "0.2.0-beta.3",
     metadata: {
       name: project.name,
       description: project.description.trim(),

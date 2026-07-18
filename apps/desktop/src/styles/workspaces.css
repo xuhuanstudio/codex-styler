@@ -1,0 +1,317 @@
+.home-page {
+  width: min(1240px, calc(100% - 44px));
+  padding-top: 24px;
+}
+
+.home-heading {
+  margin-bottom: 16px;
+}
+
+.home-heading h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(26px, 2.6vw, 36px);
+}
+
+.home-heading p {
+  max-width: 720px;
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+.home-current {
+  min-height: clamp(380px, 46vh, 520px);
+  grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.68fr);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+
+.home-current .workspace-preview {
+  min-height: clamp(348px, calc(46vh - 32px), 488px);
+}
+
+.home-current__content {
+  padding: 26px 28px 22px;
+}
+
+.home-current__content h2 {
+  margin: 8px 0 7px;
+  font-size: 24px;
+}
+
+.home-current__facts {
+  margin: 15px 0;
+  padding: 12px 0;
+}
+
+.home-actions > button {
+  min-height: clamp(94px, 10vh, 112px);
+  padding: 14px 16px;
+}
+
+.page--themes .page-heading,
+.companions-page .page-heading,
+.settings-page .page-heading {
+  margin-bottom: 22px;
+}
+
+.page--themes .page-heading h1,
+.companions-page .page-heading h1,
+.settings-page .page-heading h1 {
+  margin: 8px 0 6px;
+  font-size: clamp(28px, 3vw, 40px);
+}
+
+.page--themes .page-heading p,
+.companions-page .page-heading p,
+.settings-page .page-heading p {
+  font-size: 11.5px;
+  line-height: 1.55;
+}
+
+@media (max-height: 740px) {
+  .home-heading p {
+    display: none;
+  }
+
+  .home-current {
+    min-height: 286px;
+  }
+
+  .home-current .workspace-preview {
+    min-height: 254px;
+  }
+
+  .home-actions > button {
+    min-height: 74px;
+  }
+}
+
+.workspace-home-state {
+  display: grid;
+  width: min(420px, 82%);
+  margin: auto;
+  place-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.workspace-main {
+  position: relative;
+}
+
+.workspace-preview__scene-layer {
+  position: absolute;
+  z-index: 1;
+  inset: -12px;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.015);
+}
+
+.workspace-preview__scene-layer--gradient {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--preview-accent) 24%, transparent),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 78% 18%,
+      color-mix(in srgb, var(--preview-accent) 20%, transparent),
+      transparent 38%
+    );
+}
+
+.workspace-preview__scene-layer--vignette {
+  inset: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 44%,
+    rgba(0, 0, 0, 0.72) 118%
+  );
+  transform: none;
+}
+
+.workspace-preview__overlay {
+  z-index: 2;
+}
+
+.workspace-preview__chrome {
+  z-index: 3;
+}
+
+.workspace-home-state > svg {
+  color: var(--preview-accent);
+}
+
+.workspace-home-state > strong {
+  font-size: clamp(13px, 2.4cqh, 22px);
+  letter-spacing: -0.025em;
+}
+
+.workspace-home-grid {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+
+.workspace-home-grid span {
+  min-height: 42px;
+  padding: 9px;
+  border: 1px solid var(--preview-border);
+  border-radius: calc(var(--preview-radius) * 0.7);
+  color: var(--preview-muted);
+  background: color-mix(in srgb, var(--preview-surface) 82%, transparent);
+  font-size: 8px;
+  text-align: left;
+}
+
+.workspace-settings-state {
+  display: grid;
+  width: min(500px, 90%);
+  min-height: 220px;
+  margin: auto;
+  grid-template-columns: 120px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid var(--preview-border);
+  border-radius: var(--preview-radius);
+  background: color-mix(in srgb, var(--preview-surface) 90%, transparent);
+}
+
+.workspace-settings-state nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 9px;
+  border-right: 1px solid var(--preview-border);
+}
+
+.workspace-settings-state nav span {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--preview-muted);
+  font-size: 7px;
+}
+
+.workspace-settings-state nav span.is-active {
+  color: var(--preview-text);
+  background: color-mix(in srgb, var(--preview-accent) 15%, transparent);
+}
+
+.workspace-settings-state > div {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 20px;
+}
+
+.workspace-settings-state > div strong {
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.workspace-settings-state > div span {
+  display: block;
+  height: 34px;
+  border: 1px solid var(--preview-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--preview-surface) 82%, transparent);
+}
+
+.workspace-right-panel {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: min(190px, 34%);
+  padding: 13px;
+  border: 1px solid var(--preview-border);
+  border-radius: calc(var(--preview-radius) * 0.85);
+  background: color-mix(in srgb, var(--preview-surface) 94%, transparent);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(var(--preview-focus-blur));
+}
+
+.workspace-right-panel > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.workspace-right-panel strong {
+  font-size: 9px;
+}
+
+.workspace-right-panel > span {
+  display: block;
+  height: 35px;
+  margin-top: 7px;
+  border: 1px solid var(--preview-border);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--preview-surface) 78%, transparent);
+}
+
+.workspace-dialog-layer {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(8, 10, 13, 0.48);
+  backdrop-filter: blur(2px);
+}
+
+.workspace-dialog-layer > div {
+  width: min(300px, 62%);
+  padding: 18px;
+  border: 1px solid var(--preview-border);
+  border-radius: var(--preview-radius);
+  color: var(--preview-text);
+  background: color-mix(in srgb, var(--preview-surface) 96%, transparent);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+}
+
+.workspace-dialog-layer strong,
+.workspace-dialog-layer p {
+  display: block;
+}
+
+.workspace-dialog-layer strong {
+  margin: 10px 0 5px;
+  font-size: 11px;
+}
+
+.workspace-dialog-layer p {
+  margin: 0;
+  color: var(--preview-muted);
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.workspace-dialog-layer > div > span {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.workspace-dialog-layer i {
+  display: block;
+  width: 58px;
+  height: 26px;
+  border: 1px solid var(--preview-border);
+  border-radius: 7px;
+}
+
+.workspace-dialog-layer i:last-child {
+  border-color: var(--preview-accent);
+  background: var(--preview-accent);
+}

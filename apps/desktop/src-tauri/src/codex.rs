@@ -1,5 +1,8 @@
 use std::path::{Path, PathBuf};
 
+#[cfg(any(target_os = "windows", test))]
+use std::collections::HashSet;
+
 use sysinfo::{ProcessesToUpdate, System};
 
 use crate::{error::StylerError, model::CodexDetection};
@@ -8,6 +11,24 @@ const GRACEFUL_QUIT_POLLS: usize = 16;
 #[cfg(target_os = "windows")]
 const FORCED_QUIT_POLLS: usize = 20;
 const QUIT_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+#[cfg(target_os = "windows")]
+fn hidden_tokio_command(program: &str) -> tokio::process::Command {
+    let mut command = tokio::process::Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
+#[cfg(target_os = "windows")]
+fn hidden_command(program: &str) -> std::process::Command {
+    use std::os::windows::process::CommandExt;
+
+    let mut command = std::process::Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
 
 pub async fn quit_codex(custom_path: Option<&Path>) -> Result<CodexDetection, StylerError> {
     let initial = detect_codex(custom_path)?;
@@ -68,9 +89,10 @@ async fn wait_until_closed(
 
 #[cfg(target_os = "windows")]
 async fn request_windows_close(custom_path: Option<&Path>) -> Result<(), StylerError> {
-    let pids = desktop_processes(custom_path)
+    let processes = desktop_processes(custom_path);
+    let pids = root_process_ids(&processes)
         .into_iter()
-        .map(|(pid, _)| pid.to_string())
+        .map(|pid| pid.to_string())
         .collect::<Vec<_>>();
     if pids.is_empty() {
         return Ok(());
@@ -79,12 +101,12 @@ async fn request_windows_close(custom_path: Option<&Path>) -> Result<(), StylerE
         "$p = Get-Process -Id {} -ErrorAction SilentlyContinue; if ($p) {{ $p.CloseMainWindow() | Out-Null }}",
         pids.join(",")
     );
-    let status = tokio::process::Command::new("powershell.exe")
+    let output = hidden_tokio_command("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", &command])
-        .status()
+        .output()
         .await
         .map_err(|error| StylerError::Launch(error.to_string()))?;
-    if status.success() {
+    if output.status.success() {
         Ok(())
     } else {
         Err(StylerError::Launch(
@@ -95,15 +117,15 @@ async fn request_windows_close(custom_path: Option<&Path>) -> Result<(), StylerE
 
 #[cfg(target_os = "windows")]
 async fn force_close_windows_codex(custom_path: Option<&Path>) -> Result<(), StylerError> {
-    for (pid, _) in desktop_processes(custom_path) {
-        let status = tokio::process::Command::new("taskkill.exe")
+    let processes = desktop_processes(custom_path);
+    for pid in root_process_ids(&processes) {
+        let _output = hidden_tokio_command("taskkill.exe")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
-            .status()
+            .output()
             .await
             .map_err(|error| StylerError::Launch(error.to_string()))?;
-        // A process may exit between enumeration and taskkill. Continue and
-        // let the subsequent detection decide whether restart can proceed.
-        let _ = status;
+        // A process may exit between enumeration and taskkill. Treat that as
+        // success and let the subsequent detection decide whether to restart.
     }
     Ok(())
 }
@@ -111,7 +133,7 @@ async fn force_close_windows_codex(custom_path: Option<&Path>) -> Result<(), Sty
 pub fn detect_codex(custom_path: Option<&Path>) -> Result<CodexDetection, StylerError> {
     let located_path = locate_codex(custom_path);
     let processes = desktop_processes(located_path.as_deref().or(custom_path));
-    let running_path = processes.iter().find_map(|(_, path)| path.clone());
+    let running_path = processes.iter().find_map(|(_, _, path)| path.clone());
     let path = located_path.or(running_path);
 
     Ok(CodexDetection {
@@ -123,7 +145,7 @@ pub fn detect_codex(custom_path: Option<&Path>) -> Result<CodexDetection, Styler
     })
 }
 
-fn desktop_processes(install_path: Option<&Path>) -> Vec<(u32, Option<PathBuf>)> {
+fn desktop_processes(install_path: Option<&Path>) -> Vec<(u32, Option<u32>, Option<PathBuf>)> {
     let expected_executable = install_path.and_then(executable_from_install);
     let mut system = System::new();
     system.refresh_processes(ProcessesToUpdate::All, true);
@@ -140,9 +162,23 @@ fn desktop_processes(install_path: Option<&Path>) -> Vec<(u32, Option<PathBuf>)>
             }
             Some((
                 process.pid().as_u32(),
+                process.parent().map(|pid| pid.as_u32()),
                 install_root_from_executable(executable),
             ))
         })
+        .collect()
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn root_process_ids(processes: &[(u32, Option<u32>, Option<PathBuf>)]) -> Vec<u32> {
+    let matched = processes
+        .iter()
+        .map(|(pid, _, _)| *pid)
+        .collect::<HashSet<_>>();
+    processes
+        .iter()
+        .filter(|(_, parent, _)| parent.is_none_or(|pid| !matched.contains(&pid)))
+        .map(|(pid, _, _)| *pid)
         .collect()
 }
 
@@ -205,6 +241,42 @@ fn is_supported_windows_desktop_path(executable: &Path) -> bool {
             || lower.contains("\\programs\\chatgpt\\")
             || lower.contains("\\codex\\codex.exe")
             || lower.contains("\\chatgpt\\chatgpt.exe"))
+}
+
+#[cfg(any(target_os = "windows", test))]
+pub fn is_windows_store_install(executable: &Path) -> bool {
+    executable
+        .to_string_lossy()
+        .replace('/', "\\")
+        .to_ascii_lowercase()
+        .contains("\\program files\\windowsapps\\")
+}
+
+#[cfg(target_os = "windows")]
+pub fn windows_store_app_user_model_id(executable: &Path) -> Option<String> {
+    if !is_windows_store_install(executable) {
+        return None;
+    }
+    let filename = executable.file_name()?.to_str()?;
+    let target = if filename.eq_ignore_ascii_case("Codex.exe") {
+        "Codex.exe"
+    } else if filename.eq_ignore_ascii_case("ChatGPT.exe") {
+        "ChatGPT.exe"
+    } else {
+        return None;
+    };
+    let script = format!(
+        "$target = '{target}'; $packages = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object {{ $_.Name -match '^OpenAI\\.(Codex|ChatGPT)' }} | Sort-Object Version -Descending; foreach ($p in $packages) {{ $manifest = Get-AppxPackageManifest -Package $p.PackageFullName -ErrorAction SilentlyContinue; foreach ($app in $manifest.Package.Applications.Application) {{ if ([IO.Path]::GetFileName([string]$app.Executable) -ieq $target) {{ Write-Output ($p.PackageFamilyName + '!' + [string]$app.Id); exit 0 }} }} }}"
+    );
+    let output = hidden_command("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let id = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    (!id.is_empty()).then_some(id)
 }
 
 fn read_version(path: &Path) -> Option<String> {
@@ -270,7 +342,10 @@ fn locate_codex(custom_path: Option<&Path>) -> Option<PathBuf> {
     {
         let mut candidates = windows_standard_candidates();
         if let Some(store_path) = windows_store_install() {
-            candidates.insert(0, store_path);
+            // Prefer a directly executable per-user or system installation.
+            // Store packages remain the automatic fallback and are activated
+            // through their registered application identity at launch time.
+            candidates.push(store_path);
         }
         candidates.into_iter().find(|path| path.exists())
     }
@@ -328,7 +403,7 @@ fn windows_standard_candidates() -> Vec<PathBuf> {
 #[cfg(target_os = "windows")]
 fn windows_store_install() -> Option<PathBuf> {
     let script = "$packages = Get-AppxPackage -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^OpenAI\\.(Codex|ChatGPT)' } | Sort-Object Version -Descending; foreach ($p in $packages) { $candidates = @((Join-Path $p.InstallLocation 'app\\Codex.exe'), (Join-Path $p.InstallLocation 'app\\ChatGPT.exe'), (Join-Path $p.InstallLocation 'ChatGPT.exe')); foreach ($candidate in $candidates) { if (Test-Path $candidate) { Write-Output $candidate; exit 0 } } }";
-    let output = std::process::Command::new("powershell.exe")
+    let output = hidden_command("powershell.exe")
         .args(["-NoProfile", "-NonInteractive", "-Command", script])
         .output()
         .ok()?;
@@ -369,8 +444,11 @@ pub fn executable_from_install(path: &Path) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{executable_from_install, is_supported_windows_desktop_path};
-    use std::path::Path;
+    use super::{
+        executable_from_install, is_supported_windows_desktop_path, is_windows_store_install,
+        root_process_ids,
+    };
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn missing_install_has_no_executable() {
@@ -379,9 +457,11 @@ mod tests {
 
     #[test]
     fn recognizes_windows_store_desktop_executable() {
-        assert!(is_supported_windows_desktop_path(Path::new(
-            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.616.5445.0_x64__2p2nqsd0c76g0\app\Codex.exe"
-        )));
+        let executable = Path::new(
+            r"C:\Program Files\WindowsApps\OpenAI.Codex_26.616.5445.0_x64__2p2nqsd0c76g0\app\Codex.exe",
+        );
+        assert!(is_supported_windows_desktop_path(executable));
+        assert!(is_windows_store_install(executable));
     }
 
     #[test]
@@ -392,5 +472,16 @@ mod tests {
         assert!(!is_supported_windows_desktop_path(Path::new(
             r"C:\Users\developer\bin\codex.exe"
         )));
+    }
+
+    #[test]
+    fn selects_only_process_tree_roots_for_windows_shutdown() {
+        let processes = vec![
+            (100, None, Some(PathBuf::from("Codex.exe"))),
+            (101, Some(100), Some(PathBuf::from("Codex.exe"))),
+            (102, Some(101), Some(PathBuf::from("Codex.exe"))),
+            (200, None, Some(PathBuf::from("Codex.exe"))),
+        ];
+        assert_eq!(root_process_ids(&processes), vec![100, 200]);
     }
 }

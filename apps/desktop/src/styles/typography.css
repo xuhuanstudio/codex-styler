@@ -1,0 +1,236 @@
+/*
+ * Product typography only. Codex preview text intentionally keeps its own
+ * miniature scale so the preview remains spatially honest.
+ */
+.app-brand span:not(.brand-mark *),
+.page-kicker,
+.page-heading > div > span,
+.section-heading span,
+.featured-theme__copy > span,
+.editor-header > div > span {
+  font-size: var(--type-caption);
+}
+
+.app-nav__item span {
+  font-size: var(--type-body);
+}
+
+.connection-card__top strong,
+.connection-card__actions button {
+  font-size: var(--type-meta);
+}
+
+.connection-card__actions button {
+  white-space: nowrap;
+}
+
+@media (max-width: 1080px) {
+  .connection-card__actions button {
+    font-size: var(--type-caption);
+  }
+}
+
+.connection-card > span,
+.topbar-status,
+.preview-variant-control,
+.app-version {
+  font-size: var(--type-caption);
+}
+
+.configuration-status-pill {
+  font-size: 10px;
+}
+
+.page-heading h1,
+.home-heading h1,
+.page--themes .page-heading h1,
+.companions-page .page-heading h1,
+.settings-page .page-heading h1 {
+  font-size: clamp(27px, 2.6vw, var(--type-page));
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+}
+
+.page-heading p,
+.home-heading p,
+.page--themes .page-heading p,
+.companions-page .page-heading p,
+.settings-page .page-heading p {
+  font-size: var(--type-body);
+  line-height: 1.55;
+}
+
+.primary-button,
+.secondary-button,
+.danger-button,
+.text-button,
+.button,
+.theme-row__menu button,
+.companion-option-actions > div button,
+.editor-more-actions__menu button {
+  font-size: var(--type-meta);
+}
+
+.home-current__content h2 {
+  font-size: 23px;
+}
+
+.home-current__content > p,
+.home-actions strong {
+  font-size: var(--type-body);
+}
+
+.home-actions small,
+.home-current__facts dd {
+  font-size: var(--type-meta);
+}
+
+.home-current__eyebrow,
+.home-current__facts dt,
+.home-heading__status small {
+  font-size: var(--type-caption);
+}
+
+.home-heading__status strong {
+  font-size: var(--type-meta);
+}
+
+.section-heading h2,
+.section-heading--compact h2 {
+  font-size: 19px;
+}
+
+.theme-library-master .theme-row__copy > span,
+.theme-facts small,
+.companion-detail-summary > div:first-child > span {
+  font-size: var(--type-caption);
+}
+
+.theme-library-master .theme-row__copy h3,
+.companion-option strong {
+  font-size: var(--type-label);
+}
+
+.theme-library-master .theme-row__copy p,
+.companion-option small,
+.companion-detail-summary p {
+  font-size: var(--type-meta);
+}
+
+.theme-library-workspace .featured-theme__copy h2 {
+  font-size: 24px;
+}
+
+.theme-library-workspace .featured-theme__copy p,
+.theme-facts strong {
+  font-size: var(--type-body);
+}
+
+.configuration-state,
+.companion-detail-summary__badges span {
+  font-size: var(--type-caption);
+}
+
+.companion-detail-summary strong {
+  font-size: var(--type-section);
+}
+
+.settings-layout .settings-group p,
+.settings-mode-note,
+.update-settings-row__version span,
+.trust-grid p {
+  font-size: var(--type-meta);
+}
+
+.settings-layout .settings-group h2,
+.trust-grid h3 {
+  font-size: var(--type-label);
+}
+
+.settings-layout .ui-select select,
+.settings-layout .segmented-control button,
+.settings-layout :where(.primary-button, .secondary-button, .text-button),
+.update-settings-row__version strong,
+.codex-location-path strong {
+  font-size: var(--type-body);
+}
+
+.codex-location-path small,
+.update-settings-row__version small {
+  font-size: var(--type-caption);
+}
+
+.editor-header h1,
+.creator-header h1 {
+  font-size: 21px;
+  line-height: 1.2;
+}
+
+.editor-save-state,
+.panel-title,
+.layer-stack__group-label,
+.canvas-toolbar,
+.creator-header p,
+.creator-footer > span,
+.creator-footer .creator-footer__status {
+  font-size: var(--type-caption);
+}
+
+.layer-item strong,
+.inspector-section h3,
+.adaptive-import-button strong,
+.creator-step,
+.creator-dropzone strong,
+.source-type strong,
+.creator-panel__intro p,
+.creator-canvas-toolbar--caption,
+.creator-canvas-note,
+.creator-source-summary :is(dt, dd),
+.creator-estimate span,
+.creator-inspector-help,
+.creator-field,
+.creator-control-row,
+.creator-color-field,
+.creator-field :is(input, select, textarea),
+.creator-toggle-row,
+.creator-field-error,
+.creator-inspector-heading p {
+  font-size: var(--type-meta);
+}
+
+.layer-item small,
+.adaptive-import-button small,
+.adaptive-intro p,
+.creator-dropzone span,
+.source-type span,
+.creator-toolbar-group > span,
+.alignment-canvas-size,
+.creator-estimate small,
+.creator-field > small,
+.creator-control-row output,
+.creator-inspector-heading > span {
+  font-size: var(--type-caption);
+}
+
+.creator-panel__intro h2 {
+  font-size: var(--type-section);
+}
+
+.creator-inspector-panel h3,
+.creator-source-summary dd,
+.creator-dropzone__content strong {
+  font-size: var(--type-body);
+}
+
+.creator-segmented button,
+.creator-inspector-actions .button,
+.video-range-editor__actions button,
+.corner-mask-control .button {
+  font-size: var(--type-caption);
+}
+
+@media (max-width: 1080px) {
+  .creator-step {
+    font-size: var(--type-caption);
+  }
+}
