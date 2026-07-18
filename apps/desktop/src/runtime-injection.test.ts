@@ -69,7 +69,123 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(15);
+    expect(runtime().version).toBe(16);
+  });
+
+  it("renders validated scene layers and updates parallax without blocking Codex", async () => {
+    const theme = structuredClone(nativeRefined);
+    theme.scene.layers = [
+      {
+        id: "ambient-depth",
+        type: "gradient",
+        opacity: 0.42,
+        blendMode: "soft-light",
+        parallax: 20,
+      },
+      {
+        id: "edge-vignette",
+        type: "vignette",
+        opacity: 0.3,
+        blendMode: "multiply",
+        parallax: 0,
+      },
+    ];
+
+    await runtime().apply(theme, "dark", "compatibility");
+
+    const gradient = document.querySelector<HTMLElement>(
+      '[data-layer-id="ambient-depth"]',
+    );
+    expect(gradient).not.toBeNull();
+    expect(gradient).toHaveClass("cs-layer-gradient");
+    expect(gradient?.style.pointerEvents).toBe("");
+    expect(gradient?.style.opacity).toBe("0.42");
+    expect(gradient?.style.mixBlendMode).toBe("soft-light");
+
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        clientX: window.innerWidth,
+        clientY: window.innerHeight,
+      }),
+    );
+    expect(gradient?.style.transform).toContain("translate(");
+
+    runtime().restore();
+    expect(document.querySelector(".cs-layer")).toBeNull();
+  });
+
+  it("uses the matching image layer to control the base background", async () => {
+    const theme = structuredClone(nativeRefined);
+    const image = "data:image/png;base64,iVBORw0KGgo=";
+    theme.variants.dark.background.image = image;
+    theme.scene.layers = [
+      {
+        id: "studio-background",
+        type: "image",
+        asset: image,
+        opacity: 0.68,
+        blendMode: "soft-light",
+        parallax: 12,
+      },
+    ];
+    theme.variants.dark.motion.intensity = 1;
+    theme.variants.dark.motion.parallax = 4;
+
+    await runtime().apply(theme, "dark", "compatibility");
+
+    const background = document.querySelector<HTMLElement>(".cs-background");
+    expect(background?.dataset.layerId).toBe("studio-background");
+    expect(background?.style.opacity).toBe("0.68");
+    expect(background?.style.mixBlendMode).toBe("soft-light");
+    expect(
+      document.querySelectorAll('[data-layer-id="studio-background"]'),
+    ).toHaveLength(1);
+
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        clientX: window.innerWidth,
+        clientY: window.innerHeight,
+      }),
+    );
+    expect(background?.style.transform).toContain("translate(-2px, -2px)");
+  });
+
+  it("keeps scene layers still when the global parallax depth is zero", async () => {
+    const theme = structuredClone(nativeRefined);
+    theme.scene.layers = [
+      {
+        id: "still-gradient",
+        type: "gradient",
+        opacity: 0.4,
+        blendMode: "soft-light",
+        parallax: 12,
+      },
+    ];
+    theme.variants.dark.motion.intensity = 1;
+    theme.variants.dark.motion.parallax = 0;
+
+    await runtime().apply(theme, "dark", "compatibility");
+    window.dispatchEvent(
+      new PointerEvent("pointermove", {
+        clientX: window.innerWidth,
+        clientY: window.innerHeight,
+      }),
+    );
+
+    expect(
+      document.querySelector<HTMLElement>('[data-layer-id="still-gradient"]')
+        ?.style.transform,
+    ).toBe("");
+  });
+
+  it("rejects malformed scene layers before injecting them", async () => {
+    const theme = structuredClone(nativeRefined);
+    theme.scene.layers[0].opacity = 2;
+
+    await expect(
+      runtime().apply(theme, "dark", "compatibility"),
+    ).rejects.toThrow("invalid scene layer data");
+    expect(document.getElementById("codex-styler-scene-root")).toBeNull();
   });
 
   it("uses semantic styling when live adapter verification succeeds", async () => {

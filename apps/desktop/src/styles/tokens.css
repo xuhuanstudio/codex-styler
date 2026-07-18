@@ -1,0 +1,61 @@
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --radius-xs: 6px;
+  --radius-sm: 9px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+
+  --control-compact: 36px;
+  --control-default: 40px;
+  --control-large: 46px;
+
+  --type-caption: 11px;
+  --type-meta: 12px;
+  --type-body: 13px;
+  --type-label: 14px;
+  --type-section: 18px;
+  --type-page: 30px;
+
+  --motion-micro: 120ms;
+  --motion-standard: 180ms;
+  --motion-panel: 240ms;
+  --ease-standard: cubic-bezier(0.2, 0.75, 0.25, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --surface-canvas: var(--shell);
+  --surface-base: var(--shell-elevated);
+  --surface-subtle: var(--shell-soft);
+  --surface-hover: color-mix(in srgb, var(--shell-elevated) 82%, var(--ink) 3%);
+  --surface-selected: var(--accent-soft);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-muted);
+  --text-tertiary: var(--ink-faint);
+  --border-subtle: var(--line);
+  --border-strong: var(--line-strong);
+  --focus-ring: color-mix(in srgb, var(--accent) 78%, white);
+  --shadow-panel: 0 18px 54px rgba(20, 24, 32, 0.11);
+  --shadow-flyout: 0 18px 48px rgba(8, 10, 14, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-micro: 0ms;
+    --motion-standard: 0ms;
+    --motion-panel: 0ms;
+  }
+}
+
+:root.reduce-motion {
+  --motion-micro: 0ms;
+  --motion-standard: 0ms;
+  --motion-panel: 0ms;
+}

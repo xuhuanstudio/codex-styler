@@ -52,6 +52,31 @@ test("English dark manager at the compact supported size", async ({ page }) => {
   });
 });
 
+test("English dark home keeps a balanced preview in a tall window", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1600, height: 1000 });
+  const currentSetup = page.locator(".home-current");
+  const quickActions = page.locator(".home-actions > button");
+  await expect(currentSetup).toBeVisible();
+  const dimensions = await currentSetup.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const preview = element
+      .querySelector(".home-current__preview")!
+      .getBoundingClientRect();
+    return {
+      height: bounds.height,
+      previewAspectRatio: preview.width / preview.height,
+    };
+  });
+  expect(dimensions.height).toBeGreaterThanOrEqual(450);
+  expect(dimensions.previewAspectRatio).toBeLessThan(2.05);
+  await expect(quickActions.first()).toHaveCSS("min-height", "100px");
+  await expect(page).toHaveScreenshot("manager-en-dark-1600x1000.png", {
+    fullPage: true,
+  });
+});
+
 test("companion cards use independent portraits", async ({ page }) => {
   await openManager(page, "en", "dark", { width: 960, height: 680 });
   await page.getByRole("button", { name: "Companions" }).click();
@@ -62,6 +87,29 @@ test("companion cards use independent portraits", async ({ page }) => {
   const list = page.locator(".companion-list");
   await list.scrollIntoViewIfNeeded();
   await expect(list).toHaveScreenshot("companion-list-en-dark.png");
+});
+
+test("theme library and focused editor remain usable at compact sizes", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Themes", exact: true }).click();
+  await expect(page.locator(".theme-library-workspace")).toBeVisible();
+  await expect(page).toHaveScreenshot("themes-en-dark-1320x840.png");
+
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expect(page.locator(".theme-library-master")).toBeVisible();
+  await expect(page.locator(".featured-theme")).toBeHidden();
+  await expect(page).toHaveScreenshot("themes-en-dark-960x680.png");
+
+  await page.getByRole("button", { name: "New theme" }).click();
+  await page.getByRole("button", { name: /Start blank/ }).click();
+  await expect(page.locator(".editor-page")).toBeVisible();
+  await expect(page.locator(".layers-panel")).toBeVisible();
+  await expect(
+    page.getByRole("separator", { name: "Scene layers" }),
+  ).toBeHidden();
+  await expect(page).toHaveScreenshot("theme-editor-en-dark-960x680.png");
 });
 
 test("settings controls share a stable professional layout", async ({
@@ -87,7 +135,10 @@ test("Simplified Chinese dark layout remains stable", async ({ page }) => {
   await openManager(page, "zh-CN", "dark", { width: 960, height: 680 });
   await expect(page).toHaveScreenshot("manager-zh-dark-960x680.png", {
     fullPage: true,
-    maxDiffPixelRatio: 0.015,
+    // CoreText rasterizes dense Chinese glyphs differently between the
+    // developer OS and GitHub's macOS runner. The downloaded CI diff confirms
+    // identical layout and geometry; only glyph edges differ.
+    maxDiffPixelRatio: 0.025,
   });
 });
 
@@ -332,7 +383,7 @@ test("keyboard companion creator completes a static-image project", async ({
   await expect(buildCompanion).toBeEnabled();
   await buildCompanion.press("Enter");
   await expect(
-    page.getByText("Keyboard Friend", { exact: true }),
+    page.getByText("Keyboard Friend", { exact: true }).first(),
   ).toBeVisible();
 });
 

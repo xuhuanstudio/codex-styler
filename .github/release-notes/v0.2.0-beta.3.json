@@ -1,0 +1,41 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.3",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "A product-coherence and reliability pass unifies themes, companions, focused workspaces, runtime preferences, and companion packaging.",
+      "highlights": [
+        "Reworked Home, Themes, Companions, Settings, Theme Editor, and Companion Studio around one consistent application model and visual system.",
+        "Light/dark variants, compatibility strategy, and reduced-motion preferences now persist and apply immediately to a connected Codex session.",
+        "Theme background layers now retain their authored opacity, blend mode, and capped parallax in both preview and the injected Codex runtime.",
+        "Companion creation keeps native drag-and-drop, non-destructive editing, visual calibration, and recoverable project history."
+      ],
+      "fixes": [
+        "Fixed the Home workspace preview staying compressed at taller window sizes while preserving the compact layout.",
+        "Fixed a stale Connected state after Codex was closed or reopened externally, including recovery from refused debugging-socket connections.",
+        "Fixed Windows restart opening a terminal and Microsoft Store installs failing to relaunch from a protected WindowsApps path.",
+        "Fixed locally encoded PNG fallback images being mislabeled as WebP and rejected during companion installation.",
+        "Fixed Styler reopening on the first built-in theme instead of the previously applied theme and variant.",
+        "Fixed zero parallax and Reduce motion leaving movement or idle behavior active in Codex."
+      ]
+    },
+    "zh-CN": {
+      "summary": "本次产品一致性与可靠性更新统一了主题、伙伴、专注工作区、运行偏好和伙伴打包链路。",
+      "highlights": [
+        "围绕统一的应用心智和视觉系统，收敛主页、主题、伙伴、设置、主题编辑器和伙伴工作室。",
+        "Codex 亮暗变体、兼容策略和减少动态设置现在可以持久化，并在已连接时立即生效。",
+        "主题背景图层的透明度、混合模式和受控视差现在会同时作用于预览与真实 Codex 运行时。",
+        "伙伴创作继续支持原生拖放、非破坏性编辑、可视化校准和可恢复工程历史。"
+      ],
+      "fixes": [
+        "修复大窗口下主页工作区预览仍被压成过宽横条的问题，同时保留紧凑窗口布局。",
+        "修复外部关闭或重新打开 Codex 后仍错误显示已连接，以及调试连接被拒绝时无法进入受控重启流程的问题。",
+        "修复 Windows 重启时弹出终端，以及 Microsoft Store 安装因受保护的 WindowsApps 路径而无法重新启动的问题。",
+        "修复 WebView 回退生成 PNG 时仍被错误声明为 WebP，导致伙伴安装校验失败的问题。",
+        "修复 Styler 重启后错误回到第一套内置主题，而非恢复上次主题与变体的问题。",
+        "修复视差为零或开启减少动态后，Codex 中仍残留移动与待机动作的问题。"
+      ]
+    }
+  }
+}

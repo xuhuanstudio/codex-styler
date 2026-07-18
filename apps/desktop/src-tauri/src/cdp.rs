@@ -13,6 +13,72 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::{codex::executable_from_install, error::StylerError};
 
+#[cfg(target_os = "windows")]
+use crate::codex::{is_windows_store_install, windows_store_app_user_model_id};
+
+#[cfg(target_os = "windows")]
+fn launch_windows_packaged_app(
+    app_user_model_id: &str,
+    arguments: &str,
+) -> Result<u32, StylerError> {
+    use windows::{
+        Win32::{
+            System::Com::{
+                CLSCTX_LOCAL_SERVER, COINIT_MULTITHREADED, CoCreateInstance, CoInitializeEx,
+                CoUninitialize,
+            },
+            UI::Shell::{AO_NONE, ApplicationActivationManager, IApplicationActivationManager},
+        },
+        core::HSTRING,
+    };
+
+    unsafe {
+        CoInitializeEx(None, COINIT_MULTITHREADED)
+            .ok()
+            .map_err(|error| StylerError::Launch(error.to_string()))?;
+        let result = (|| {
+            let manager: IApplicationActivationManager =
+                CoCreateInstance(&ApplicationActivationManager, None, CLSCTX_LOCAL_SERVER)?;
+            manager.ActivateApplication(
+                &HSTRING::from(app_user_model_id),
+                &HSTRING::from(arguments),
+                AO_NONE,
+            )
+        })();
+        CoUninitialize();
+        result.map_err(|error| StylerError::Launch(error.to_string()))
+    }
+}
+
+fn launch_codex_process(executable: &Path, port: u16) -> Result<u32, StylerError> {
+    let port_argument = format!("--remote-debugging-port={port}");
+    let address_argument = "--remote-debugging-address=127.0.0.1";
+
+    #[cfg(target_os = "windows")]
+    if is_windows_store_install(executable) {
+        let app_user_model_id = windows_store_app_user_model_id(executable).ok_or_else(|| {
+            StylerError::Launch(
+                "The Microsoft Store installation could not be resolved to an application identity"
+                    .into(),
+            )
+        })?;
+        return launch_windows_packaged_app(
+            &app_user_model_id,
+            &format!("{port_argument} {address_argument}"),
+        );
+    }
+
+    Command::new(executable)
+        .arg(port_argument)
+        .arg(address_argument)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map(|child| child.id())
+        .map_err(|error| StylerError::Launch(error.to_string()))
+}
+
 #[derive(Debug)]
 pub struct CdpSession {
     pub port: u16,
@@ -35,14 +101,7 @@ pub async fn launch_and_connect(install_path: &str) -> Result<CdpSession, Styler
     let executable =
         executable_from_install(Path::new(install_path)).ok_or(StylerError::CodexNotFound)?;
 
-    let child = Command::new(executable)
-        .arg(format!("--remote-debugging-port={port}"))
-        .arg("--remote-debugging-address=127.0.0.1")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|error| StylerError::Launch(error.to_string()))?;
+    let child_id = launch_codex_process(&executable, port)?;
 
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(900))
@@ -59,7 +118,7 @@ pub async fn launch_and_connect(install_path: &str) -> Result<CdpSession, Styler
             return Ok(CdpSession {
                 port,
                 websocket_url,
-                child_id: child.id(),
+                child_id,
             });
         }
         sleep(Duration::from_millis(200)).await;
@@ -105,6 +164,15 @@ pub async fn evaluate(websocket_url: &str, expression: &str) -> Result<Value, St
     Err(StylerError::Runtime(
         "The Codex debugging socket closed before replying".into(),
     ))
+}
+
+pub async fn probe(websocket_url: &str) -> Result<(), StylerError> {
+    let result = tokio::time::timeout(Duration::from_millis(750), connect_async(websocket_url))
+        .await
+        .map_err(|_| StylerError::Runtime("The Codex debugging socket probe timed out".into()))?;
+    let (mut socket, _) = result?;
+    socket.close(None).await?;
+    Ok(())
 }
 
 fn reserve_loopback_port() -> Result<u16, StylerError> {

@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 15) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 16) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -33,6 +33,8 @@
     "deleted",
   ]);
   let pointerHandler = null;
+  let scenePointerHandler = null;
+  let sceneAnimationFrame = null;
   let resizeHandler = null;
   let layoutResizeHandler = null;
   let mutationObserver = null;
@@ -152,6 +154,24 @@
       throw new Error("Codex Styler rejected an unsafe chrome treatment");
     }
     assertSafeImage(background.image);
+    const layers = theme.scene?.layers;
+    if (!Array.isArray(layers) || layers.length > 8) {
+      throw new Error("Codex Styler rejected an invalid scene layer list");
+    }
+    layers.forEach((layer) => {
+      if (
+        !layer ||
+        !["image", "gradient", "vignette"].includes(layer.type) ||
+        !finiteBetween(layer.opacity, 0, 1) ||
+        !finiteBetween(layer.parallax, -30, 30) ||
+        !["normal", "multiply", "screen", "overlay", "soft-light"].includes(
+          layer.blendMode,
+        )
+      ) {
+        throw new Error("Codex Styler rejected invalid scene layer data");
+      }
+      assertSafeImage(layer.asset);
+    });
     const entities = theme.scene?.entities;
     if (!Array.isArray(entities) || entities.length > 1) {
       throw new Error("Codex Styler rejected an invalid entity list");
@@ -310,6 +330,11 @@
   };
 
   const remove = () => {
+    if (scenePointerHandler)
+      window.removeEventListener("pointermove", scenePointerHandler);
+    if (sceneAnimationFrame !== null) cancelAnimationFrame(sceneAnimationFrame);
+    scenePointerHandler = null;
+    sceneAnimationFrame = null;
     mutationObserver?.disconnect();
     mutationObserver = null;
     activeState = null;
@@ -1123,6 +1148,23 @@
         position: absolute; inset: 0; background: ${background.overlay};
         opacity: ${background.overlayOpacity};
       }
+      #${BACKDROP_ID} .cs-layer {
+        position: absolute; inset: -18px;
+        pointer-events: none;
+        background-position: center;
+        background-size: cover;
+        transform: scale(1.015);
+      }
+      #${BACKDROP_ID} .cs-layer-gradient {
+        background:
+          linear-gradient(135deg, color-mix(in srgb, ${appearance.accent} 22%, transparent), transparent 42%),
+          radial-gradient(circle at 78% 18%, color-mix(in srgb, ${appearance.accent} 18%, transparent), transparent 38%);
+      }
+      #${BACKDROP_ID} .cs-layer-vignette {
+        inset: 0;
+        background: radial-gradient(ellipse at center, transparent 44%, rgb(0 0 0 / 72%) 118%);
+        transform: none;
+      }
       #${ENTITY_ID} {
         position: fixed; inset: 0; z-index: 10; pointer-events: none;
         overflow: hidden; contain: strict;
@@ -1147,9 +1189,7 @@
     const settings =
       !document.querySelector("aside.app-shell-left-panel") &&
       !document.querySelector("main.main-surface") &&
-      document.querySelector(
-        `body > [${APP_ROOT_ATTRIBUTE}] .main-surface`,
-      );
+      document.querySelector(`body > [${APP_ROOT_ATTRIBUTE}] .main-surface`);
     document.documentElement.setAttribute(
       "data-codex-styler-page",
       home ? "home" : settings ? "settings" : "task",
@@ -1423,7 +1463,7 @@
     const draw = (timestamp = performance.now()) => {
       const framesPerPage =
         renderer.type === "sprite-atlas"
-          ? renderer.framesPerPage ?? renderer.columns * renderer.rows
+          ? (renderer.framesPerPage ?? renderer.columns * renderer.rows)
           : 1;
       const pageIndex = Math.floor(pendingFrame / framesPerPage);
       const image = loadPage(pageIndex) ?? loadPage(0);
@@ -1438,9 +1478,7 @@
       frame = pendingFrame;
       const localFrame = frame % framesPerPage;
       const column =
-        renderer.type === "sprite-atlas"
-          ? localFrame % renderer.columns
-          : 0;
+        renderer.type === "sprite-atlas" ? localFrame % renderer.columns : 0;
       const row =
         renderer.type === "sprite-atlas"
           ? Math.floor(localFrame / renderer.columns)
@@ -1506,7 +1544,7 @@
     };
     const initialFramesPerPage =
       renderer.type === "sprite-atlas"
-        ? renderer.framesPerPage ?? renderer.columns * renderer.rows
+        ? (renderer.framesPerPage ?? renderer.columns * renderer.rows)
         : 1;
     loadPage(Math.floor(pendingFrame / initialFramesPerPage));
     scheduleDraw();
@@ -1614,18 +1652,17 @@
           const y =
             Math.sin(currentRadians) * (1 - responsiveness) +
             Math.sin(nextRadians) * responsiveness;
-          smoothedDirection =
-            ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
+          smoothedDirection = ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
         }
         let closest = directionalPoses[0];
         let closestDistance = Number.POSITIVE_INFINITY;
         directionalPoses.forEach((pose) => {
-            const rawDistance = Math.abs(pose.angle - smoothedDirection);
-            const distance = Math.min(rawDistance, 360 - rawDistance);
-            if (distance < closestDistance) {
-              closest = pose;
-              closestDistance = distance;
-            }
+          const rawDistance = Math.abs(pose.angle - smoothedDirection);
+          const distance = Math.min(rawDistance, 360 - rawDistance);
+          if (distance < closestDistance) {
+            closest = pose;
+            closestDistance = distance;
+          }
         });
         cancelIdle();
         activePose = closest;
@@ -1652,7 +1689,8 @@
     entityCleanup = () => {
       cancelIdle();
       document.removeEventListener("visibilitychange", onVisibilityChange);
-      for (const entry of pageCache.values()) entry.image.removeAttribute("src");
+      for (const entry of pageCache.values())
+        entry.image.removeAttribute("src");
       pageCache.clear();
       attachmentObserver?.disconnect();
       canvas.removeEventListener("pointerdown", onDown);
@@ -1668,9 +1706,7 @@
     if (!document.getElementById(STYLE_ID)) {
       return { ok: false, reason: "runtime stylesheet was removed" };
     }
-    const appRoot = document.querySelector(
-      `body > [${APP_ROOT_ATTRIBUTE}]`,
-    );
+    const appRoot = document.querySelector(`body > [${APP_ROOT_ATTRIBUTE}]`);
     if (!appRoot) {
       return { ok: false, reason: "application root was not found" };
     }
@@ -1733,10 +1769,79 @@
     backdrop.setAttribute("aria-hidden", "true");
     const background = document.createElement("div");
     background.className = "cs-background";
+    const backgroundLayer = theme.scene.layers.find(
+      (layer) =>
+        layer.type === "image" &&
+        layer.asset === theme.variants[variant].background.image,
+    );
+    if (backgroundLayer) {
+      background.dataset.layerId = backgroundLayer.id;
+      background.dataset.parallax = String(backgroundLayer.parallax);
+      background.style.opacity = String(backgroundLayer.opacity);
+      background.style.mixBlendMode = backgroundLayer.blendMode;
+    }
     const overlay = document.createElement("div");
     overlay.className = "cs-overlay";
-    backdrop.append(background, overlay);
+    backdrop.append(background);
+    theme.scene.layers.forEach((layer) => {
+      if (
+        layer.type === "image" &&
+        layer.asset === theme.variants[variant].background.image
+      ) {
+        return;
+      }
+      const element = document.createElement("div");
+      element.className = `cs-layer cs-layer-${layer.type}`;
+      element.dataset.layerId = layer.id;
+      element.dataset.parallax = String(layer.parallax);
+      element.style.opacity = String(layer.opacity);
+      element.style.mixBlendMode = layer.blendMode;
+      if (layer.type === "image" && layer.asset) {
+        element.style.backgroundImage = `url('${layer.asset}')`;
+      }
+      backdrop.appendChild(element);
+    });
+    backdrop.append(overlay);
     document.body.appendChild(backdrop);
+
+    const sceneLayers = Array.from(
+      backdrop.querySelectorAll("[data-parallax]"),
+    );
+    const motionIntensity = theme.variants[variant].motion?.intensity ?? 0;
+    const globalParallax = Math.max(
+      0,
+      theme.variants[variant].motion?.parallax ?? 0,
+    );
+    if (
+      motionIntensity > 0 &&
+      globalParallax > 0 &&
+      sceneLayers.some((element) => Number(element.dataset.parallax) !== 0)
+    ) {
+      scenePointerHandler = (event) => {
+        if (sceneAnimationFrame !== null)
+          cancelAnimationFrame(sceneAnimationFrame);
+        sceneAnimationFrame = requestAnimationFrame(() => {
+          sceneAnimationFrame = null;
+          const x = event.clientX / Math.max(1, window.innerWidth) - 0.5;
+          const y = event.clientY / Math.max(1, window.innerHeight) - 0.5;
+          sceneLayers.forEach((element) => {
+            const authoredDepth = Number(element.dataset.parallax || 0);
+            const cappedDepth =
+              Math.sign(authoredDepth) *
+              Math.min(Math.abs(authoredDepth), globalParallax);
+            const depth = cappedDepth * motionIntensity;
+            if (depth === 0) {
+              element.style.transform = "";
+              return;
+            }
+            element.style.transform = `translate(${-x * depth}px, ${-y * depth}px) scale(1.015)`;
+          });
+        });
+      };
+      window.addEventListener("pointermove", scenePointerHandler, {
+        passive: true,
+      });
+    }
 
     const entityRoot = document.createElement("div");
     entityRoot.id = ENTITY_ID;
@@ -1807,7 +1912,9 @@
 
   const updateEntity = (entity, revision = latestRevision + 1) => {
     if (!Number.isInteger(revision) || revision < 0) {
-      throw new Error("Codex Styler rejected an invalid configuration revision");
+      throw new Error(
+        "Codex Styler rejected an invalid configuration revision",
+      );
     }
     if (revision < latestRevision) {
       return { ok: true, stale: true, revision: latestRevision };
@@ -1837,7 +1944,9 @@
   ) => {
     assertSafeTheme(theme, variant);
     if (!Number.isInteger(revision) || revision < 0) {
-      throw new Error("Codex Styler rejected an invalid configuration revision");
+      throw new Error(
+        "Codex Styler rejected an invalid configuration revision",
+      );
     }
     if (revision < latestRevision) {
       return {
@@ -1925,7 +2034,7 @@
   };
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 15,
+    version: 16,
     apply,
     updateEntity,
     pause: remove,

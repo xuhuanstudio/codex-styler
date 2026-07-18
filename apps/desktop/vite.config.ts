@@ -18,6 +18,23 @@ export default defineConfig({
       process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari13",
     minify: !process.env.TAURI_ENV_DEBUG,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rolldownOptions: {
+      output: {
+        manualChunks(id) {
+          if (
+            id.includes("node_modules/react") ||
+            id.includes("node_modules/react-dom")
+          ) {
+            return "react-vendor";
+          }
+          if (id.includes("node_modules/lucide-react")) return "icons";
+          if (id.includes("packages/theme-core")) return "theme-core";
+          if (id.includes("node_modules/jszip")) return "archive-vendor";
+          if (id.includes("node_modules/@tauri-apps")) return "tauri-vendor";
+          return undefined;
+        },
+      },
+    },
   },
   test: {
     include: ["src/**/*.{test,spec}.{ts,tsx}"],

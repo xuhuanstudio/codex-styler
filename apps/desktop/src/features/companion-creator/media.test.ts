@@ -75,6 +75,16 @@ describe("creator video input boundary", () => {
         new File([new Uint8Array([0])], "notes.txt", { type: "text/plain" }),
       ]),
     ).toThrow("PNG, JPEG, or WebP");
+    expect(() =>
+      validateCreatorSourceFiles([
+        new File(["<svg></svg>"], "sprite.svg", { type: "image/svg+xml" }),
+      ]),
+    ).toThrow("PNG, JPEG, or WebP");
+    expect(() =>
+      validateCreatorSourceFiles([
+        new File(["<html></html>"], "sprite.png", { type: "text/html" }),
+      ]),
+    ).toThrow("PNG, JPEG, or WebP");
   });
 });
 

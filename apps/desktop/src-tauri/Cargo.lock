@@ -392,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "codex-styler"
-version = "0.2.0-beta.2"
+version = "0.2.0-beta.3"
 dependencies = [
  "futures-util",
  "reqwest",
@@ -407,6 +407,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tokio-tungstenite",
+ "windows 0.62.2",
 ]
 
 [[package]]
