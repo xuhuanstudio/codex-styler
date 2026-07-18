@@ -304,6 +304,12 @@ const messages = {
     commandPlaceholder: "Ask Codex to build, explain, or refine…",
     connectionError: "Could not connect to Codex",
     applyFailed: "Could not apply theme",
+    windowsStoreLaunchFailed:
+      "Windows could not start the Microsoft Store Codex app. Open Codex once, close it completely, then try again. If this continues, run Diagnostics & compatibility.",
+    windowsLaunchPermissionFailed:
+      "Windows blocked Codex from starting. Close Codex and try again. If either app runs as administrator, run both apps at the same permission level.",
+    runtimeConnectionLost:
+      "The temporary Codex connection was lost. Close Codex, then use Start and apply to reconnect.",
     configurationApplied: "Setup applied to Codex",
     themeApplied: "Theme applied to Codex",
     companionApplied: "Companion applied to Codex",
@@ -350,7 +356,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 3",
+    version: "Beta 4",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -648,6 +654,12 @@ const messages = {
     commandPlaceholder: "让 Codex 构建、解释或继续完善…",
     connectionError: "无法连接 Codex",
     applyFailed: "无法应用主题",
+    windowsStoreLaunchFailed:
+      "Windows 无法启动 Microsoft Store 版 Codex。请先手动打开一次 Codex，完全退出后再试；若仍然失败，请运行“诊断与兼容性”。",
+    windowsLaunchPermissionFailed:
+      "Windows 阻止了 Codex 启动。请完全退出 Codex 后重试；如果其中一个应用以管理员身份运行，请让两个应用使用相同的权限级别。",
+    runtimeConnectionLost:
+      "与 Codex 的临时连接已断开。请完全退出 Codex，然后使用“启动并应用”重新连接。",
     configurationApplied: "搭配已应用到 Codex",
     themeApplied: "主题已应用到 Codex",
     companionApplied: "互动伙伴已应用到 Codex",
@@ -688,7 +700,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 3",
+    version: "Beta 4",
   },
 } as const;
 

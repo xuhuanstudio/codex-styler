@@ -294,7 +294,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.3")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.4")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -664,6 +664,42 @@ describe("Codex Styler shell", () => {
       screen.queryByRole("dialog", {
         name: "Restart Codex to apply this theme?",
       }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explains a Microsoft Store identity failure in the selected language", async () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "zh-CN",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: true,
+      running: false,
+      path: "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.0.0.0_x64__2p2nqsd0c76g0\\app\\Codex.exe",
+      version: "26.0.0.0",
+      platform: "windows",
+    });
+    vi.mocked(launchCodex).mockRejectedValue(
+      new Error(
+        "Codex could not be launched: The Microsoft Store installation could not be resolved to an application identity",
+      ),
+    );
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "启动并应用" }));
+
+    expect(
+      await screen.findByText(/Windows 无法启动 Microsoft Store 版 Codex/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/could not be resolved to an application identity/),
     ).not.toBeInTheDocument();
   });
 

@@ -9,6 +9,7 @@ import "./styles/workspaces.css";
 import "./styles/settings.css";
 import "./styles/editor.css";
 import "./styles/creator-beta3.css";
+import "./styles/interaction-surfaces.css";
 import "./styles/typography.css";
 
 createRoot(document.getElementById("root")!).render(

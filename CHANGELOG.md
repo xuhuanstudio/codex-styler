@@ -4,6 +4,26 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.4] - 2026-07-18
+
+### Added
+
+- Cross-platform product chrome for scrollbars, range controls, checkboxes, color inputs, and native selects, including compact creator timelines and reduced-motion behavior.
+- Localized recovery guidance for Windows Store activation, permission mismatches, and expired Codex debugging connections.
+
+### Changed
+
+- Windows restart now carries the verified Codex installation path through shutdown polling, caches valid Store locations, bounds every helper query, and closes independent verified process roots concurrently.
+- Microsoft Store activation resolves registered Start Menu identities and package manifests before attempting tightly scoped same-package fallbacks.
+- Issue templates, compatibility guidance, and visual regression baselines now reflect the current Beta lifecycle and interaction system.
+
+### Fixed
+
+- Windows release builds no longer open a terminal alongside Codex Styler.
+- Restart no longer repeats `Get-AppxPackage` on every 250 ms shutdown poll or waits indefinitely for PowerShell and task-kill helpers.
+- Store installations whose manifest executable uses a target-name token or a non-default application ID can be launched through their registered package identity.
+- The manager no longer mixes platform-default scrollbars and form-control chrome with the application design system.
+
 ## [0.2.0-beta.3] - 2026-07-18
 
 ### Added

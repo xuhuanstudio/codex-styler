@@ -266,7 +266,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.3");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.4");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -321,6 +321,26 @@ export function App() {
       return t("themeValidationFailed");
     }
     return t("themeSaveFailed");
+  };
+  const runtimeFailureMessage = (detail: string) => {
+    if (
+      /Microsoft Store installation|application identity|activate the Microsoft Store|AppsFolder|AppUserModelId/i.test(
+        detail,
+      )
+    ) {
+      return t("windowsStoreLaunchFailed");
+    }
+    if (/access is denied|拒绝访问|os error 5\b/i.test(detail)) {
+      return t("windowsLaunchPermissionFailed");
+    }
+    if (
+      /debugging socket|connection refused|os error 61\b|websocket.*(?:closed|connect)|target closed/i.test(
+        detail,
+      )
+    ) {
+      return t("runtimeConnectionLost");
+    }
+    return detail;
   };
   const allCompanions = [...builtinCompanions, ...localCompanions];
   const companionForTheme = (
@@ -741,7 +761,7 @@ export function App() {
       await recoverRuntimeFailure(detail, revision);
       if (revision !== applyRevisionRef.current) return;
       dispatchSession({ type: "operation/error", revision, message: detail });
-      setToast(`${t("applyFailed")}: ${detail}`);
+      setToast(`${t("applyFailed")}: ${runtimeFailureMessage(detail)}`);
     } finally {
       if (revision === applyRevisionRef.current) setBusy(false);
     }
@@ -788,7 +808,7 @@ export function App() {
       await recoverRuntimeFailure(detail, revision);
       if (revision !== applyRevisionRef.current) return;
       dispatchSession({ type: "operation/error", revision, message: detail });
-      setToast(`${t("applyFailed")}: ${detail}`);
+      setToast(`${t("applyFailed")}: ${runtimeFailureMessage(detail)}`);
     } finally {
       if (revision === applyRevisionRef.current) setBusy(false);
     }
@@ -842,7 +862,7 @@ export function App() {
     } catch (error) {
       console.error(error);
       const detail = error instanceof Error ? error.message : String(error);
-      setRestartError(detail);
+      setRestartError(runtimeFailureMessage(detail));
       setToast(t("codexQuitFailed"));
     } finally {
       setBusy(false);
@@ -855,7 +875,7 @@ export function App() {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       await recoverRuntimeFailure(detail, applyRevisionRef.current);
-      setToast(`${t("applyFailed")}: ${detail}`);
+      setToast(`${t("applyFailed")}: ${runtimeFailureMessage(detail)}`);
     }
   }
 

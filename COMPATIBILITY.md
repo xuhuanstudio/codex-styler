@@ -2,13 +2,13 @@
 
 Compatibility is claimed only after real-device validation.
 
-| Platform   | Architecture  | Beta 2 status                                                         | RC requirement                            |
-| ---------- | ------------- | --------------------------------------------------------------------- | ----------------------------------------- |
-| macOS 13+  | Apple Silicon | Ad-hoc signed Creator Beta; locally built, installed, and exercised   | Two complete real-device runs             |
-| Windows 11 | x64           | CI-built unsigned Beta; explicitly awaiting community device evidence | Two complete independent real-device runs |
-| macOS      | Intel         | Not verified                                                          | Out of 0.2 scope                          |
-| Windows    | ARM64         | Not verified                                                          | Out of 0.2 scope                          |
-| Linux      | —             | Unsupported                                                           | Out of 0.2 scope                          |
+| Platform   | Architecture  | Beta 4 status                                                           | RC requirement                            |
+| ---------- | ------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
+| macOS 13+  | Apple Silicon | Ad-hoc signed Beta; locally built, installed, and exercised             | Two complete real-device runs             |
+| Windows 11 | x64           | CI-built unsigned Beta; lifecycle fixes await community device evidence | Two complete independent real-device runs |
+| macOS      | Intel         | Not verified                                                            | Out of 0.2 scope                          |
+| Windows    | ARM64         | Not verified                                                            | Out of 0.2 scope                          |
+| Linux      | —             | Unsupported                                                             | Out of 0.2 scope                          |
 
 ## Codex versions and runtime strategy
 
