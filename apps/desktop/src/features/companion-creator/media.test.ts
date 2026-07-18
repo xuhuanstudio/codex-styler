@@ -3,6 +3,7 @@ import {
   assertSupportedVideoSource,
   mattePixel,
   retainLargestAlphaComponent,
+  validateCreatorSourceFiles,
 } from "./media";
 
 describe("creator video input boundary", () => {
@@ -21,7 +22,59 @@ describe("creator video input boundary", () => {
       assertSupportedVideoSource(
         new File([new Uint8Array([0])], "turn.svg", { type: "video/mp4" }),
       ),
-    ).toThrow("MP4, MOV, or WebM");
+    ).toThrow("MP4, M4V, MOV, or WebM");
+  });
+
+  it("accepts system-native M4V aliases and naturally orders image drops", () => {
+    expect(() =>
+      assertSupportedVideoSource(
+        new File([new Uint8Array([0])], "turn.m4v", {
+          type: "video/x-m4v",
+        }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertSupportedVideoSource(
+        new File([new Uint8Array([0])], "turn.mp4", {
+          type: "application/mp4",
+        }),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertSupportedVideoSource(
+        new File([new Uint8Array([0])], "turn.mov", {
+          type: "application/x-quicktime",
+        }),
+      ),
+    ).not.toThrow();
+    const selection = validateCreatorSourceFiles([
+      new File([new Uint8Array([0])], "frame-10.png", {
+        type: "image/png",
+      }),
+      new File([new Uint8Array([0])], "frame-2.png", {
+        type: "image/png",
+      }),
+    ]);
+    expect(selection.kind).toBe("sequence");
+    expect(selection.files.map((file) => file.name)).toEqual([
+      "frame-2.png",
+      "frame-10.png",
+    ]);
+  });
+
+  it("rejects mixed and mismatched drag-and-drop sources", () => {
+    expect(() =>
+      validateCreatorSourceFiles(
+        [new File([new Uint8Array([0])], "still.png", { type: "image/png" })],
+        "video",
+      ),
+    ).toThrow("one MP4");
+    expect(() =>
+      validateCreatorSourceFiles([
+        new File([new Uint8Array([0])], "still.png", { type: "image/png" }),
+        new File([new Uint8Array([0])], "notes.txt", { type: "text/plain" }),
+      ]),
+    ).toThrow("PNG, JPEG, or WebP");
   });
 });
 

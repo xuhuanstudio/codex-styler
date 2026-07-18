@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import JSZip from "jszip";
 
 export interface DiagnosticCheck {
   id: string;
@@ -87,6 +86,7 @@ ${report.privacy.map((item) => `- ${item}`).join("\n")}
 export async function exportDiagnostics(
   report: DiagnosticsReport,
 ): Promise<void> {
+  const JSZip = (await import("jszip")).default;
   const zip = new JSZip();
   zip.file("diagnostics.json", JSON.stringify(report, null, 2));
   zip.file("summary.txt", diagnosticsSummary(report));

@@ -1,5 +1,9 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { CompanionCreatorProject } from "./model";
+import {
+  companionProjectIsPristine,
+  normalizeCompanionProject,
+  type CompanionCreatorProject,
+} from "./model";
 
 const databaseName = "codex-styler.v1";
 const storeName = "companion-project-files";
@@ -9,6 +13,27 @@ const projectPathHeader = "x-codex-styler-project-path";
 
 function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
+}
+
+async function mapConcurrent<T, R>(
+  items: readonly T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const output = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(1, concurrency), items.length) },
+    async () => {
+      while (cursor < items.length) {
+        const index = cursor;
+        cursor += 1;
+        output[index] = await mapper(items[index]!, index);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return output;
 }
 
 function openDatabase(): Promise<IDBDatabase | null> {
@@ -74,12 +99,24 @@ async function writeFile(
 
 async function readFile(projectId: string, path: string): Promise<Blob | null> {
   if (isTauri()) {
-    const result = await invoke<number[]>("load_companion_project_file", {
-      projectId,
-      projectPath: path,
-    });
-    if (result.length === 0) return null;
-    return new Blob([Uint8Array.from(result).buffer]);
+    const result = await invoke<ArrayBuffer | Uint8Array | number[]>(
+      "load_companion_project_file",
+      {
+        projectId,
+        projectPath: path,
+      },
+    );
+    const bytes = ArrayBuffer.isView(result)
+      ? new Uint8Array(
+          result.buffer,
+          result.byteOffset,
+          result.byteLength,
+        ).slice()
+      : Object.prototype.toString.call(result) === "[object ArrayBuffer]"
+        ? new Uint8Array(result as ArrayBuffer)
+        : Uint8Array.from(result as number[]);
+    if (bytes.byteLength === 0) return null;
+    return new Blob([bytes.slice().buffer]);
   }
   const database = await openDatabase();
   if (!database) return null;
@@ -129,12 +166,29 @@ export async function saveCompanionProject(
   return saved;
 }
 
+function extensionForBlob(blob: Blob): "png" | "webp" {
+  return blob.type === "image/png" ? "png" : "webp";
+}
+
+export async function cacheCompanionProjectFrames(
+  projectId: string,
+  frames: Array<{ blob: Blob }>,
+): Promise<string[]> {
+  return mapConcurrent(frames, 8, async (frame, index) => {
+    const storedPath = `frames/source-${String(index + 1).padStart(3, "0")}.${extensionForBlob(frame.blob)}`;
+    await writeFile(projectId, storedPath, frame.blob);
+    return storedPath;
+  });
+}
+
 export async function loadCompanionProject(
   projectId: string,
 ): Promise<CompanionCreatorProject | null> {
   const blob = await readFile(projectId, "project.json");
   if (!blob) return null;
-  return JSON.parse(await blob.text()) as CompanionCreatorProject;
+  return normalizeCompanionProject(
+    JSON.parse(await blob.text()) as CompanionCreatorProject,
+  );
 }
 
 export async function loadCompanionProjectSource(
@@ -142,6 +196,15 @@ export async function loadCompanionProjectSource(
   storedPath: string,
 ): Promise<Blob | null> {
   return readFile(projectId, storedPath);
+}
+
+export async function loadCompanionProjectFrames(
+  projectId: string,
+  storedPaths: string[],
+): Promise<Array<Blob | null>> {
+  return mapConcurrent(storedPaths, 8, (storedPath) =>
+    readFile(projectId, storedPath),
+  );
 }
 
 export async function listCompanionProjects(): Promise<
@@ -153,6 +216,7 @@ export async function listCompanionProjects(): Promise<
   const projects = await Promise.all(ids.map(loadCompanionProject));
   return projects
     .filter((project): project is CompanionCreatorProject => project !== null)
+    .filter((project) => !companionProjectIsPristine(project))
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
 }
 

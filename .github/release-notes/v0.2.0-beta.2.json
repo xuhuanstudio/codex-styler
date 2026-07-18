@@ -1,0 +1,35 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.2",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "Companion Studio is now a more reliable, coherent workspace for importing, cleaning, aligning, calibrating, previewing, and packaging animated companions.",
+      "highlights": [
+        "Rebuilt the creator workspace with consistent controls, non-destructive editing, clearer readiness feedback, and safer recovery actions.",
+        "Added real file drag-and-drop, stronger source validation, broader system video decoding, and clearer conversion guidance when a codec is unavailable.",
+        "Added shared-canvas alignment diagnostics, visual direction calibration, pose-aware idle-motion authoring, and an interactive runtime preview.",
+        "Update dialogs can now show localized release highlights before an installer is downloaded."
+      ],
+      "fixes": [
+        "Corrected built-in companion portraits so atlas cells are never mistaken for library thumbnails.",
+        "Improved package validation, frame bounds, cleanup masks, project persistence, and companion metadata defaults.",
+        "Removed the extra in-step navigation layer so the creator remains an iterative professional workspace."
+      ]
+    },
+    "zh-CN": {
+      "summary": "伙伴工作室现已成为更可靠、更统一的专业工作区，可完成素材导入、背景处理、对齐、方向校准、互动预览与伙伴打包。",
+      "highlights": [
+        "重构伙伴创作工作区，统一控件与视觉语言，并补齐非破坏性编辑、就绪状态和安全恢复操作。",
+        "加入真正的文件拖放、更严格的素材校验、更广泛的系统视频解码，以及解码失败时更明确的转换建议。",
+        "加入共享画布对齐诊断、可视化方向校准、与姿态关联的小动作创作，以及真实互动运行预览。",
+        "更新面板现在可以在下载安装包之前展示与应用语言一致的版本摘要。"
+      ],
+      "fixes": [
+        "修复内置伙伴头像错误切割图集单元格的问题。",
+        "强化伙伴包校验、帧边界、背景处理遮罩、工程持久化和元数据默认值。",
+        "移除额外的小步骤导航层，使创作器保持适合反复观察和调参的开放工作台。"
+      ]
+    }
+  }
+}

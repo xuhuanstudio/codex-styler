@@ -51,6 +51,9 @@ const releaseNotes = await readFile(
   new URL(`../.github/release-notes/v${expected}.md`, import.meta.url),
   "utf8",
 );
+const localizedReleaseNotes = await readJson(
+  `.github/release-notes/v${expected}.json`,
+);
 
 const cargoVersion = cargoManifest.match(
   /^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/mu,
@@ -96,6 +99,30 @@ if (mismatches.length > 0) {
   process.exit(1);
 }
 
+const localizedNotesAreValid =
+  localizedReleaseNotes.format === "codex-styler-release-notes-v1" &&
+  localizedReleaseNotes.version === expected &&
+  localizedReleaseNotes.defaultLocale === "en" &&
+  ["en", "zh-CN"].every((locale) => {
+    const notes = localizedReleaseNotes.locales?.[locale];
+    return (
+      typeof notes?.summary === "string" &&
+      notes.summary.length > 0 &&
+      Array.isArray(notes.highlights) &&
+      notes.highlights.length > 0 &&
+      notes.highlights.every((item) => typeof item === "string") &&
+      Array.isArray(notes.fixes) &&
+      notes.fixes.every((item) => typeof item === "string")
+    );
+  });
+
+if (!localizedNotesAreValid) {
+  console.error(
+    `Localized release notes for ${expected} must contain validated English and Simplified Chinese content.`,
+  );
+  process.exit(1);
+}
+
 if (
   displayVersions.length !== 2 ||
   displayVersions.some((version) => version !== expectedDisplayVersion)
@@ -134,5 +161,5 @@ if (staleReleaseReferences.length > 0) {
 }
 
 console.log(
-  `Release version ${expected} is synchronized across ${versions.size} files, the desktop display, and both platform downloads.`,
+  `Release version ${expected} is synchronized across ${versions.size} files, localized update notes, the desktop display, and both platform downloads.`,
 );

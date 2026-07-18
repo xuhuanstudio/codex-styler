@@ -90,7 +90,9 @@ describe("built-in themes", () => {
     expect(composed.scene.entities[0]?.anchor).toEqual({ x: 40, y: 60 });
     expect(composed.scene.entities[0]?.attachment?.target).toBe("composer");
     expect(composed.scene.entities[0]?.renderer.normalization).toBe("preserve");
-    expect(mossCompanion.assets).toHaveLength(4);
+    expect(
+      mossCompanion.assets.filter((asset) => asset.type === "sprite-atlas"),
+    ).toHaveLength(4);
     expect(composed.scene.entities[0]?.renderer).toMatchObject({
       directions: 181,
       framesPerPage: 48,
@@ -105,7 +107,10 @@ describe("built-in themes", () => {
     legacy.assets.push(...structuredClone(mossCompanion.assets));
     const migrated = embeddedCompanionForTheme(legacy);
     expect(migrated?.entity.id).toBe("moss-gecko");
-    expect(migrated?.assets).toHaveLength(mossCompanion.assets.length);
+    expect(migrated?.assets).toHaveLength(
+      mossCompanion.assets.filter((asset) => asset.type === "sprite-atlas")
+        .length,
+    );
   });
 
   it("recommends an intentional companion for every built-in theme", () => {
@@ -136,8 +141,20 @@ describe("built-in themes", () => {
       expect(renderer?.type, companion.id).toBe("sprite-atlas");
       if (renderer?.type !== "sprite-atlas") continue;
       expect(renderer.pages, companion.id).toHaveLength(
-        companion.assets.length,
+        companion.assets.filter((asset) => asset.type === "sprite-atlas")
+          .length,
       );
+      expect(companion.metadata.preview, companion.id).toMatch(
+        /-portrait\.webp$/u,
+      );
+      expect(
+        companion.assets.some(
+          (asset) =>
+            asset.type === "preview" &&
+            asset.path === companion.metadata.preview,
+        ),
+        companion.id,
+      ).toBe(true);
       expect(renderer.frameAngles, companion.id).toHaveLength(
         renderer.directions,
       );

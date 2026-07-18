@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import { assertTheme, validateTheme } from "./validation";
 import type { ThemeDefinition, ThemePackage } from "./types";
 
@@ -9,10 +8,20 @@ export const THEME_PACKAGE_LIMITS = {
   maxImageDimension: 8192,
 } as const;
 
-const allowedFile = /^(theme|LICENSES)\.json$|^(assets|previews)\/[A-Za-z0-9._/-]+\.(png|jpe?g|webp)$/i;
+async function loadZip() {
+  return (await import("jszip")).default;
+}
+
+const allowedFile =
+  /^(theme|LICENSES)\.json$|^(assets|previews)\/[A-Za-z0-9._/-]+\.(png|jpe?g|webp)$/i;
 
 export function isSafeArchivePath(path: string): boolean {
-  if (!path || path.startsWith("/") || path.includes("\\") || path.includes("\0")) {
+  if (
+    !path ||
+    path.startsWith("/") ||
+    path.includes("\\") ||
+    path.includes("\0")
+  ) {
     return false;
   }
   const parts = path.split("/");
@@ -103,8 +112,8 @@ export function readImageDimensions(
   if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) {
     let offset = 2;
     const startOfFrame = new Set([
-      0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd,
-      0xce, 0xcf,
+      0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce,
+      0xcf,
     ]);
     while (offset + 9 < bytes.length) {
       if (bytes[offset] !== 0xff) {
@@ -114,7 +123,8 @@ export function readImageDimensions(
       const marker = bytes[offset + 1];
       offset += 2;
       if (marker === 0xd8 || marker === 0x01) continue;
-      if (marker === 0xd9 || marker === 0xda || offset + 2 > bytes.length) break;
+      if (marker === 0xd9 || marker === 0xda || offset + 2 > bytes.length)
+        break;
       const segmentLength = readUint16BE(bytes, offset);
       if (segmentLength < 2 || offset + segmentLength > bytes.length) break;
       if (startOfFrame.has(marker) && segmentLength >= 7) {
@@ -140,10 +150,7 @@ export function readImageDimensions(
       return {
         width: 1 + bytes[21] + ((bytes[22] & 0x3f) << 8),
         height:
-          1 +
-          (bytes[22] >> 6) +
-          (bytes[23] << 2) +
-          ((bytes[24] & 0x0f) << 10),
+          1 + (bytes[22] >> 6) + (bytes[23] << 2) + ((bytes[24] & 0x0f) << 10),
       };
     }
     if (
@@ -178,6 +185,7 @@ export async function importThemePackage(
   }
 
   const zipInput = input instanceof Blob ? await readBlob(input) : input;
+  const JSZip = await loadZip();
   const zip = await JSZip.loadAsync(zipInput);
   const files = new Map<string, Uint8Array>();
   let declaredTotal = 0;
@@ -189,7 +197,10 @@ export async function importThemePackage(
       entry as typeof entry & { unsafeOriginalName?: string }
     ).unsafeOriginalName;
     if (unsafeOriginalName && unsafeOriginalName !== path) {
-      throw new Error("Archive entry was normalized from an unsafe path: " + unsafeOriginalName);
+      throw new Error(
+        "Archive entry was normalized from an unsafe path: " +
+          unsafeOriginalName,
+      );
     }
     if (!isSafeArchivePath(path) || !allowedFile.test(path)) {
       throw new Error("Disallowed archive path or file type: " + path);
@@ -246,7 +257,9 @@ export async function importThemePackage(
   if (!result.ok) {
     throw new Error(
       "Theme manifest is invalid:\n" +
-        result.issues.map((issue) => issue.path + " " + issue.message).join("\n"),
+        result.issues
+          .map((issue) => issue.path + " " + issue.message)
+          .join("\n"),
     );
   }
   assertTheme(theme);
@@ -265,6 +278,7 @@ export async function exportThemePackage(
   resolveAsset?: (path: string) => Promise<Uint8Array>,
 ): Promise<Blob> {
   assertTheme(theme);
+  const JSZip = await loadZip();
   const zip = new JSZip();
   zip.file("theme.json", JSON.stringify(theme, null, 2));
   zip.file(

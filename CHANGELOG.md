@@ -4,6 +4,26 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.2] - 2026-07-18
+
+### Added
+
+- Structured English and Simplified Chinese update highlights fetched from the selected GitHub Release before an installer is downloaded.
+- Native file drag-and-drop, source validation, broader system video decoding, alignment diagnostics, motion-range authoring, and interactive runtime testing in Companion Studio.
+- Dedicated portrait assets for every built-in companion and expanded creator screenshot coverage.
+
+### Changed
+
+- Rebuilt all seven Companion Studio stages around a consistent professional workspace, non-destructive previews, readiness feedback, autosave, reset, and explicit destructive-action confirmation.
+- Improved shared-canvas alignment, visual direction calibration, pose-aware idle-motion editing, package metadata, and project persistence.
+- Kept the creator iterative by removing the proposed second layer of in-step navigation while retaining the primary workflow and recovery controls.
+
+### Fixed
+
+- Companion library portraits no longer display unrelated cells from runtime sprite atlases.
+- Unsupported or mislabeled video streams now produce accurate codec guidance instead of treating every MP4 container as H.264-decodable.
+- Package validation, frame bounds, cleanup corrections, shared crops, and companion defaults are normalized consistently across import, save, export, and re-import.
+
 ## [0.2.0-beta.1] - 2026-07-17
 
 ### Added

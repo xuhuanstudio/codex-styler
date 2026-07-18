@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import {
   THEME_PACKAGE_LIMITS,
   isSafeArchivePath,
@@ -9,6 +8,10 @@ import type { CompanionPackage, CompanionPackageDefinition } from "./types";
 
 const allowedFile =
   /^(companion|LICENSES)\.json$|^(assets|previews)\/[A-Za-z0-9._/-]+\.(png|jpe?g|webp)$/i;
+
+async function loadZip() {
+  return (await import("jszip")).default;
+}
 
 async function inputBytes(
   input: Blob | ArrayBuffer | Uint8Array,
@@ -63,6 +66,7 @@ export async function importCompanionPackage(
   if (compressedSize > THEME_PACKAGE_LIMITS.compressedBytes) {
     throw new Error("Companion package exceeds the 50 MiB compressed limit");
   }
+  const JSZip = await loadZip();
   const zip = await JSZip.loadAsync(await inputBytes(input));
   let declaredTotal = 0;
   for (const [path, entry] of Object.entries(zip.files)) {
@@ -162,6 +166,7 @@ export async function exportCompanionPackage(
   resolveAsset: (path: string) => Promise<Uint8Array>,
 ): Promise<Blob> {
   assertCompanion(companion);
+  const JSZip = await loadZip();
   const zip = new JSZip();
   zip.file("companion.json", JSON.stringify(companion, null, 2));
   zip.file(
