@@ -14,6 +14,8 @@ const messages = {
     homeDescription:
       "See the active visual system, companion, connection state, and safest next action without navigating the library.",
     codexAppearance: "Codex appearance",
+    codexAppearanceDescription:
+      "While a Styler theme is active, its adaptive semantic colors take priority over Codex's own appearance. Restore official to return control to Codex.",
     themeActive: "Theme active",
     currentSetup: "Current setup",
     appliedTheme: "Applied theme",
@@ -356,7 +358,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 4",
+    version: "Beta 5",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -370,6 +372,8 @@ const messages = {
     homeDescription:
       "直接查看当前视觉系统、互动伙伴、连接状态与下一步操作，无需先理解主题库结构。",
     codexAppearance: "Codex 外观",
+    codexAppearanceDescription:
+      "主题生效期间，Styler 的自适应语义颜色会优先于 Codex 自身外观；恢复官方界面后，颜色控制权将交还给 Codex。",
     themeActive: "主题已启用",
     currentSetup: "当前搭配",
     appliedTheme: "已应用主题",
@@ -700,7 +704,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 4",
+    version: "Beta 5",
   },
 } as const;
 

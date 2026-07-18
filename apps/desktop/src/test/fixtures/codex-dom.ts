@@ -23,8 +23,13 @@ export function codexFixture(page: CodexFixturePage): string {
           <div data-feature="game-source"></div>
         `
       : `
-          <article data-testid="conversation-thread">Conversation</article>
-          <div class="composer-surface-chrome" contenteditable="true"></div>
+          <article data-testid="conversation-thread">
+            <p class="text-token-text-primary">Conversation</p>
+            <small class="text-token-text-secondary">Supporting context</small>
+          </article>
+          <div class="composer-surface-chrome" contenteditable="true">
+            <span data-placeholder="Ask Codex"></span>
+          </div>
         `;
   const rightPanel =
     page === "right-panel"

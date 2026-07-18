@@ -3,6 +3,7 @@ import {
   type ThemeDefinition,
   type ThemeVariant,
 } from "@codex-styler/theme-core";
+import { adaptiveReadableColor } from "./contrast";
 
 type Rgb = [number, number, number];
 
@@ -262,8 +263,16 @@ function themeVariant(
   const accent = dark
     ? mix(profile.accent, "#ffffff", profile.luminance < 0.08 ? 0.36 : 0.22)
     : mix(profile.accent, "#111318", profile.luminance > 0.55 ? 0.3 : 0.16);
-  const text = dark ? "#f5f5f2" : "#17181b";
-  const mutedText = dark ? "#b7bac2" : "#5d616a";
+  const text = adaptiveReadableColor(
+    mix(dark ? "#f5f5f2" : "#17181b", profile.dominant, dark ? 0.07 : 0.09),
+    surface,
+    4.5,
+  );
+  const mutedText = adaptiveReadableColor(
+    mix(dark ? "#b7bac2" : "#5d616a", profile.dominant, dark ? 0.1 : 0.12),
+    surface,
+    4.5,
+  );
   return {
     background: {
       color: dark ? mix(profile.average, "#08090d", 0.78) : "#ececea",

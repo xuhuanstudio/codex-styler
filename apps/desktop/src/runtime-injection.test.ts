@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeRefined } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
+import { contrastRatio } from "./lib/contrast";
+import { resolveThemeContrast } from "./lib/theme-contrast";
 import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
 
 interface InjectedRuntime {
@@ -14,6 +16,7 @@ interface InjectedRuntime {
     resolvedMode: string;
     reason: string | null;
     stale?: boolean;
+    contrastRepairApplied?: boolean;
   }>;
   updateEntity: (
     entity: unknown,
@@ -55,6 +58,9 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement.dataset.codexStylerMode).toBe(
       "compatibility",
     );
+    expect(
+      document.getElementById("codex-styler-contrast-repair-style"),
+    ).toBeNull();
   });
 
   it("restores and replaces an older injected runtime", () => {
@@ -69,7 +75,7 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(16);
+    expect(runtime().version).toBe(18);
   });
 
   it("renders validated scene layers and updates parallax without blocking Codex", async () => {
@@ -433,6 +439,153 @@ describe("injected compatibility runtime", () => {
     );
     expect(stylesheet?.textContent).toContain(
       "--codex-styler-success: #52C982",
+    );
+  });
+
+  it("adapts semantic text to image scene layers and overrides stale Codex appearance classes", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const theme = structuredClone(nativeRefined);
+    const image = "data:image/png;base64,iVBORw0KGgo=";
+    delete theme.variants.light.background.image;
+    theme.variants.light.appearance.surfaceOpacity = 0.3;
+    theme.variants.light.appearance.palette = {
+      surfaceRaised: theme.variants.light.appearance.text,
+      control: theme.variants.light.appearance.text,
+    };
+    theme.scene.layers = [
+      {
+        id: "independent-background",
+        type: "image",
+        asset: image,
+        opacity: 1,
+        blendMode: "normal",
+        parallax: 0,
+      },
+    ];
+    const contrastSystem = resolveThemeContrast(theme, "light");
+
+    await runtime().apply(theme, "light", "developer");
+
+    const stylesheet = document.getElementById("codex-styler-runtime-style");
+    expect(contrastSystem.hasImageBackdrop).toBe(true);
+    expect(stylesheet?.textContent).toContain(
+      `--codex-styler-text-primary: ${contrastSystem.textPrimary}`,
+    );
+    expect(stylesheet?.textContent).not.toContain(
+      `--codex-styler-surface-raised: ${theme.variants.light.appearance.text}`,
+    );
+    const raisedSurface = stylesheet?.textContent.match(
+      /--codex-styler-surface-raised:\s*(#[0-9a-f]{6})/i,
+    )?.[1];
+    expect(raisedSurface).toBeDefined();
+    expect(
+      contrastRatio(contrastSystem.textPrimary, raisedSurface as string),
+    ).toBeGreaterThanOrEqual(4.49);
+    expect(stylesheet?.textContent).toContain(
+      `${Math.round(contrastSystem.quietSurfaceOpacity * 100)}%, transparent) !important`,
+    );
+    expect(stylesheet?.textContent).toContain("color-scheme: light !important");
+    expect(stylesheet?.textContent).toContain(
+      '[class~="text-token-text-primary"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[class~="text-token-text-secondary"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-token-foreground-secondary: var(--codex-styler-text-secondary)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      ":is(input, textarea)::placeholder",
+    );
+    expect(stylesheet?.textContent).not.toContain("* {\n          color:");
+    expect(document.documentElement.dataset.codexStylerVariant).toBe("light");
+    expect(document.documentElement.dataset.codexStylerContrast).toBe(
+      contrastSystem.tone,
+    );
+
+    runtime().restore();
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-variant",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-contrast",
+    );
+  });
+
+  it("repairs a stale Codex foreground without dropping the semantic theme", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const contrastSystem = resolveThemeContrast(nativeRefined, "dark");
+    vi.stubGlobal(
+      "getComputedStyle",
+      vi.fn((element: Element) => ({
+        backgroundColor: element.matches("main.main-surface")
+          ? "rgba(20, 24, 28, 0.92)"
+          : "rgba(0, 0, 0, 0)",
+        backgroundImage: "none",
+        color: element.matches('[class~="text-token-text-primary"]')
+          ? document.documentElement.hasAttribute(
+              "data-codex-styler-contrast-repair",
+            )
+            ? contrastSystem.textPrimary
+            : "#151515"
+          : contrastSystem.textPrimary,
+        position: "relative",
+        zIndex: "auto",
+      })),
+    );
+
+    const outcome = await runtime().apply(nativeRefined, "dark", "auto");
+
+    expect(outcome.resolvedMode).toBe("semantic");
+    expect(outcome.reason).toBeNull();
+    expect(outcome.contrastRepairApplied).toBe(true);
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-contrast-repair",
+      "active",
+    );
+    const repairStyle = document.getElementById(
+      "codex-styler-contrast-repair-style",
+    );
+    expect(repairStyle?.textContent).toContain(
+      `--codex-styler-text-primary: ${contrastSystem.textPrimary}`,
+    );
+    expect(repairStyle?.textContent).toContain("99%, transparent");
+
+    runtime().restore();
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-contrast-repair",
+    );
+    expect(
+      document.getElementById("codex-styler-contrast-repair-style"),
+    ).toBeNull();
+  });
+
+  it("falls back only when targeted contrast repair also fails", async () => {
+    document.body.innerHTML = codexFixture("task");
+    vi.stubGlobal(
+      "getComputedStyle",
+      vi.fn((element: Element) => ({
+        backgroundColor: element.matches("main.main-surface")
+          ? "rgba(20, 24, 28, 0.92)"
+          : "rgba(0, 0, 0, 0)",
+        backgroundImage: "none",
+        color: element.matches('[class~="text-token-text-primary"]')
+          ? "#151515"
+          : "#f7f7f5",
+        position: "relative",
+        zIndex: "auto",
+      })),
+    );
+
+    const outcome = await runtime().apply(nativeRefined, "dark", "auto");
+
+    expect(outcome.resolvedMode).toBe("compatibility");
+    expect(outcome.reason).toContain("native foreground");
+    expect(document.documentElement.dataset.codexStylerMode).toBe(
+      "compatibility",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-contrast-repair",
     );
   });
 

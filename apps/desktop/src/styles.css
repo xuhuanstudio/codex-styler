@@ -1272,7 +1272,7 @@ button:disabled {
     color-mix(in srgb, var(--preview-border) 70%, transparent);
   background: color-mix(
     in srgb,
-    var(--preview-surface) calc(var(--preview-surface-opacity) * 100%),
+    var(--preview-surface) calc(var(--preview-surface-strong-opacity) * 100%),
     transparent
   );
   backdrop-filter: blur(16px) saturate(1.05);
@@ -1285,7 +1285,7 @@ button:disabled {
   border-radius: calc(var(--preview-radius) + 3px);
   background: color-mix(
     in srgb,
-    var(--preview-surface) calc(var(--preview-surface-opacity) * 96%),
+    var(--preview-surface) calc(var(--preview-surface-strong-opacity) * 96%),
     transparent
   );
   box-shadow: 8px 0 24px rgba(0, 0, 0, 0.08);
@@ -1463,7 +1463,11 @@ button:disabled {
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--preview-border) 72%, transparent);
   border-radius: calc(var(--preview-radius) + 4px);
-  background: color-mix(in srgb, var(--preview-surface) 42%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--preview-surface) calc(var(--preview-surface-opacity) * 100%),
+    transparent
+  );
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.11);
   backdrop-filter: blur(var(--preview-focus-blur));
 }
@@ -1471,7 +1475,11 @@ button:disabled {
 .workspace-preview[data-layout="immersive"] .workspace-main {
   margin: 7px;
   border-radius: calc(var(--preview-radius) + 8px);
-  background: color-mix(in srgb, var(--preview-surface) 30%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--preview-surface) calc(var(--preview-surface-opacity) * 100%),
+    transparent
+  );
 }
 
 .workspace-header {
@@ -1531,7 +1539,7 @@ button:disabled {
   border-radius: var(--preview-radius);
   background: color-mix(
     in srgb,
-    var(--preview-surface) calc(var(--preview-surface-opacity) * 72%),
+    var(--preview-surface) calc(var(--preview-surface-strong-opacity) * 86%),
     transparent
   );
   backdrop-filter: blur(11px);
@@ -1547,7 +1555,7 @@ button:disabled {
   border-radius: calc(var(--preview-radius) + 5px);
   background: color-mix(
     in srgb,
-    var(--preview-surface) calc(var(--preview-surface-opacity) * 86%),
+    var(--preview-surface) calc(var(--preview-surface-strong-opacity) * 96%),
     transparent
   );
 }
@@ -1628,7 +1636,7 @@ button:disabled {
   color: var(--preview-muted);
   background: color-mix(
     in srgb,
-    var(--preview-surface) calc(var(--preview-surface-opacity) * 86%),
+    var(--preview-surface) calc(var(--preview-surface-strong-opacity) * 96%),
     transparent
   );
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);

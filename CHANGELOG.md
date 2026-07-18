@@ -4,6 +4,26 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.5] - 2026-07-18
+
+### Added
+
+- Theme-aware foreground adaptation that evaluates the actual quiet and raised UI surfaces over both solid and image-backed scenes.
+- Targeted semantic contrast recovery that strengthens affected surfaces and moves text only as far as needed toward a readable neutral before considering compatibility fallback.
+- Runtime regression coverage for stale Codex foreground utilities, repair success, repair failure, scene-layer imagery, and complete restoration.
+
+### Changed
+
+- Theme previews and the injected Codex runtime now share the same surface-opacity and text-contrast model across every built-in light and dark variant.
+- Generated image themes retain a restrained tint from the source image while meeting readable contrast on their component surfaces.
+- While a Styler theme is active, its variant, semantic foregrounds, placeholders, and icon roles explicitly take priority over Codex's own appearance; restoring the official interface removes that priority completely.
+
+### Fixed
+
+- Light Codex appearance no longer leaves dark native text blended into dark or image-backed Styler surfaces, and the inverse dark-appearance mismatch is corrected as well.
+- A native foreground-class conflict no longer immediately removes semantic surfaces, component styling, icons, and layout; the runtime first applies a scoped readability repair and verifies the result.
+- Structural adapter failures still fall back safely, while recoverable foreground or surface conflicts keep the complete theme whenever the targeted repair succeeds.
+
 ## [0.2.0-beta.4] - 2026-07-18
 
 ### Added

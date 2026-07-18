@@ -27,6 +27,8 @@ describe("adaptive image themes", () => {
     );
     expect(schemes[1].variants.dark.appearance.layout).toBe("editorial");
     expect(schemes[3].variants.dark.appearance.iconStyle).toBe("themed");
+    expect(schemes[0].variants.dark.appearance.text).not.toBe("#f5f5f2");
+    expect(schemes[0].variants.light.appearance.mutedText).not.toBe("#5d616a");
     for (const scheme of schemes) {
       for (const variant of Object.values(scheme.variants)) {
         expect(

@@ -28,8 +28,8 @@ import {
 } from "@codex-styler/theme-core";
 import type { Locale } from "../lib/i18n";
 import type { PreviewScenario } from "../lib/storage";
-import { readableColor } from "../lib/contrast";
 import { drawSpriteFrame } from "../lib/sprite-normalization";
+import { resolveThemeContrast } from "../lib/theme-contrast";
 
 interface PreviewWorkspaceProps {
   theme: ThemeDefinition;
@@ -82,18 +82,10 @@ export function PreviewWorkspace({
         )
       : [];
   const entityPageImagesKey = entityPageImages.join("\n");
-  const protectedText = readableColor(
-    visual.appearance.text,
-    visual.appearance.surface,
+  const contrastSystem = useMemo(
+    () => resolveThemeContrast(theme, variant),
+    [theme, variant],
   );
-  const protectedMuted = readableColor(
-    visual.appearance.mutedText,
-    visual.appearance.surface,
-    4.5,
-  );
-  const protectedSurfaceOpacity = backgroundImage
-    ? Math.max(0.72, visual.appearance.surfaceOpacity)
-    : visual.appearance.surfaceOpacity;
 
   useEffect(() => {
     if (!entityPageImages.length || entity?.renderer.type !== "sprite-atlas") {
@@ -203,21 +195,16 @@ export function PreviewWorkspace({
         "--preview-overlay": visual.background.overlay,
         "--preview-overlay-opacity": visual.background.overlayOpacity,
         "--preview-surface": visual.appearance.surface,
-        "--preview-surface-opacity": protectedSurfaceOpacity,
-        "--preview-text": protectedText,
-        "--preview-muted": protectedMuted,
+        "--preview-surface-opacity": contrastSystem.quietSurfaceOpacity,
+        "--preview-surface-strong-opacity": contrastSystem.strongSurfaceOpacity,
+        "--preview-text": contrastSystem.textPrimary,
+        "--preview-muted": contrastSystem.textSecondary,
         "--preview-border": visual.appearance.border,
         "--preview-accent": visual.appearance.accent,
         "--preview-radius": visual.appearance.radius + "px",
         "--preview-focus-blur": visual.appearance.focusBlur + "px",
       }) as CSSProperties,
-    [
-      backgroundImage,
-      protectedMuted,
-      protectedSurfaceOpacity,
-      protectedText,
-      visual,
-    ],
+    [backgroundImage, contrastSystem, visual],
   );
 
   function handlePointer(event: MouseEvent<HTMLDivElement>) {
@@ -355,6 +342,7 @@ export function PreviewWorkspace({
       data-layout={visual.appearance.layout ?? "native"}
       data-icon-style={visual.appearance.iconStyle ?? "native"}
       data-decorations={visual.appearance.decorations ?? "none"}
+      data-contrast-tone={contrastSystem.tone}
       data-preview-scenario={scenario}
       role="group"
       aria-label={isChinese ? "Codex 主题预览" : "Codex theme preview"}
