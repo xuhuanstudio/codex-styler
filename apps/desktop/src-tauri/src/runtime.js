@@ -1,10 +1,11 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 16) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 18) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
   const ENTITY_ID = "codex-styler-entity-root";
   const STYLE_ID = "codex-styler-runtime-style";
+  const CONTRAST_REPAIR_STYLE_ID = "codex-styler-contrast-repair-style";
   const APP_ROOT_ATTRIBUTE = "data-codex-styler-app-root";
   const OVERLAY_ROOT_ATTRIBUTE = "data-codex-styler-overlay-root";
   const UNLAYERED_ROOT_ATTRIBUTE = "data-codex-styler-unlayered-root";
@@ -53,6 +54,14 @@
 
   const rgb = (hex) =>
     [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+  const toHex = (channels) =>
+    `#${channels
+      .map((value) =>
+        Math.max(0, Math.min(255, Math.round(value)))
+          .toString(16)
+          .padStart(2, "0"),
+      )
+      .join("")}`;
   const luminance = (hex) => {
     const channels = rgb(hex).map((value) => {
       const normalized = value / 255;
@@ -67,11 +76,66 @@
     const b = luminance(background);
     return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
   };
-  const readable = (preferred, background) => {
-    if (contrast(preferred, background) >= 4.5) return preferred;
-    return contrast("#151515", background) >= contrast("#f7f7f5", background)
-      ? "#151515"
-      : "#f7f7f5";
+  const mix = (from, to, amount) => {
+    const start = rgb(from);
+    const end = rgb(to);
+    const progress = Math.max(0, Math.min(1, amount));
+    return toHex(
+      start.map((value, index) => value + (end[index] - value) * progress),
+    );
+  };
+  const composite = (foreground, background, opacity) =>
+    mix(background, foreground, opacity);
+  const adjustBrightness = (color, brightness) =>
+    toHex(rgb(color).map((value) => value * Math.max(0, brightness)));
+  const cssColorToHex = (value) => {
+    if (typeof value !== "string") return null;
+    if (HEX.test(value)) return value;
+    const match = value.match(
+      /^rgba?\(\s*(\d+(?:\.\d+)?)\s*[, ]\s*(\d+(?:\.\d+)?)\s*[, ]\s*(\d+(?:\.\d+)?)/i,
+    );
+    return match
+      ? toHex([Number(match[1]), Number(match[2]), Number(match[3])])
+      : null;
+  };
+  const minimumContrast = (foreground, backgrounds) =>
+    Math.min(
+      ...backgrounds.map((background) => contrast(foreground, background)),
+    );
+  const readable = (preferred, backgrounds, minimum = 4.5) => {
+    const samples = Array.isArray(backgrounds) ? backgrounds : [backgrounds];
+    if (minimumContrast(preferred, samples) >= minimum) return preferred;
+    const candidates = ["#151515", "#f7f7f5", "#000000", "#ffffff", "#767676"]
+      .filter((anchor) => minimumContrast(anchor, samples) >= minimum)
+      .map((anchor) => {
+        let low = 0;
+        let high = 1;
+        for (let iteration = 0; iteration < 18; iteration += 1) {
+          const middle = (low + high) / 2;
+          if (
+            minimumContrast(mix(preferred, anchor, middle), samples) >= minimum
+          ) {
+            high = middle;
+          } else {
+            low = middle;
+          }
+        }
+        return { color: mix(preferred, anchor, high), change: high };
+      })
+      .sort((left, right) => left.change - right.change);
+    if (candidates[0]) return candidates[0].color;
+
+    let best = preferred;
+    let bestRatio = minimumContrast(preferred, samples);
+    for (let value = 0; value <= 255; value += 1) {
+      const gray = toHex([value, value, value]);
+      const ratio = minimumContrast(gray, samples);
+      if (ratio > bestRatio) {
+        best = gray;
+        bestRatio = ratio;
+      }
+    }
+    return best;
   };
 
   const assertSafeImage = (value) => {
@@ -346,6 +410,7 @@
     healthTimer = null;
     document.getElementById(BACKDROP_ID)?.remove();
     document.getElementById(STYLE_ID)?.remove();
+    document.getElementById(CONTRAST_REPAIR_STYLE_ID)?.remove();
     document.documentElement.removeAttribute("data-codex-styler");
     document.documentElement.removeAttribute("data-codex-styler-mode");
     document.documentElement.removeAttribute("data-codex-styler-fallback");
@@ -353,6 +418,11 @@
     document.documentElement.removeAttribute("data-codex-styler-layout");
     document.documentElement.removeAttribute("data-codex-styler-icons");
     document.documentElement.removeAttribute("data-codex-styler-decorations");
+    document.documentElement.removeAttribute("data-codex-styler-variant");
+    document.documentElement.removeAttribute("data-codex-styler-contrast");
+    document.documentElement.removeAttribute(
+      "data-codex-styler-contrast-repair",
+    );
     document.documentElement.removeAttribute("data-codex-styler-density");
     document.documentElement.removeAttribute(
       "data-codex-styler-collision-guard",
@@ -441,18 +511,247 @@
     });
   };
 
-  const semanticPalette = (appearance, background, variant) => {
+  const hasImageBackdrop = (theme, variant) =>
+    Boolean(
+      theme.variants[variant].background.image ||
+      theme.scene.layers.some(
+        (layer) =>
+          layer.type === "image" && Boolean(layer.asset) && layer.opacity > 0,
+      ),
+    );
+
+  const surfaceSamples = (surface, backdrops, opacity) =>
+    backdrops.map((backdrop) => composite(surface, backdrop, opacity));
+
+  const resolveContrastSystem = (theme, variant) => {
+    const visual = theme.variants[variant];
+    const { appearance, background } = visual;
+    const imageBacked = hasImageBackdrop(theme, variant);
+    const backdropRange = imageBacked
+      ? ["#000000", "#ffffff"]
+      : [adjustBrightness(background.color, background.brightness)];
+    const backdrops = backdropRange.map((sample) =>
+      composite(background.overlay, sample, background.overlayOpacity),
+    );
+    const authoredSurfaceOpacity = imageBacked
+      ? Math.max(0.72, appearance.surfaceOpacity)
+      : appearance.surfaceOpacity;
+    let quietSurfaceOpacity = imageBacked
+      ? Math.max(0.64, authoredSurfaceOpacity * 0.78)
+      : Math.max(0.38, authoredSurfaceOpacity * 0.62);
+    let quietBackgrounds = surfaceSamples(
+      appearance.surface,
+      backdrops,
+      quietSurfaceOpacity,
+    );
+    let textPrimary = readable(appearance.text, quietBackgrounds);
+    let textSecondary = readable(appearance.mutedText, quietBackgrounds);
+
+    while (
+      quietSurfaceOpacity < 0.96 &&
+      (minimumContrast(textPrimary, quietBackgrounds) < 4.5 ||
+        minimumContrast(textSecondary, quietBackgrounds) < 4.5)
+    ) {
+      quietSurfaceOpacity = Math.min(0.96, quietSurfaceOpacity + 0.02);
+      quietBackgrounds = surfaceSamples(
+        appearance.surface,
+        backdrops,
+        quietSurfaceOpacity,
+      );
+      textPrimary = readable(appearance.text, quietBackgrounds);
+      textSecondary = readable(appearance.mutedText, quietBackgrounds);
+    }
+
+    const strongSurfaceOpacity = Math.min(
+      0.98,
+      Math.max(
+        authoredSurfaceOpacity,
+        quietSurfaceOpacity + (imageBacked ? 0.12 : 0.08),
+      ),
+    );
+    const strongBackgrounds = surfaceSamples(
+      appearance.surface,
+      backdrops,
+      strongSurfaceOpacity,
+    );
+    const semanticBackgrounds = [
+      ...quietBackgrounds,
+      ...strongBackgrounds,
+      appearance.surface,
+    ];
+    textPrimary = readable(appearance.text, semanticBackgrounds);
+    textSecondary = readable(appearance.mutedText, semanticBackgrounds);
+    const textTertiary = readable(
+      appearance.palette?.textTertiary || appearance.mutedText,
+      semanticBackgrounds,
+      3,
+    );
+    return {
+      hasImageBackdrop: imageBacked,
+      quietSurfaceOpacity,
+      strongSurfaceOpacity,
+      quietBackgrounds,
+      strongBackgrounds,
+      textPrimary,
+      textSecondary,
+      textTertiary,
+      tone:
+        minimumContrast("#ffffff", quietBackgrounds) >=
+        minimumContrast("#000000", quietBackgrounds)
+          ? "light"
+          : "dark",
+    };
+  };
+
+  const resolveEmergencyContrastSystem = (theme, variant) => {
+    const visual = theme.variants[variant];
+    const { appearance, background } = visual;
+    const imageBacked = hasImageBackdrop(theme, variant);
+    const backdropRange = imageBacked
+      ? ["#000000", "#ffffff"]
+      : [adjustBrightness(background.color, background.brightness)];
+    const backdrops = backdropRange.map((sample) =>
+      composite(background.overlay, sample, background.overlayOpacity),
+    );
+    const quietSurfaceOpacity = imageBacked ? 0.96 : 0.94;
+    const strongSurfaceOpacity = 0.99;
+    const quietBackgrounds = surfaceSamples(
+      appearance.surface,
+      backdrops,
+      quietSurfaceOpacity,
+    );
+    const strongBackgrounds = surfaceSamples(
+      appearance.surface,
+      backdrops,
+      strongSurfaceOpacity,
+    );
+    const semanticBackgrounds = [
+      ...quietBackgrounds,
+      ...strongBackgrounds,
+      appearance.surface,
+    ];
+    return {
+      quietSurfaceOpacity,
+      strongSurfaceOpacity,
+      quietBackgrounds,
+      strongBackgrounds,
+      textPrimary: readable(appearance.text, semanticBackgrounds),
+      textSecondary: readable(appearance.mutedText, semanticBackgrounds),
+      textTertiary: readable(
+        appearance.palette?.textTertiary || appearance.mutedText,
+        semanticBackgrounds,
+        3,
+      ),
+    };
+  };
+
+  const installContrastRepair = () => {
+    if (!activeState?.theme || !activeState?.variant) return false;
+    const { theme, variant } = activeState;
+    const appearance = theme.variants[variant].appearance;
+    const repair = resolveEmergencyContrastSystem(theme, variant);
+    const quietSurfacePercent = Math.round(repair.quietSurfaceOpacity * 100);
+    const strongSurfacePercent = Math.round(repair.strongSurfaceOpacity * 100);
+    document.getElementById(CONTRAST_REPAIR_STYLE_ID)?.remove();
+    const style = document.createElement("style");
+    style.id = CONTRAST_REPAIR_STYLE_ID;
+    style.textContent = `
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] body,
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] body > [${APP_ROOT_ATTRIBUTE}] {
+        --codex-styler-text-primary: ${repair.textPrimary} !important;
+        --codex-styler-text-secondary: ${repair.textSecondary} !important;
+        --codex-styler-text-tertiary: ${repair.textTertiary} !important;
+        --color-text-foreground: ${repair.textPrimary} !important;
+        --color-text-foreground-secondary: ${repair.textSecondary} !important;
+        --color-text-foreground-tertiary: ${repair.textTertiary} !important;
+        --color-token-foreground: ${repair.textPrimary} !important;
+        --color-token-foreground-secondary: ${repair.textSecondary} !important;
+        --color-token-foreground-tertiary: ${repair.textTertiary} !important;
+        --color-token-text-primary: ${repair.textPrimary} !important;
+        --color-token-text-secondary: ${repair.textSecondary} !important;
+        --color-token-text-tertiary: ${repair.textTertiary} !important;
+        --color-token-description-foreground: ${repair.textSecondary} !important;
+        --color-token-disabled-foreground: ${repair.textTertiary} !important;
+        --color-token-input-foreground: ${repair.textPrimary} !important;
+        --color-token-input-placeholder-foreground: ${repair.textTertiary} !important;
+        --color-token-icon-foreground: ${repair.textPrimary} !important;
+      }
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] main.main-surface {
+        color: ${repair.textPrimary} !important;
+        background: color-mix(in srgb, ${appearance.surface} ${quietSurfacePercent}%, transparent) !important;
+      }
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] aside.app-shell-left-panel,
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] main.main-surface > header:not(.app-header-tint),
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] main.main-surface article,
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] main.main-surface [data-message-author-role],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] .composer-surface-chrome,
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] [role="dialog"],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] [role="menu"],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] [role="listbox"],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] [data-pip-obstacle="thread-summary-panel"],
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] :is(input, textarea, select) {
+        color: ${repair.textPrimary} !important;
+        background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
+      }
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] :is(
+        [class~="text-foreground"],
+        [class~="text-primary"],
+        [class~="text-token-foreground"],
+        [class~="text-token-text-primary"],
+        [class~="text-token-input-foreground"]
+      ) {
+        color: ${repair.textPrimary} !important;
+      }
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] :is(
+        [class~="text-secondary"],
+        [class~="text-foreground-secondary"],
+        [class~="text-token-foreground-secondary"],
+        [class~="text-token-text-secondary"],
+        [class~="text-token-description-foreground"]
+      ) {
+        color: ${repair.textSecondary} !important;
+      }
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] :is(
+        [class~="text-tertiary"],
+        [class~="text-foreground-tertiary"],
+        [class~="text-token-foreground-tertiary"],
+        [class~="text-token-text-tertiary"],
+        [class~="text-token-disabled-foreground"]
+      ),
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] :is(input, textarea)::placeholder,
+      html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-contrast-repair="active"] [contenteditable="true"] [data-placeholder]::before {
+        color: ${repair.textTertiary} !important;
+        opacity: 1 !important;
+      }
+    `;
+    document.head.appendChild(style);
+    document.documentElement.setAttribute(
+      "data-codex-styler-contrast-repair",
+      "active",
+    );
+    return true;
+  };
+
+  const semanticPalette = (appearance, background, variant, contrastSystem) => {
     const custom = appearance.palette || {};
-    const textPrimary = readable(appearance.text, appearance.surface);
-    const textSecondary = readable(appearance.mutedText, appearance.surface);
-    const safeOverride = (candidate, foreground, fallback, minimum = 4.5) =>
-      candidate && contrast(foreground, candidate) >= minimum
+    const textPrimary = contrastSystem.textPrimary;
+    const textSecondary = contrastSystem.textSecondary;
+    const textTertiary = contrastSystem.textTertiary;
+    const readableSurface = (surface, minimum = 4.5) =>
+      contrast(textPrimary, surface) >= minimum &&
+      contrast(textSecondary, surface) >= minimum &&
+      contrast(textTertiary, surface) >= 3;
+    const safeSurface = (candidate, fallback, minimum = 4.5) => {
+      if (candidate && readableSurface(candidate, minimum)) {
+        return candidate;
+      }
+      return readableSurface(fallback, minimum) ? fallback : appearance.surface;
+    };
+    const safeForeground = (candidate, backgrounds, fallback, minimum = 4.5) =>
+      candidate && minimumContrast(candidate, backgrounds) >= minimum
         ? candidate
-        : fallback;
-    const safeForeground = (candidate, backgroundColor, fallback) =>
-      candidate && contrast(candidate, backgroundColor) >= 4.5
-        ? candidate
-        : fallback;
+        : readable(fallback, backgrounds, minimum);
     const statusDefaults =
       variant === "dark"
         ? {
@@ -469,69 +768,59 @@
           };
     const success = safeForeground(
       custom.success,
-      appearance.surface,
+      contrastSystem.strongBackgrounds,
       statusDefaults.success,
     );
     const warning = safeForeground(
       custom.warning,
-      appearance.surface,
+      contrastSystem.strongBackgrounds,
       statusDefaults.warning,
     );
     const danger = safeForeground(
       custom.danger,
-      appearance.surface,
+      contrastSystem.strongBackgrounds,
       statusDefaults.danger,
     );
     const info = safeForeground(
       custom.info || appearance.accent,
-      appearance.surface,
+      contrastSystem.strongBackgrounds,
       statusDefaults.info,
     );
     const onAccent = safeForeground(
       custom.onAccent,
-      appearance.accent,
+      [appearance.accent],
       readable(appearance.surface, appearance.accent),
     );
     return {
-      canvas: safeOverride(custom.canvas, textPrimary, background.color),
+      canvas: safeSurface(custom.canvas, background.color),
       surface: appearance.surface,
-      surfaceRaised: safeOverride(
+      surfaceRaised: safeSurface(
         custom.surfaceRaised,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 92%, ${appearance.text})`,
+        mix(appearance.surface, appearance.text, 0.08),
       ),
-      surfaceOverlay: safeOverride(
+      surfaceOverlay: safeSurface(
         custom.surfaceOverlay,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 86%, ${appearance.text})`,
+        mix(appearance.surface, appearance.text, 0.14),
       ),
-      surfaceSunken: safeOverride(
+      surfaceSunken: safeSurface(
         custom.surfaceSunken,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 88%, ${background.color})`,
+        mix(appearance.surface, background.color, 0.12),
       ),
-      control: safeOverride(
+      control: safeSurface(
         custom.control,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 90%, ${appearance.text})`,
+        mix(appearance.surface, appearance.text, 0.1),
       ),
-      controlHover: safeOverride(
+      controlHover: safeSurface(
         custom.controlHover,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 84%, ${appearance.text})`,
+        mix(appearance.surface, appearance.text, 0.16),
       ),
-      controlActive: safeOverride(
+      controlActive: safeSurface(
         custom.controlActive,
-        textPrimary,
-        `color-mix(in srgb, ${appearance.surface} 76%, ${appearance.text})`,
+        mix(appearance.surface, appearance.text, 0.24),
       ),
       textPrimary,
       textSecondary,
-      textTertiary: safeForeground(
-        custom.textTertiary,
-        appearance.surface,
-        `color-mix(in srgb, ${textSecondary} 78%, ${appearance.surface})`,
-      ),
+      textTertiary,
       accent: appearance.accent,
       onAccent,
       border: appearance.border,
@@ -543,16 +832,28 @@
         `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
       focus: safeForeground(
         custom.focus || appearance.accent,
-        appearance.surface,
+        contrastSystem.strongBackgrounds,
         statusDefaults.info,
       ),
       success,
       warning,
       danger,
       info,
-      added: safeForeground(custom.added, appearance.surface, success),
-      modified: safeForeground(custom.modified, appearance.surface, warning),
-      deleted: safeForeground(custom.deleted, appearance.surface, danger),
+      added: safeForeground(
+        custom.added,
+        contrastSystem.strongBackgrounds,
+        success,
+      ),
+      modified: safeForeground(
+        custom.modified,
+        contrastSystem.strongBackgrounds,
+        warning,
+      ),
+      deleted: safeForeground(
+        custom.deleted,
+        contrastSystem.strongBackgrounds,
+        danger,
+      ),
     };
   };
 
@@ -629,6 +930,8 @@
     --color-token-side-bar-background: var(--codex-styler-canvas);
     --color-token-main-surface-primary: color-mix(in srgb, var(--codex-styler-surface) 88%, transparent);
     --color-token-foreground: var(--codex-styler-text-primary);
+    --color-token-foreground-secondary: var(--codex-styler-text-secondary);
+    --color-token-foreground-tertiary: var(--codex-styler-text-tertiary);
     --color-token-text-primary: var(--codex-styler-text-primary);
     --color-token-text-secondary: var(--codex-styler-text-secondary);
     --color-token-text-tertiary: var(--codex-styler-text-tertiary);
@@ -775,17 +1078,21 @@
   const installStyles = (theme, variant, safeMode) => {
     const visual = theme.variants[variant];
     const { appearance, background } = visual;
-    const protectedText = readable(appearance.text, appearance.surface);
-    const protectedOpacity = background.image
-      ? Math.max(0.72, appearance.surfaceOpacity)
-      : appearance.surfaceOpacity;
-    const surfacePercent = Math.round(protectedOpacity * 100);
-    const quietSurfacePercent = background.image
-      ? Math.max(64, Math.round(surfacePercent * 0.78))
-      : Math.max(38, Math.round(surfacePercent * 0.62));
-    const strongSurfacePercent = Math.min(94, Math.max(58, surfacePercent));
+    const contrastSystem = resolveContrastSystem(theme, variant);
+    const protectedText = contrastSystem.textPrimary;
+    const quietSurfacePercent = Math.round(
+      contrastSystem.quietSurfaceOpacity * 100,
+    );
+    const strongSurfacePercent = Math.round(
+      contrastSystem.strongSurfaceOpacity * 100,
+    );
     const accentText = readable(appearance.surface, appearance.accent);
-    const palette = semanticPalette(appearance, background, variant);
+    const palette = semanticPalette(
+      appearance,
+      background,
+      variant,
+      contrastSystem,
+    );
     const style = document.createElement("style");
     style.id = STYLE_ID;
     const semantic = safeMode
@@ -794,17 +1101,17 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"],
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
-          color-scheme: ${variant};
+          color-scheme: ${variant} !important;
           ${codexColorTokenDeclarations(palette)}
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           background: transparent !important;
-          color: ${protectedText};
+          color: var(--codex-styler-text-primary) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] aside.app-shell-left-panel {
-          color: ${protectedText} !important;
-          background: linear-gradient(180deg, color-mix(in srgb, ${appearance.surface} ${Math.min(96, strongSurfacePercent + 5)}%, transparent), color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent)) !important;
+          color: var(--codex-styler-text-primary) !important;
+          background: linear-gradient(180deg, color-mix(in srgb, ${appearance.surface} ${Math.min(99, strongSurfacePercent + 2)}%, transparent), color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent)) !important;
           border-color: ${appearance.border} !important;
           backdrop-filter: saturate(1.08) blur(${appearance.focusBlur}px) !important;
         }
@@ -825,7 +1132,7 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface {
           overflow: clip !important;
-          color: ${protectedText} !important;
+          color: var(--codex-styler-text-primary) !important;
           background: color-mix(in srgb, ${appearance.surface} ${quietSurfacePercent}%, transparent) !important;
           border: 1px solid color-mix(in srgb, ${appearance.border} 84%, transparent) !important;
           border-color: ${appearance.border} !important;
@@ -846,7 +1153,7 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="immersive"] main.main-surface {
           margin: 10px 12px 12px 9px !important;
           border-radius: ${Math.max(18, appearance.radius + 10)}px !important;
-          background: color-mix(in srgb, ${appearance.surface} ${Math.max(50, quietSurfacePercent - 8)}%, transparent) !important;
+          background: color-mix(in srgb, ${appearance.surface} ${quietSurfacePercent}%, transparent) !important;
           box-shadow: 0 26px 72px rgb(0 0 0 / 18%), inset 0 1px color-mix(in srgb, ${protectedText} 7%, transparent) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-layout="editorial"] main.main-surface [role="main"] {
@@ -859,7 +1166,7 @@
           background-blend-mode: normal !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface > header:not(.app-header-tint) {
-          background: color-mix(in srgb, ${appearance.surface} ${Math.min(90, strongSurfacePercent + 4)}%, transparent) !important;
+          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
           border-color: ${appearance.border} !important;
           backdrop-filter: blur(${appearance.focusBlur}px) !important;
         }
@@ -884,7 +1191,7 @@
           background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
           border-color: ${appearance.border} !important;
           border-radius: ${appearance.radius}px !important;
-          color: ${protectedText} !important;
+          color: var(--codex-styler-text-primary) !important;
           box-shadow: 0 1px 0 color-mix(in srgb, ${protectedText} 5%, transparent), 0 14px 40px rgb(0 0 0 / 9%) !important;
           backdrop-filter: saturate(1.08) blur(${appearance.focusBlur}px) !important;
         }
@@ -893,17 +1200,17 @@
           box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 14%, transparent), 0 18px 50px rgb(0 0 0 / 12%) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] .ProseMirror {
-          color: ${protectedText} !important;
+          color: var(--codex-styler-text-primary) !important;
           caret-color: ${appearance.accent} !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] button[class~="bg-token-foreground"] {
-          color: ${appearance.surface} !important;
+          color: ${accentText} !important;
           background: ${appearance.accent} !important;
           box-shadow: 0 6px 18px color-mix(in srgb, ${appearance.accent} 22%, transparent) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] {
-          color: ${protectedText} !important;
-          background: color-mix(in srgb, ${appearance.surface} ${Math.min(96, strongSurfacePercent + 5)}%, transparent) !important;
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
           border: 1px solid color-mix(in srgb, ${appearance.border} 88%, transparent) !important;
           border-radius: ${Math.max(12, appearance.radius + 4)}px !important;
           box-shadow: 0 22px 70px rgb(0 0 0 / 16%), inset 0 1px color-mix(in srgb, ${protectedText} 5%, transparent) !important;
@@ -923,9 +1230,53 @@
           transform: translateX(2px);
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is(input, textarea, select) {
-          color: ${protectedText} !important;
+          color: var(--codex-styler-text-primary) !important;
           border-color: ${appearance.border} !important;
-          background-color: color-mix(in srgb, ${appearance.surface} ${Math.min(96, strongSurfacePercent + 5)}%, transparent) !important;
+          background-color: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
+        }
+        /* Codex's own appearance can leave utility classes with a stale
+           foreground after a Styler theme changes. Exact semantic roles take
+           precedence here; links, statuses, diffs, and accents keep meaning. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(
+          [class~="text-foreground"],
+          [class~="text-primary"],
+          [class~="text-token-foreground"],
+          [class~="text-token-text-primary"],
+          [class~="text-token-input-foreground"]
+        ) {
+          color: var(--codex-styler-text-primary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(
+          [class~="text-secondary"],
+          [class~="text-foreground-secondary"],
+          [class~="text-token-foreground-secondary"],
+          [class~="text-token-text-secondary"],
+          [class~="text-token-description-foreground"]
+        ) {
+          color: var(--codex-styler-text-secondary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(
+          [class~="text-tertiary"],
+          [class~="text-foreground-tertiary"],
+          [class~="text-token-foreground-tertiary"],
+          [class~="text-token-text-tertiary"],
+          [class~="text-token-disabled-foreground"]
+        ) {
+          color: var(--codex-styler-text-tertiary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(
+          [class~="text-icon-primary"],
+          [class~="text-token-icon-foreground"]
+        ) {
+          color: var(--codex-styler-text-primary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(input, textarea)::placeholder {
+          color: var(--codex-styler-text-tertiary) !important;
+          opacity: 1 !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [contenteditable="true"] [data-placeholder]::before {
+          color: var(--codex-styler-text-tertiary) !important;
+          opacity: 1 !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is(a, [role="link"]) {
           text-decoration-color: color-mix(in srgb, ${appearance.accent} 55%, transparent);
@@ -1704,22 +2055,41 @@
     const sidebar = document.querySelector("aside.app-shell-left-panel");
     const main = document.querySelector("main.main-surface");
     if (!document.getElementById(STYLE_ID)) {
-      return { ok: false, reason: "runtime stylesheet was removed" };
+      return {
+        ok: false,
+        reason: "runtime stylesheet was removed",
+        repairable: false,
+      };
+    }
+    if (
+      !document.documentElement.hasAttribute("data-codex-styler-variant") ||
+      !document.documentElement.hasAttribute("data-codex-styler-contrast")
+    ) {
+      return {
+        ok: false,
+        reason: "adaptive contrast state was removed",
+        repairable: false,
+      };
     }
     const appRoot = document.querySelector(`body > [${APP_ROOT_ATTRIBUTE}]`);
     if (!appRoot) {
-      return { ok: false, reason: "application root was not found" };
+      return {
+        ok: false,
+        reason: "application root was not found",
+        repairable: false,
+      };
     }
     if (!sidebar || !main) {
       const alternateSurface = appRoot.querySelector(
         '.main-surface, [role="dialog"], [role="alertdialog"]',
       );
       if (alternateSurface || appRoot.childElementCount > 0) {
-        return { ok: true, reason: null };
+        return { ok: true, reason: null, repairable: false };
       }
       return {
         ok: false,
         reason: "a visible application surface was not found",
+        repairable: false,
       };
     }
     const mainStyle = getComputedStyle(main);
@@ -1730,9 +2100,47 @@
       return {
         ok: false,
         reason: "semantic surface style did not take effect",
+        repairable: true,
       };
     }
-    return { ok: true, reason: null };
+    if (activeState?.theme && activeState?.variant) {
+      const contrastSystem = document.documentElement.hasAttribute(
+        "data-codex-styler-contrast-repair",
+      )
+        ? resolveEmergencyContrastSystem(activeState.theme, activeState.variant)
+        : resolveContrastSystem(activeState.theme, activeState.variant);
+      if (
+        minimumContrast(
+          contrastSystem.textPrimary,
+          contrastSystem.quietBackgrounds,
+        ) < 4.45
+      ) {
+        return {
+          ok: false,
+          reason: "adaptive text contrast could not be guaranteed",
+          repairable: true,
+        };
+      }
+      const primaryText =
+        main.querySelector(
+          '[class~="text-token-foreground"], [class~="text-token-text-primary"], [class~="text-foreground"], [class~="text-primary"]',
+        ) || main;
+      const computedForeground = cssColorToHex(
+        getComputedStyle(primaryText).color,
+      );
+      if (
+        computedForeground &&
+        minimumContrast(computedForeground, contrastSystem.quietBackgrounds) <
+          4.2
+      ) {
+        return {
+          ok: false,
+          reason: "Codex native foreground overrode adaptive theme colors",
+          repairable: true,
+        };
+      }
+    }
+    return { ok: true, reason: null, repairable: false };
   };
 
   const nextFrame = () =>
@@ -1747,6 +2155,12 @@
       safeMode ? "compatibility" : "semantic",
     );
     const appearance = theme.variants[variant].appearance;
+    const contrastSystem = resolveContrastSystem(theme, variant);
+    document.documentElement.setAttribute("data-codex-styler-variant", variant);
+    document.documentElement.setAttribute(
+      "data-codex-styler-contrast",
+      contrastSystem.tone,
+    );
     document.documentElement.setAttribute(
       "data-codex-styler-layout",
       appearance.layout || "native",
@@ -1888,6 +2302,36 @@
           healthTimer = null;
           const verification = verifySemanticAdapter();
           if (!verification.ok && activeState?.resolvedMode === "semantic") {
+            if (
+              verification.repairable &&
+              !document.documentElement.hasAttribute(
+                "data-codex-styler-contrast-repair",
+              ) &&
+              installContrastRepair()
+            ) {
+              healthTimer = setTimeout(() => {
+                healthTimer = null;
+                const repairedVerification = verifySemanticAdapter();
+                if (
+                  !repairedVerification.ok &&
+                  activeState?.resolvedMode === "semantic"
+                ) {
+                  const state = activeState;
+                  render(
+                    state.theme,
+                    state.variant,
+                    true,
+                    state.requestedMode,
+                    "compatibility",
+                  );
+                  document.documentElement.setAttribute(
+                    "data-codex-styler-fallback",
+                    repairedVerification.reason,
+                  );
+                }
+              }, 120);
+              return;
+            }
             const state = activeState;
             render(
               state.theme,
@@ -2008,7 +2452,25 @@
         reason: null,
       };
     }
-    const verification = verifySemanticAdapter();
+    let verification = verifySemanticAdapter();
+    let contrastRepairApplied = false;
+    if (verification.repairable && installContrastRepair()) {
+      await nextFrame();
+      await nextFrame();
+      if (revision !== latestRevision) {
+        return {
+          ok: true,
+          stale: true,
+          revision: latestRevision,
+          themeId: theme.id,
+          requestedMode: compatibilityMode,
+          resolvedMode,
+          reason: null,
+        };
+      }
+      verification = verifySemanticAdapter();
+      contrastRepairApplied = verification.ok;
+    }
     if (!verification.ok) {
       render(theme, variant, true, compatibilityMode, "compatibility");
       document.documentElement.setAttribute(
@@ -2030,11 +2492,12 @@
       requestedMode: compatibilityMode,
       resolvedMode: "semantic",
       reason: null,
+      contrastRepairApplied,
     };
   };
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 16,
+    version: 18,
     apply,
     updateEntity,
     pause: remove,

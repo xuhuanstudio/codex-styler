@@ -266,7 +266,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.4");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.5");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -1725,8 +1725,17 @@ export function App() {
                 : t("unknownCompatibility")}
           </div>
           <div className="preview-variant-control">
-            <span>{t("codexAppearance")}</span>
-            <div className="variant-switch" aria-label={t("codexAppearance")}>
+            <span title={t("codexAppearanceDescription")}>
+              {t("codexAppearance")}
+            </span>
+            <span id="codex-appearance-description" className="visually-hidden">
+              {t("codexAppearanceDescription")}
+            </span>
+            <div
+              className="variant-switch"
+              aria-label={t("codexAppearance")}
+              aria-describedby="codex-appearance-description"
+            >
               <button
                 className={variant === "light" ? "is-active" : ""}
                 onClick={() => chooseVariant("light")}

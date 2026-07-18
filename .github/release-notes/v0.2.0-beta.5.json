@@ -1,0 +1,37 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.5",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "Adaptive foregrounds now follow each theme's real UI surfaces, while targeted readability repair preserves the complete theme when Codex native colors conflict.",
+      "highlights": [
+        "Text keeps a restrained theme tint and moves gradually toward black, white, or gray only as far as the actual component surface requires.",
+        "Solid backgrounds, image scenes, quiet workspace glass, raised cards, dialogs, the composer, sidebars, placeholders, and semantic icons share one contrast model.",
+        "A stale Codex foreground now triggers a scoped high-priority repair and a second health check instead of immediately removing semantic styling.",
+        "Styler colors take priority while a theme is active; one-click restore removes every override and returns appearance control to Codex."
+      ],
+      "fixes": [
+        "Fixed black Codex text becoming unreadable on dark or image-backed Styler surfaces when Codex itself used a light appearance.",
+        "Fixed the inverse white-text conflict on light Styler surfaces.",
+        "Fixed recoverable foreground conflicts unnecessarily dropping component surfaces, icons, layout treatments, and other semantic theme effects.",
+        "Kept conservative fallback for missing application roots, removed runtime styles, failed repairs, and other genuine structural failures."
+      ]
+    },
+    "zh-CN": {
+      "summary": "自适应前景色现在会依据主题中真实的 UI 表面进行计算；当 Codex 原生颜色发生冲突时，局部可读性修复会优先保留完整主题效果。",
+      "highlights": [
+        "文字会保留克制的主题色倾向，并只按实际组件表面的需要逐步向黑、白或灰过渡，而不是突然切成纯黑或纯白。",
+        "纯色背景、图片场景、工作区玻璃表面、卡片、对话框、输入框、侧栏、占位文字与语义图标现在使用同一套对比度模型。",
+        "检测到 Codex 遗留前景色时，会先应用高优先级的局部修复并再次健康检查，不再立即撤掉语义主题。",
+        "主题生效期间由 Styler 接管语义颜色；一键恢复会完整移除覆盖并把外观控制权交还给 Codex。"
+      ],
+      "fixes": [
+        "修复 Codex 自身为亮色外观时，黑色文字在深色或图片型 Styler 表面上不可读的问题。",
+        "修复 Codex 自身为暗色外观时，白色文字与浅色 Styler 表面冲突的反向问题。",
+        "修复可恢复的前景色冲突导致组件表面、图标、布局处理和其他完整主题效果被不必要降级的问题。",
+        "应用根缺失、运行时样式被移除、局部修复仍失败等真实结构异常仍会安全回退。"
+      ]
+    }
+  }
+}

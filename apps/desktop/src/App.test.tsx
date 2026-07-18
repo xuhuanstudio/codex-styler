@@ -294,7 +294,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.4")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.5")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
