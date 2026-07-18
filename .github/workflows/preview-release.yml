@@ -53,7 +53,9 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          localized_notes=".github/release-notes/${GITHUB_REF_NAME}.json"
           test -f "$notes"
+          test -f "$localized_notes"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
           echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
           echo "MAC_UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
@@ -163,7 +165,9 @@ jobs:
         run: |
           $version = $env:GITHUB_REF_NAME.Substring(1)
           $notes = ".github/release-notes/$($env:GITHUB_REF_NAME).md"
+          $localizedNotes = ".github/release-notes/$($env:GITHUB_REF_NAME).json"
           if (-not (Test-Path $notes)) { throw "Missing release notes: $notes" }
+          if (-not (Test-Path $localizedNotes)) { throw "Missing localized release notes: $localizedNotes" }
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "EXE_NAME=Codex-Styler_$($version)_x64-unsigned-setup.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
           "WIN_UPDATER_SIG_NAME=Codex-Styler_$($version)_x64-unsigned-setup.exe.sig" | Out-File -FilePath $env:GITHUB_ENV -Append
@@ -247,7 +251,9 @@ jobs:
           set -euo pipefail
           version="${GITHUB_REF_NAME#v}"
           notes=".github/release-notes/${GITHUB_REF_NAME}.md"
+          localized_notes=".github/release-notes/${GITHUB_REF_NAME}.json"
           test -f "$notes"
+          test -f "$localized_notes"
           echo "RELEASE_VERSION=$version" >> "$GITHUB_ENV"
           echo "DMG_NAME=Codex-Styler_${version}_aarch64-unsigned.dmg" >> "$GITHUB_ENV"
           echo "MAC_UPDATER_NAME=Codex-Styler_${version}_aarch64.app.tar.gz" >> "$GITHUB_ENV"
@@ -286,6 +292,11 @@ jobs:
           mac_signature="$(cat "release/$MAC_UPDATER_SIG_NAME")"
           windows_signature="$(cat "release/$WIN_UPDATER_SIG_NAME")"
           notes="$(cat ".github/release-notes/${GITHUB_REF_NAME}.md")"
+          cp ".github/release-notes/${GITHUB_REF_NAME}.json" release/release-notes.json
+          jq -e \
+            --arg version "$RELEASE_VERSION" \
+            '.format == "codex-styler-release-notes-v1" and .version == $version and .defaultLocale == "en" and (.locales.en.summary | length) > 0 and (.locales["zh-CN"].summary | length) > 0' \
+            release/release-notes.json >/dev/null
           jq -n \
             --arg version "$RELEASE_VERSION" \
             --arg notes "$notes" \

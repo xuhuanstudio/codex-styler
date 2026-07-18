@@ -198,7 +198,7 @@ export function App() {
   const [busy, setBusy] = useState(false);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.1");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.2");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -435,7 +435,7 @@ export function App() {
       void handleCheckForUpdates(false);
     }, 900);
     return () => window.clearTimeout(timeout);
-  }, [settings.automaticUpdateChecks, settings.onboardingComplete]);
+  }, [locale, settings.automaticUpdateChecks, settings.onboardingComplete]);
 
   const appTheme = useMemo(() => {
     if (settings.appearance === "system") return "system";
@@ -657,7 +657,7 @@ export function App() {
   async function handleCheckForUpdates(manual = true) {
     setUpdateStatus("checking");
     try {
-      const result = await checkForUpdates();
+      const result = await checkForUpdates(locale);
       const checkedAt = new Date().toISOString();
       setCurrentVersion(result.currentVersion);
       updateSettings({ lastUpdateCheckAt: checkedAt });
@@ -1799,12 +1799,39 @@ export function App() {
               {availableUpdate.prerelease && <small>{t("prerelease")}</small>}
             </div>
             <p>{t("updateAvailableBody")}</p>
-            {availableUpdate.notes && (
+            {availableUpdate.releaseNotes ? (
+              <div className="update-dialog__notes">
+                <strong>{t("releaseNotes")}</strong>
+                <p className="update-dialog__summary">
+                  {availableUpdate.releaseNotes.summary}
+                </p>
+                {availableUpdate.releaseNotes.highlights.length > 0 && (
+                  <section>
+                    <h3>{t("releaseHighlights")}</h3>
+                    <ul>
+                      {availableUpdate.releaseNotes.highlights.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+                {availableUpdate.releaseNotes.fixes.length > 0 && (
+                  <section>
+                    <h3>{t("releaseFixes")}</h3>
+                    <ul>
+                      {availableUpdate.releaseNotes.fixes.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </div>
+            ) : availableUpdate.notes ? (
               <div className="update-dialog__notes">
                 <strong>{t("releaseNotes")}</strong>
                 <p>{availableUpdate.notes}</p>
               </div>
-            )}
+            ) : null}
             {updateInstallStatus !== "idle" && (
               <div className="update-dialog__progress" aria-live="polite">
                 <div>
@@ -2529,8 +2556,25 @@ function CompanionsView({
             const active = selected?.id === item.id;
             const renderer = item.entity.renderer;
             const previewSize = 64;
-            const frameScale =
+            const hasDedicatedPortrait = Boolean(item.metadata.preview);
+            const fallbackFrame =
               renderer.type === "sprite-atlas"
+                ? Math.max(
+                    0,
+                    Math.min(
+                      (renderer.frameCount ?? renderer.directions) - 1,
+                      renderer.neutralFrame ?? renderer.reducedMotionFrame ?? 0,
+                    ),
+                  )
+                : 0;
+            const framesPerPage =
+              renderer.type === "sprite-atlas"
+                ? (renderer.framesPerPage ?? renderer.columns * renderer.rows)
+                : 1;
+            const pageIndex = Math.floor(fallbackFrame / framesPerPage);
+            const frameOnPage = fallbackFrame % framesPerPage;
+            const frameScale =
+              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
                 ? Math.min(
                     previewSize / renderer.frameWidth,
                     previewSize / renderer.frameHeight,
@@ -2541,14 +2585,22 @@ function CompanionsView({
                 ? `${renderer.columns * renderer.frameWidth * frameScale}px ${renderer.rows * renderer.frameHeight * frameScale}px`
                 : "contain";
             const frameWidth =
-              renderer.type === "sprite-atlas"
+              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
                 ? renderer.frameWidth * frameScale
                 : previewSize;
             const frameHeight =
-              renderer.type === "sprite-atlas"
+              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
                 ? renderer.frameHeight * frameScale
                 : previewSize;
-            const previewPath = item.metadata.preview ?? renderer.asset;
+            const previewPath =
+              item.metadata.preview ??
+              (renderer.type === "sprite-atlas"
+                ? (renderer.pages?.[pageIndex] ?? renderer.asset)
+                : renderer.asset);
+            const backgroundPosition =
+              renderer.type === "sprite-atlas" && !hasDedicatedPortrait
+                ? `${-(frameOnPage % renderer.columns) * renderer.frameWidth * frameScale}px ${-Math.floor(frameOnPage / renderer.columns) * renderer.frameHeight * frameScale}px`
+                : "center";
             return (
               <div
                 key={item.id}
@@ -2568,6 +2620,13 @@ function CompanionsView({
                   <span className="companion-option__visual companion-option__visual--sprite">
                     <span
                       className="companion-option__frame"
+                      data-preview-source={
+                        hasDedicatedPortrait
+                          ? "portrait"
+                          : renderer.type === "sprite-atlas"
+                            ? "neutral-frame"
+                            : "image"
+                      }
                       style={{
                         width: `${frameWidth}px`,
                         height: `${frameHeight}px`,
@@ -2577,7 +2636,7 @@ function CompanionsView({
                             ? "contain"
                             : backgroundSize,
                         backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
+                        backgroundPosition,
                       }}
                     />
                   </span>
@@ -3452,7 +3511,7 @@ function SettingsView({
         </div>
       </section>
       <div className="settings-layout">
-        <section className="settings-group">
+        <section className="settings-group settings-group--split">
           <div className="settings-group__title">
             <Languages size={17} />
             <div>
@@ -3460,21 +3519,23 @@ function SettingsView({
               <p>{t("languageDescription")}</p>
             </div>
           </div>
-          <label className="select-control">
-            <select
-              value={settings.locale}
-              onChange={(event) =>
-                onChange({ locale: event.target.value as LocalePreference })
-              }
-            >
-              <option value="system">{t("systemLanguage")}</option>
-              <option value="en">English</option>
-              <option value="zh-CN">简体中文</option>
-            </select>
-            <ChevronRight size={14} aria-hidden="true" />
-          </label>
+          <div className="settings-group__control">
+            <label className="select-control">
+              <select
+                value={settings.locale}
+                onChange={(event) =>
+                  onChange({ locale: event.target.value as LocalePreference })
+                }
+              >
+                <option value="system">{t("systemLanguage")}</option>
+                <option value="en">English</option>
+                <option value="zh-CN">简体中文</option>
+              </select>
+              <ChevronRight size={14} aria-hidden="true" />
+            </label>
+          </div>
         </section>
-        <section className="settings-group">
+        <section className="settings-group settings-group--split">
           <div className="settings-group__title">
             <Palette size={17} />
             <div>
@@ -3482,23 +3543,33 @@ function SettingsView({
               <p>{t("managerAppearanceDescription")}</p>
             </div>
           </div>
-          <SegmentedControl
-            value={settings.appearance}
-            options={[
-              {
-                value: "system",
-                label: t("system"),
-                icon: <Monitor size={13} />,
-              },
-              { value: "light", label: t("light"), icon: <Sun size={13} /> },
-              { value: "dark", label: t("dark"), icon: <Moon size={13} /> },
-            ]}
-            onChange={(value) =>
-              onChange({ appearance: value as ManagerAppearance })
-            }
-          />
+          <div className="settings-group__control">
+            <SegmentedControl
+              value={settings.appearance}
+              options={[
+                {
+                  value: "system",
+                  label: t("system"),
+                  icon: <Monitor size={13} />,
+                },
+                {
+                  value: "light",
+                  label: t("light"),
+                  icon: <Sun size={13} />,
+                },
+                {
+                  value: "dark",
+                  label: t("dark"),
+                  icon: <Moon size={13} />,
+                },
+              ]}
+              onChange={(value) =>
+                onChange({ appearance: value as ManagerAppearance })
+              }
+            />
+          </div>
         </section>
-        <section className="settings-group">
+        <section className="settings-group settings-group--split">
           <div className="settings-group__title">
             <ShieldCheck size={17} />
             <div>
@@ -3506,25 +3577,27 @@ function SettingsView({
               <p>{t("runtimeStrategyDescription")}</p>
             </div>
           </div>
-          <label className="select-control">
-            <select
-              value={settings.runtimeStrategy}
-              onChange={(event) =>
-                onChange({
-                  runtimeStrategy: event.target.value as RuntimeStrategy,
-                })
-              }
-            >
-              <option value="enhanced">{t("automaticMode")}</option>
-              <option value="conservative">{t("compatibilityMode")}</option>
-            </select>
-            <ChevronRight size={14} aria-hidden="true" />
-          </label>
-          <p className="settings-mode-note">
-            {settings.runtimeStrategy === "enhanced"
-              ? t("automaticModeDescription")
-              : t("compatibilityModeDescription")}
-          </p>
+          <div className="settings-group__control">
+            <label className="select-control">
+              <select
+                value={settings.runtimeStrategy}
+                onChange={(event) =>
+                  onChange({
+                    runtimeStrategy: event.target.value as RuntimeStrategy,
+                  })
+                }
+              >
+                <option value="enhanced">{t("automaticMode")}</option>
+                <option value="conservative">{t("compatibilityMode")}</option>
+              </select>
+              <ChevronRight size={14} aria-hidden="true" />
+            </label>
+            <p className="settings-mode-note">
+              {settings.runtimeStrategy === "enhanced"
+                ? t("automaticModeDescription")
+                : t("compatibilityModeDescription")}
+            </p>
+          </div>
         </section>
         <section className="settings-group codex-location-setting">
           <div className="settings-group__title">

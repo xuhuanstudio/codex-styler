@@ -44,6 +44,7 @@ function calibratedCompanion(config: {
   name: string;
   description: string;
   atlas: CalibratedAtlas;
+  portrait: string;
   size: number;
   defaultThemeIds?: string[];
   locales: CompanionDefinition["locales"];
@@ -61,6 +62,7 @@ function calibratedCompanion(config: {
       author: "Codex Styler contributors",
       license: "CC-BY-4.0",
       tags: ["companion", "pointer-aware"],
+      preview: `assets/companions/${config.portrait}`,
     },
     compatibility: {
       styler: {
@@ -110,12 +112,20 @@ function calibratedCompanion(config: {
       size: config.size,
       opacity: 0.96,
     },
-    assets: renderer.pages.map((page, index) => ({
-      id: `companion-${config.id}-atlas-${index + 1}`,
-      path: `assets/companions/${page}`,
-      type: "sprite-atlas" as const,
-      license: "CC-BY-4.0",
-    })),
+    assets: [
+      ...renderer.pages.map((page, index) => ({
+        id: `companion-${config.id}-atlas-${index + 1}`,
+        path: `assets/companions/${page}`,
+        type: "sprite-atlas" as const,
+        license: "CC-BY-4.0",
+      })),
+      {
+        id: `companion-${config.id}-portrait`,
+        path: `assets/companions/${config.portrait}`,
+        type: "preview" as const,
+        license: "CC-BY-4.0",
+      },
+    ],
     defaultThemeIds: config.defaultThemeIds ?? [],
     locales: config.locales,
   };
@@ -159,6 +169,7 @@ export const mossCompanion = calibratedCompanion({
   description:
     "A calibrated 181-frame chameleon that follows the pointer smoothly and can be dragged.",
   atlas: chameleonAtlas,
+  portrait: "moss-chameleon-portrait.webp",
   size: 136,
   defaultThemeIds: [
     "codex-styler.native-refined",
@@ -182,6 +193,7 @@ export const picoCompanion = calibratedCompanion({
   name: "Pico",
   description: "A lively scarlet parrot with a naturally expressive gaze.",
   atlas: parrotAtlas,
+  portrait: "pico-parrot-portrait.webp",
   size: 94,
   locales: {
     en: {
@@ -201,6 +213,7 @@ export const puddleCompanion = calibratedCompanion({
   name: "Puddle",
   description: "A vivid blue frog with a grounded, pointer-aware stance.",
   atlas: frogAtlas,
+  portrait: "puddle-frog-portrait.webp",
   size: 142,
   locales: {
     en: {
@@ -219,6 +232,7 @@ export const mochiCompanion = calibratedCompanion({
   name: "Mochi",
   description: "A warm orange cat with a soft, continuous look-around loop.",
   atlas: catAtlas,
+  portrait: "mochi-cat-portrait.webp",
   size: 120,
   locales: {
     en: {
@@ -238,6 +252,7 @@ export const tokenThiefCompanion = calibratedCompanion({
   description:
     "A theatrical clown with expressive, pointer-aware head movement.",
   atlas: tokenThiefAtlas,
+  portrait: "token-thief-portrait.webp",
   size: 124,
   defaultThemeIds: ["codex-styler.merry-big-top"],
   locales: {
@@ -259,6 +274,7 @@ export const resetGodCompanion = calibratedCompanion({
   description:
     "A gilded reset deity with calm, pointer-aware ceremonial poses.",
   atlas: resetGodAtlas,
+  portrait: "reset-god-portrait.webp",
   size: 122,
   defaultThemeIds: ["codex-styler.gilded-grandeur"],
   locales: {

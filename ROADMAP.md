@@ -24,7 +24,7 @@ The roadmap is organized by evidence gates, not calendar promises.
 - calibrated poses, pose-aware idle clips, paged atlas packing, 48 MiB decoded-page target, and two-page runtime LRU;
 - six built-in companions migrated to the calibrated runtime model.
 
-### Gate 3: Creator Experience — implemented for Beta 1
+### Gate 3: Creator Experience — refined for Beta 2
 
 - seven-step Companion Studio with autosave, recovery, undo/redo, step reset, and project reset;
 - visual atlas grid, direction dial, exact angle binding, direction curve, idle and exclusion tracks;
@@ -38,14 +38,14 @@ The roadmap is organized by evidence gates, not calendar promises.
 - Codex DOM fixtures for home, task, settings, right panel, dynamic composer, and top-level overlays;
 - package, migration, revision race, cleanup, calibration, page-cache, updater-channel, and Rust lifecycle tests;
 - macOS Apple Silicon local build and install evidence;
-- Windows 11 x64 community device evidence: required for Beta 2 and RC, not claimed by Beta 1;
+- Windows 11 x64 community device evidence: still required before RC and not claimed by either Beta build;
 - dependency audits, package-size checks, complete upgrade/restore/uninstall evidence, and P0/P1 closure.
 
 ## Release sequence
 
 1. `v0.2.0-beta.1`: functionally complete Creator Beta; macOS local validation; Windows CI build marked as awaiting community validation.
-2. `v0.2.0-beta.2`: Beta 1 fixes plus at least two independent Windows 11 x64 diagnostic reports.
-3. `v0.2.0-rc.1`: two complete macOS and two complete Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
+2. `v0.2.0-beta.2`: Companion Studio refinement, safer import and editing, corrected portraits, and localized pre-download update notes.
+3. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
 4. `v0.2.0`: only when RC evidence supports it.
 
 ## v1 Stable

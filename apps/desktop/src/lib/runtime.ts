@@ -40,6 +40,12 @@ export interface RuntimeStatus {
 export interface AvailableUpdate {
   version: string;
   notes: string | null;
+  releaseNotes: {
+    locale: string;
+    summary: string;
+    highlights: string[];
+    fixes: string[];
+  } | null;
   publishedAt: string | null;
   prerelease: boolean;
 }
@@ -245,11 +251,13 @@ export async function restoreOfficial(): Promise<RuntimeStatus> {
   return invoke<RuntimeStatus>("restore_official");
 }
 
-export async function checkForUpdates(): Promise<UpdateCheckResult> {
+export async function checkForUpdates(
+  locale: "en" | "zh-CN",
+): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.2.0-beta.1", update: null };
+    return { currentVersion: "0.2.0-beta.2", update: null };
   }
-  return invoke<UpdateCheckResult>("check_for_updates");
+  return invoke<UpdateCheckResult>("check_for_updates", { locale });
 }
 
 export async function downloadAndInstallUpdate(

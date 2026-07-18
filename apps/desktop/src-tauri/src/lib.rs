@@ -5,6 +5,7 @@ mod error;
 mod model;
 
 use std::{
+    collections::HashMap,
     fs,
     path::{Component, Path, PathBuf},
     sync::Mutex,
@@ -33,11 +34,41 @@ struct GitHubRelease {
     prerelease: bool,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct LocalizedReleaseNotes {
+    locale: String,
+    summary: String,
+    #[serde(default)]
+    highlights: Vec<String>,
+    #[serde(default)]
+    fixes: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReleaseNotesDocument {
+    format: String,
+    version: String,
+    default_locale: String,
+    locales: HashMap<String, ReleaseNotesLocale>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+struct ReleaseNotesLocale {
+    summary: String,
+    #[serde(default)]
+    highlights: Vec<String>,
+    #[serde(default)]
+    fixes: Vec<String>,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateMetadata {
     version: String,
     notes: Option<String>,
+    release_notes: Option<LocalizedReleaseNotes>,
     published_at: Option<String>,
     prerelease: bool,
 }
@@ -108,17 +139,74 @@ fn select_release(
         .map(|(_, release)| release)
 }
 
+fn select_localized_release_notes(
+    document: &ReleaseNotesDocument,
+    expected_version: &Version,
+    requested_locale: Option<&str>,
+) -> Option<LocalizedReleaseNotes> {
+    if document.format != "codex-styler-release-notes-v1"
+        || Version::parse(&document.version).ok().as_ref() != Some(expected_version)
+    {
+        return None;
+    }
+
+    let requested = requested_locale.unwrap_or_default();
+    let language = requested.split(['-', '_']).next().unwrap_or_default();
+    let candidates = [requested, language, document.default_locale.as_str(), "en"];
+    candidates.into_iter().find_map(|locale| {
+        if locale.is_empty() {
+            return None;
+        }
+        document
+            .locales
+            .get(locale)
+            .cloned()
+            .map(|notes| LocalizedReleaseNotes {
+                locale: locale.to_string(),
+                summary: notes.summary,
+                highlights: notes.highlights,
+                fixes: notes.fixes,
+            })
+    })
+}
+
+async fn fetch_localized_release_notes(
+    client: &reqwest::Client,
+    tag: &str,
+    expected_version: &Version,
+    locale: Option<&str>,
+) -> Option<LocalizedReleaseNotes> {
+    let endpoint = format!(
+        "https://github.com/xuhuanstudio/codex-styler/releases/download/{tag}/release-notes.json"
+    );
+    let document = client
+        .get(endpoint)
+        .header("Accept", "application/json")
+        .header("User-Agent", "codex-styler-update-check")
+        .send()
+        .await
+        .ok()?
+        .error_for_status()
+        .ok()?
+        .json::<ReleaseNotesDocument>()
+        .await
+        .ok()?;
+    select_localized_release_notes(&document, expected_version, locale)
+}
+
 #[tauri::command]
 async fn check_for_updates(
     app: AppHandle,
     pending_update: State<'_, PendingUpdate>,
+    locale: Option<String>,
 ) -> Result<UpdateCheckResult, String> {
     let current = Version::parse(env!("CARGO_PKG_VERSION")).map_err(|error| error.to_string())?;
     *pending_update
         .0
         .lock()
         .map_err(|_| "Update state is unavailable".to_string())? = None;
-    let releases = reqwest::Client::new()
+    let client = reqwest::Client::new();
+    let releases = client
         .get(RELEASES_API)
         .header("Accept", "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
@@ -165,9 +253,17 @@ async fn check_for_updates(
     if manifest_version != expected_version {
         return Err("The update manifest version does not match its GitHub release".into());
     }
+    let release_notes = fetch_localized_release_notes(
+        &client,
+        &release.tag_name,
+        &expected_version,
+        locale.as_deref(),
+    )
+    .await;
     let metadata = UpdateMetadata {
         version: update.version.clone(),
         notes: update.body.clone(),
+        release_notes,
         published_at: update.date.map(|date| date.to_string()),
         prerelease: release.prerelease,
     };
@@ -367,11 +463,59 @@ fn is_safe_project_path(path: &str) -> bool {
     {
         return false;
     }
-    path == "project.json"
-        || (path.starts_with("sources/")
-            && path
-                .strip_prefix("sources/")
-                .is_some_and(|name| !name.is_empty() && !name.contains('/')))
+    if path == "project.json" {
+        return true;
+    }
+    let safe_file = |prefix: &str, allowed_extensions: &[&str]| {
+        path.strip_prefix(prefix).is_some_and(|name| {
+            !name.is_empty()
+                && !name.contains('/')
+                && Path::new(name)
+                    .extension()
+                    .and_then(|extension| extension.to_str())
+                    .is_some_and(|extension| {
+                        allowed_extensions.contains(&extension.to_ascii_lowercase().as_str())
+                    })
+        })
+    };
+    safe_file(
+        "sources/",
+        &["png", "jpg", "jpeg", "webp", "mp4", "m4v", "mov", "webm"],
+    ) || safe_file("frames/", &["png", "webp"])
+}
+
+const CREATOR_SOURCE_BYTE_LIMIT: u64 = 250 * 1024 * 1024;
+
+fn is_supported_creator_source_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            matches!(
+                extension.to_ascii_lowercase().as_str(),
+                "png" | "jpg" | "jpeg" | "webp" | "mp4" | "m4v" | "mov" | "webm"
+            )
+        })
+}
+
+#[tauri::command]
+fn read_creator_source_file(path: String) -> Result<Response, String> {
+    let path = PathBuf::from(path);
+    if !path.is_absolute() || !is_supported_creator_source_path(&path) {
+        return Err(
+            "Dropped source must be an absolute PNG, JPEG, WebP, MP4, M4V, MOV, or WebM path"
+                .into(),
+        );
+    }
+    let metadata = fs::metadata(&path).map_err(|error| error.to_string())?;
+    if !metadata.is_file() {
+        return Err("Dropped source is not a regular file".into());
+    }
+    if metadata.len() > CREATOR_SOURCE_BYTE_LIMIT {
+        return Err("Dropped source exceeds the 250 MiB creator limit".into());
+    }
+    fs::read(path)
+        .map(Response::new)
+        .map_err(|error| error.to_string())
 }
 
 fn companion_project_file_path(
@@ -763,6 +907,7 @@ pub fn run() {
             load_companion_project_file,
             list_companion_projects,
             delete_companion_project,
+            read_creator_source_file,
             check_for_updates,
             download_and_install_update,
             restart_app,
@@ -812,6 +957,31 @@ mod tests {
         assert!(!is_valid_theme_id("../quiet-garden"));
         assert!(!is_valid_theme_id("Local.Theme"));
         assert!(!is_valid_theme_id("ab"));
+    }
+
+    #[test]
+    fn creator_drop_paths_only_accept_declared_media_extensions() {
+        assert!(is_supported_creator_source_path(Path::new("/tmp/turn.MP4")));
+        assert!(is_supported_creator_source_path(Path::new(
+            "C:\\media\\frame.webp"
+        )));
+        assert!(!is_supported_creator_source_path(Path::new(
+            "/tmp/project.json"
+        )));
+        assert!(!is_supported_creator_source_path(Path::new(
+            "/tmp/script.svg"
+        )));
+    }
+
+    #[test]
+    fn companion_project_paths_allow_only_declared_source_and_frame_files() {
+        assert!(is_safe_project_path("project.json"));
+        assert!(is_safe_project_path("sources/source-001.mp4"));
+        assert!(is_safe_project_path("frames/source-001.webp"));
+        assert!(is_safe_project_path("frames/source-512.png"));
+        assert!(!is_safe_project_path("frames/source-001.svg"));
+        assert!(!is_safe_project_path("frames/nested/source-001.webp"));
+        assert!(!is_safe_project_path("../frames/source-001.webp"));
     }
 
     #[test]
@@ -910,5 +1080,74 @@ mod tests {
         )
         .unwrap();
         assert_eq!(selected.tag_name, "v0.2.0-rc.2");
+    }
+
+    #[test]
+    fn localized_release_notes_prefer_the_requested_locale() {
+        let document = ReleaseNotesDocument {
+            format: "codex-styler-release-notes-v1".into(),
+            version: "0.2.0-beta.2".into(),
+            default_locale: "en".into(),
+            locales: HashMap::from([
+                (
+                    "en".into(),
+                    ReleaseNotesLocale {
+                        summary: "Creator refinements".into(),
+                        highlights: vec!["English highlight".into()],
+                        fixes: vec![],
+                    },
+                ),
+                (
+                    "zh-CN".into(),
+                    ReleaseNotesLocale {
+                        summary: "创作器体验优化".into(),
+                        highlights: vec!["中文重点".into()],
+                        fixes: vec![],
+                    },
+                ),
+            ]),
+        };
+
+        let notes = select_localized_release_notes(
+            &document,
+            &Version::parse("0.2.0-beta.2").unwrap(),
+            Some("zh-CN"),
+        )
+        .unwrap();
+        assert_eq!(notes.locale, "zh-CN");
+        assert_eq!(notes.summary, "创作器体验优化");
+    }
+
+    #[test]
+    fn localized_release_notes_fall_back_to_english_and_reject_other_versions() {
+        let document = ReleaseNotesDocument {
+            format: "codex-styler-release-notes-v1".into(),
+            version: "0.2.0-beta.2".into(),
+            default_locale: "en".into(),
+            locales: HashMap::from([(
+                "en".into(),
+                ReleaseNotesLocale {
+                    summary: "Creator refinements".into(),
+                    highlights: vec![],
+                    fixes: vec![],
+                },
+            )]),
+        };
+
+        let notes = select_localized_release_notes(
+            &document,
+            &Version::parse("0.2.0-beta.2").unwrap(),
+            Some("fr-FR"),
+        )
+        .unwrap();
+        assert_eq!(notes.locale, "en");
+        assert!(
+            select_localized_release_notes(
+                &document,
+                &Version::parse("0.2.0-rc.1").unwrap(),
+                Some("en"),
+            )
+            .is_none()
+        );
     }
 }

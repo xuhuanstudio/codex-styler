@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 type Locale = "en" | "zh-CN";
@@ -49,6 +50,29 @@ test("English dark manager at the compact supported size", async ({ page }) => {
   await expect(page).toHaveScreenshot("manager-en-dark-960x680.png", {
     fullPage: true,
   });
+});
+
+test("companion cards use independent portraits", async ({ page }) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await page.getByRole("button", { name: "Companions" }).click();
+  await expect(page.locator('[data-preview-source="portrait"]')).toHaveCount(6);
+  await expect(
+    page.locator('.companion-option__frame[style*="-atlas"]'),
+  ).toHaveCount(0);
+  const list = page.locator(".companion-list");
+  await list.scrollIntoViewIfNeeded();
+  await expect(list).toHaveScreenshot("companion-list-en-dark.png");
+});
+
+test("settings controls share a stable professional layout", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Settings" }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await expect(page).toHaveScreenshot("settings-en-dark.png");
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expect(page).toHaveScreenshot("settings-en-dark-960x680.png");
 });
 
 test("Simplified Chinese light layout remains stable", async ({ page }) => {
@@ -104,36 +128,310 @@ test("keyboard companion creator completes a static-image project", async ({
   await expect(
     page.getByRole("heading", { name: "Companion Studio" }),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Reset step" })).toBeDisabled();
+  await expect(
+    page.getByRole("button", { name: "Reset project" }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("A reliable source makes calibration faster"),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: /Static image/ }).press("Enter");
-  await page
-    .locator('.creator-import input[type="file"]')
-    .setInputFiles(
-      fileURLToPath(new URL("../public/favicon.png", import.meta.url)),
+  const imagePath = fileURLToPath(
+    new URL("../public/companions/pico-parrot-portrait.webp", import.meta.url),
+  );
+  const imageBytes = [...(await readFile(imagePath))];
+  const dataTransfer = await page.evaluateHandle((bytes) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(
+      new File([new Uint8Array(bytes)], "pico-parrot-portrait.webp", {
+        type: "image/webp",
+      }),
     );
-  await expect(page.getByText("favicon.png", { exact: true })).toBeVisible();
+    return transfer;
+  }, imageBytes);
+  const dropzone = page.locator(".creator-dropzone");
+  await dropzone.dispatchEvent("dragenter", { dataTransfer });
+  await expect(dropzone).toContainText("Release to import");
+  await dropzone.dispatchEvent("drop", { dataTransfer });
+  await expect(
+    page.getByText("pico-parrot-portrait.webp", { exact: true }),
+  ).toBeVisible();
+  const removeSource = page.getByRole("button", { name: "Remove source" });
+  await expect(removeSource).toBeVisible();
+  await removeSource.click();
+  await expect(
+    page.getByRole("dialog", { name: "Remove the imported source?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: /Video/ }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Change the source type?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(page).toHaveScreenshot("creator-import-en-dark.png");
   await page.getByRole("button", { name: /Next/ }).press("Enter");
   const generateFrames = page.getByRole("button", {
-    name: /Generate logical frames/,
+    name: /Prepare companion frame/,
   });
   await expect(generateFrames).toBeVisible();
+  await expect(page).toHaveScreenshot("creator-extract-en-dark.png");
   await generateFrames.press("Enter");
-  await expect(page.getByText("1 frames")).toBeVisible();
-
-  for (const step of [
-    "Clean up",
-    "Align",
-    "Calibrate",
-    "Motions",
-    "Test & Save",
-  ]) {
-    await page.getByRole("button", { name: step }).press("Enter");
-  }
-  await page.getByLabel("Companion name").fill("Keyboard Friend");
+  await expect(page.getByRole("heading", { name: "Clean up" })).toBeVisible();
+  await expect(page.getByText("Processing is synchronized")).toBeVisible();
+  await page.getByRole("button", { name: "Import", exact: true }).click();
   await page
-    .getByRole("button", { name: /Build and install companion/ })
-    .press("Enter");
+    .locator('.creator-import input[type="file"]')
+    .setInputFiles(imagePath);
+  await expect(
+    page.getByRole("dialog", { name: "Replace the imported source?" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await page.getByRole("button", { name: /Clean up/ }).click();
+  await expect(page).toHaveScreenshot("creator-cleanup-en-dark.png");
+  const cleanupMode = page.getByLabel("Mode");
+  const sampleColor = page.getByLabel("Sample color");
+  await expect(sampleColor).toBeDisabled();
+  await cleanupMode.selectOption("sampled-color");
+  await expect(sampleColor).toBeEnabled();
+  await expect(page.getByLabel("Tolerance")).toBeEnabled();
+  await expect(page.getByText("Unapplied adjustments")).toBeVisible();
+  await page.getByRole("button", { name: "Discard edits" }).click();
+  await expect(page.getByText("Processing is synchronized")).toBeVisible();
+  await expect(cleanupMode).toHaveValue("preserve-alpha");
+  await expect(sampleColor).toBeDisabled();
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expect(page).toHaveScreenshot("creator-cleanup-en-dark-960x680.png");
+  await page.setViewportSize({ width: 1320, height: 840 });
+  await page.getByRole("button", { name: "top left corner mask" }).click();
+  await expect(page.locator(".cleanup-corner-mask-overlay")).toHaveCount(0);
+  await page.getByRole("button", { name: "Source" }).click();
+  await expect(page.locator(".cleanup-corner-mask-overlay")).toHaveCount(1);
+  const brushSurface = page.locator(".cleanup-brush-stage > svg");
+  const brushBox = await brushSurface.boundingBox();
+  expect(brushBox).not.toBeNull();
+  await page.mouse.move(
+    brushBox!.x + brushBox!.width * 0.74,
+    brushBox!.y + brushBox!.height * 0.25,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    brushBox!.x + brushBox!.width * 0.78,
+    brushBox!.y + brushBox!.height * 0.3,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await expect(page.locator(".cleanup-stroke--erase")).toHaveCount(1);
+  await page.getByRole("button", { name: "Result" }).click();
+  await expect(page.locator(".cleanup-stroke--erase")).toHaveCount(0);
+  await expect(page.getByText("Unapplied adjustments")).toBeVisible();
+  await page.getByRole("button", { name: "Align" }).press("Enter");
+  await expect(
+    page.getByRole("heading", { name: "Align", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Shared canvas ready" }),
+  ).toBeVisible();
+  await expect(page).toHaveScreenshot("creator-align-en-dark.png");
+  await page
+    .getByRole("button", { name: "Current frame", exact: true })
+    .click();
+  const baselineX = page.getByLabel("Horizontal offset");
+  const baselineXBefore = Number(await baselineX.inputValue());
+  const alignmentSurface = page.locator(".alignment-frame-hit");
+  const alignmentBox = await alignmentSurface.boundingBox();
+  expect(alignmentBox).not.toBeNull();
+  await page.mouse.move(
+    alignmentBox!.x + alignmentBox!.width / 2,
+    alignmentBox!.y + alignmentBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    alignmentBox!.x + alignmentBox!.width / 2 + 12,
+    alignmentBox!.y + alignmentBox!.height / 2,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await baselineX.inputValue()))
+    .not.toBe(baselineXBefore);
+  await expect(
+    page.getByRole("heading", { name: "Some frames need alignment" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Snap current frame" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Shared canvas ready" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Shared canvas" }).click();
+  const cropX = page.getByLabel("X", { exact: true });
+  const cropXBefore = Number(await cropX.inputValue());
+  const cropSurface = page.locator(".alignment-crop-hit");
+  const cropBox = await cropSurface.boundingBox();
+  expect(cropBox).not.toBeNull();
+  await page.mouse.move(
+    cropBox!.x + cropBox!.width / 2,
+    cropBox!.y + cropBox!.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    cropBox!.x + cropBox!.width / 2 + 18,
+    cropBox!.y + cropBox!.height / 2,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await expect
+    .poll(async () => Number(await cropX.inputValue()))
+    .not.toBe(cropXBefore);
+  await page
+    .getByRole("button", { name: "Auto-align included frames" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Shared canvas ready" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Calibrate" }).press("Enter");
+  await expect(page).toHaveScreenshot("creator-calibrate-en-dark.png");
+  await page.getByRole("button", { name: "Motions" }).press("Enter");
+  await expect(page).toHaveScreenshot("creator-motions-en-dark.png");
+  await page.getByRole("button", { name: "Test & Save" }).press("Enter");
+  await expect(page).toHaveScreenshot("creator-test-en-dark.png");
+  const companionPlacement = page.getByRole("button", {
+    name: "Drag companion position",
+  });
+  const composerEdge = page.locator(".mock-composer-edge");
+  const companionBox = await companionPlacement.boundingBox();
+  const composerBox = await composerEdge.boundingBox();
+  expect(companionBox).not.toBeNull();
+  expect(composerBox).not.toBeNull();
+  expect(
+    Math.abs(companionBox!.y + companionBox!.height - composerBox!.y),
+  ).toBeLessThanOrEqual(4);
+
+  const horizontalPosition = page
+    .locator(".creator-control-row")
+    .filter({ hasText: "Horizontal position" })
+    .locator('input[type="range"]');
+  const horizontalBefore = Number(await horizontalPosition.inputValue());
+  await companionPlacement.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect
+    .poll(async () => Number(await horizontalPosition.inputValue()))
+    .toBeLessThan(horizontalBefore);
+
+  const buildCompanion = page.getByRole("button", {
+    name: /Build and install companion/,
+  });
+  const companionName = page.getByLabel("Companion name");
+  await companionName.fill("");
+  await expect(buildCompanion).toBeDisabled();
+  await companionName.fill("Keyboard Friend");
+  await page
+    .getByLabel("Description")
+    .fill("A keyboard-tested local companion.");
+  await page.getByLabel("Author").fill("Test creator");
+  await page.getByLabel("Asset license").selectOption("CC0-1.0");
+  await expect(buildCompanion).toBeEnabled();
+  await buildCompanion.press("Enter");
   await expect(
     page.getByText("Keyboard Friend", { exact: true }),
   ).toBeVisible();
+});
+
+test("companion creator confirms destructive project reset", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Companions" }).click();
+  await page.getByRole("button", { name: "New companion" }).click();
+  const resetProject = page.getByRole("button", { name: "Reset project" });
+  await expect(resetProject).toBeDisabled();
+  await page
+    .locator('.creator-import input[type="file"]')
+    .setInputFiles(
+      fileURLToPath(
+        new URL(
+          "../public/companions/pico-parrot-portrait.webp",
+          import.meta.url,
+        ),
+      ),
+    );
+  await expect(resetProject).toBeEnabled();
+  await resetProject.click();
+  const dialog = page.getByRole("dialog", {
+    name: "Reset this companion project?",
+  });
+  await expect(dialog).toBeVisible();
+  await expect(page).toHaveScreenshot("creator-reset-dialog-en-dark.png");
+  await dialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toHaveCount(0);
+});
+
+test("standard H.264 MP4 extracts without conversion", async ({ page }) => {
+  await openManager(page, "en", "dark", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Companions" }).click();
+  await page.getByRole("button", { name: "New companion" }).click();
+  await page.getByRole("button", { name: /Video/ }).click();
+  await page
+    .locator('.creator-import input[type="file"]')
+    .setInputFiles(
+      fileURLToPath(new URL("./fixtures/short-h264.mp4", import.meta.url)),
+    );
+  await expect(page.getByText("short-h264.mp4", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Next/ }).click();
+  await expect(page.getByRole("button", { name: "Set in" })).toBeVisible();
+  await expect(page).toHaveScreenshot("creator-video-extract-en-dark.png");
+  await page.getByRole("button", { name: /Extract video frames/ }).click();
+  await expect(page.getByText(/\d+ frames/u)).toBeVisible();
+  await expect(
+    page.getByText(/could not be decoded|codec inside/u),
+  ).toHaveCount(0);
+});
+
+test("light companion cleanup remains legible", async ({ page }) => {
+  await openManager(page, "en", "light", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Companions" }).click();
+  await page.getByRole("button", { name: "New companion" }).click();
+  await page.getByRole("button", { name: /Static image/ }).click();
+  await page
+    .locator('.creator-import input[type="file"]')
+    .setInputFiles(
+      fileURLToPath(
+        new URL(
+          "../public/companions/pico-parrot-portrait.webp",
+          import.meta.url,
+        ),
+      ),
+    );
+  await page.getByRole("button", { name: /Next/ }).click();
+  await page.getByRole("button", { name: /Prepare companion frame/ }).click();
+  await expect(page.getByRole("heading", { name: "Clean up" })).toBeVisible();
+  await expect(page.getByText("Processing is synchronized")).toBeVisible();
+  await expect(page).toHaveScreenshot("creator-cleanup-en-light.png");
+});
+
+test("atlas grid controls map to the visible slice preview", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1320, height: 840 });
+  await page.getByRole("button", { name: "Companions" }).click();
+  await page.getByRole("button", { name: "New companion" }).click();
+  await page.getByRole("button", { name: /Sprite atlas/ }).click();
+  await page
+    .locator('.creator-import input[type="file"]')
+    .setInputFiles(
+      fileURLToPath(
+        new URL(
+          "../public/companions/pico-parrot-portrait.webp",
+          import.meta.url,
+        ),
+      ),
+    );
+  await page.getByRole("button", { name: /Next/ }).click();
+  const fitGrid = page.getByRole("button", {
+    name: "Fit grid evenly to source",
+  });
+  await expect(fitGrid).toBeEnabled();
+  await fitGrid.click();
+  await expect(page.getByLabel("Cell width")).toHaveValue("112");
+  await expect(page.getByLabel("Cell height")).toHaveValue("162");
+  await expect(page.locator(".atlas-grid-preview .is-overflow")).toHaveCount(0);
 });

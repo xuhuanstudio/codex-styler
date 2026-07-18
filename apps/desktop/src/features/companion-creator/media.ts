@@ -1,5 +1,10 @@
 import { atlasCellRect, naturalFileOrder } from "./calibration";
-import type { AtlasSliceSettings, CleanupSettings, FrameBounds } from "./model";
+import type {
+  AtlasSliceSettings,
+  CleanupSettings,
+  CompanionImportKind,
+  FrameBounds,
+} from "./model";
 import {
   applyCleanupPixels,
   retainLargestAlphaComponent as retainLargestAlphaComponentBuffer,
@@ -16,24 +21,80 @@ export const CREATOR_INPUT_LIMITS = {
 
 const VIDEO_EXTENSIONS_BY_MIME = new Map<string, ReadonlySet<string>>([
   ["video/mp4", new Set([".mp4", ".m4v"])],
+  ["application/mp4", new Set([".mp4", ".m4v"])],
+  ["video/x-m4v", new Set([".mp4", ".m4v"])],
   ["video/quicktime", new Set([".mov"])],
+  ["video/x-quicktime", new Set([".mov"])],
+  ["application/x-quicktime", new Set([".mov"])],
   ["video/webm", new Set([".webm"])],
 ]);
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+
+function fileExtension(file: File): string {
+  const dot = file.name.lastIndexOf(".");
+  return dot >= 0 ? file.name.slice(dot).toLowerCase() : "";
+}
+
+function isVideoSource(file: File): boolean {
+  const extension = fileExtension(file);
+  return (
+    file.type.toLowerCase().startsWith("video/") ||
+    [...VIDEO_EXTENSIONS_BY_MIME.values()].some((extensions) =>
+      extensions.has(extension),
+    )
+  );
+}
+
+function isImageSource(file: File): boolean {
+  return (
+    file.type.toLowerCase().startsWith("image/") ||
+    IMAGE_EXTENSIONS.has(fileExtension(file))
+  );
+}
+
+export function validateCreatorSourceFiles(
+  files: File[],
+  preferredKind?: CompanionImportKind,
+): { kind: CompanionImportKind; files: File[] } {
+  if (files.length === 0) throw new Error("Choose at least one source file");
+  const kind =
+    preferredKind ??
+    (files.length === 1 && isVideoSource(files[0]!)
+      ? "video"
+      : files.length > 1
+        ? "sequence"
+        : "image");
+  if (kind === "video") {
+    if (files.length !== 1 || !isVideoSource(files[0]!)) {
+      throw new Error("Video import accepts one MP4, M4V, MOV, or WebM file");
+    }
+    assertSupportedVideoSource(files[0]!);
+    return { kind, files };
+  }
+  if (!files.every(isImageSource)) {
+    throw new Error("Image sources must be PNG, JPEG, or WebP files");
+  }
+  if (kind !== "sequence" && files.length !== 1) {
+    throw new Error("Static image and atlas import accept one image at a time");
+  }
+  if (files.length > CREATOR_INPUT_LIMITS.frameCount) {
+    throw new Error("An image sequence can contain at most 512 files");
+  }
+  return { kind, files: naturalFileOrder(files) };
+}
 
 export function assertSupportedVideoSource(file: File): void {
   if (file.size > CREATOR_INPUT_LIMITS.videoBytes) {
     throw new Error("Video exceeds the 250 MiB creator limit");
   }
-  const extension = file.name
-    .slice(Math.max(0, file.name.lastIndexOf(".")))
-    .toLowerCase();
+  const extension = fileExtension(file);
   const mime = file.type.toLowerCase();
   const allowedByMime = VIDEO_EXTENSIONS_BY_MIME.get(mime);
   const extensionAllowed = [...VIDEO_EXTENSIONS_BY_MIME.values()].some(
     (extensions) => extensions.has(extension),
   );
   if (!extensionAllowed) {
-    throw new Error("Choose an MP4, MOV, or WebM video file");
+    throw new Error("Choose an MP4, M4V, MOV, or WebM video file");
   }
   if (
     mime &&
@@ -60,16 +121,20 @@ function canvasBlob(
   quality = 0.94,
 ): Promise<Blob> {
   if (canvas instanceof HTMLCanvasElement) {
-    return new Promise((resolve, reject) => {
-      canvas.toBlob(
-        (blob) =>
-          blob ? resolve(blob) : reject(new Error("Could not encode frame")),
-        type,
-        quality,
-      );
+    const encode = (requestedType: string) =>
+      new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, requestedType, quality);
+      });
+    return encode(type).then(async (blob) => {
+      if (blob) return blob;
+      const fallback = await encode("image/png");
+      if (fallback) return fallback;
+      throw new Error("The decoded frame could not be encoded locally");
     });
   }
-  return canvas.convertToBlob({ type, quality });
+  return canvas
+    .convertToBlob({ type, quality })
+    .catch(() => canvas.convertToBlob({ type: "image/png" }));
 }
 
 async function frameFromBitmap(
@@ -160,7 +225,32 @@ export async function sliceAtlas(
   }
 }
 
-function waitForEvent(target: EventTarget, type: string): Promise<void> {
+function mediaFailure(video: HTMLVideoElement, stage: string): Error {
+  const code = video.error?.code;
+  if (code === 1) {
+    return new Error(`Video loading was interrupted during ${stage}`);
+  }
+  if (code === 2) {
+    return new Error(`The local video file could not be read during ${stage}`);
+  }
+  if (code === 3) {
+    return new Error(
+      "The system video decoder rejected a frame. The file may be damaged or use an unsupported codec profile.",
+    );
+  }
+  if (code === 4) {
+    return new Error(
+      "This system does not support the codec inside this video container.",
+    );
+  }
+  return new Error(`The video failed while waiting for ${stage}`);
+}
+
+function waitForVideoEvent(
+  video: HTMLVideoElement,
+  type: string,
+  timeoutMs = 15_000,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const onSuccess = () => {
       cleanup();
@@ -168,25 +258,82 @@ function waitForEvent(target: EventTarget, type: string): Promise<void> {
     };
     const onError = () => {
       cleanup();
-      reject(new Error(`Media failed while waiting for ${type}`));
+      reject(mediaFailure(video, type));
     };
+    const timeout = window.setTimeout(() => {
+      cleanup();
+      reject(new Error(`Video loading timed out during ${type}`));
+    }, timeoutMs);
     const cleanup = () => {
-      target.removeEventListener(type, onSuccess);
-      target.removeEventListener("error", onError);
+      window.clearTimeout(timeout);
+      video.removeEventListener(type, onSuccess);
+      video.removeEventListener("error", onError);
     };
-    target.addEventListener(type, onSuccess, { once: true });
-    target.addEventListener("error", onError, { once: true });
+    video.addEventListener(type, onSuccess, { once: true });
+    video.addEventListener("error", onError, { once: true });
   });
 }
 
 async function waitForPresentedFrame(video: HTMLVideoElement): Promise<void> {
   if (typeof video.requestVideoFrameCallback === "function") {
     await new Promise<void>((resolve) => {
-      video.requestVideoFrameCallback(() => resolve());
+      const timeout = window.setTimeout(resolve, 750);
+      video.requestVideoFrameCallback(() => {
+        window.clearTimeout(timeout);
+        resolve();
+      });
     });
     return;
   }
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+}
+
+async function seekVideoFrame(
+  video: HTMLVideoElement,
+  timeSeconds: number,
+): Promise<void> {
+  const safeTime = Math.max(
+    0,
+    Math.min(timeSeconds, Math.max(0, video.duration - 0.001)),
+  );
+  if (
+    video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA &&
+    Math.abs(video.currentTime - safeTime) < 0.0005
+  ) {
+    return;
+  }
+  const seeked = waitForVideoEvent(video, "seeked");
+  video.currentTime = safeTime;
+  await seeked;
+}
+
+function videoExtractionError(error: unknown, video: HTMLVideoElement): Error {
+  if (video.error) return mediaFailure(video, "frame extraction");
+  if (error instanceof Error) {
+    if (
+      /Video exceeds|Choose a|duration could not|no usable video track/u.test(
+        error.message,
+      )
+    ) {
+      return error;
+    }
+    if (/timed out/u.test(error.message)) {
+      return new Error(
+        `${error.message}. Try a shorter local file, or re-encode the source if playback also fails in the system player.`,
+        { cause: error },
+      );
+    }
+    if (/encoded locally/u.test(error.message)) {
+      return new Error(
+        "The video decoded successfully, but this system could not encode the extracted frame.",
+        { cause: error },
+      );
+    }
+    return new Error(`Video frame extraction failed: ${error.message}`, {
+      cause: error,
+    });
+  }
+  return new Error("Video frame extraction failed for an unknown reason");
 }
 
 export async function extractVideoFrames(
@@ -200,15 +347,19 @@ export async function extractVideoFrames(
   video.playsInline = true;
   video.preload = "auto";
   const sourceUrl = URL.createObjectURL(file);
-  // The value is a freshly created local blob: URL for an allowlisted video
-  // File, never DOM text, markup, a remote URL, or package-controlled data.
-  video.src = sourceUrl; // lgtm[js/xss-through-dom]
   try {
-    await waitForEvent(video, "loadedmetadata");
+    const metadataReady = waitForVideoEvent(video, "loadedmetadata");
+    const firstFrameReady = waitForVideoEvent(video, "loadeddata");
+    // The value is a freshly created local blob: URL for an allowlisted video
+    // File, never DOM text, markup, a remote URL, or package-controlled data.
+    video.src = sourceUrl; // lgtm[js/xss-through-dom]
+    video.load();
+    await Promise.all([metadataReady, firstFrameReady]);
     if (!Number.isFinite(video.duration) || video.duration <= 0) {
-      throw new Error(
-        "The video duration could not be read. Convert it to MP4 H.264.",
-      );
+      throw new Error("The video duration could not be read");
+    }
+    if (video.videoWidth < 1 || video.videoHeight < 1) {
+      throw new Error("The file contains no usable video track");
     }
     if (
       video.videoWidth > CREATOR_INPUT_LIMITS.videoDimension ||
@@ -218,11 +369,8 @@ export async function extractVideoFrames(
     }
     const maximumRange = CREATOR_INPUT_LIMITS.videoDurationSeconds * 1000;
     const startMs = Math.max(0, options.startMs);
-    const endMs = Math.min(
-      video.duration * 1000,
-      options.endMs,
-      startMs + maximumRange,
-    );
+    const decodedEndMs = Math.max(0, video.duration * 1000 - 1);
+    const endMs = Math.min(decodedEndMs, options.endMs, startMs + maximumRange);
     if (endMs <= startMs) throw new Error("Choose a non-empty video range");
     const count = Math.min(
       CREATOR_INPUT_LIMITS.frameCount,
@@ -239,9 +387,7 @@ export async function extractVideoFrames(
         count === 1
           ? startMs
           : startMs + ((endMs - startMs) * index) / (count - 1);
-      const seeked = waitForEvent(video, "seeked");
-      video.currentTime = timeMs / 1000;
-      await seeked;
+      await seekVideoFrame(video, timeMs / 1000);
       await waitForPresentedFrame(video);
       context.clearRect(0, 0, canvas.width, canvas.height);
       context.drawImage(video, 0, 0);
@@ -259,16 +405,7 @@ export async function extractVideoFrames(
     }
     return output;
   } catch (error) {
-    if (
-      error instanceof Error &&
-      /Video exceeds|Choose a|duration/u.test(error.message)
-    ) {
-      throw error;
-    }
-    throw new Error(
-      "This video could not be decoded locally. Convert it to MP4 H.264 and try again.",
-      { cause: error },
-    );
+    throw videoExtractionError(error, video);
   } finally {
     video.removeAttribute("src");
     video.load();

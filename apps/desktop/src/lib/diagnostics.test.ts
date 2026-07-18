@@ -4,7 +4,7 @@ import { diagnosticsSummary, type DiagnosticsReport } from "./diagnostics";
 const report: DiagnosticsReport = {
   format: "codex-styler-diagnostics-v1",
   generatedAt: "1784300000",
-  appVersion: "0.2.0-beta.1",
+  appVersion: "0.2.0-beta.2",
   platform: "windows",
   codexVersion: "26.707.91948",
   checks: [

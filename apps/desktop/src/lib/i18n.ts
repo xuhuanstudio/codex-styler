@@ -234,6 +234,8 @@ const messages = {
     updateAvailableBody:
       "The signed update will be downloaded, verified, installed, and Codex Styler will restart.",
     releaseNotes: "What’s new",
+    releaseHighlights: "Highlights",
+    releaseFixes: "Fixes",
     prerelease: "Pre-release",
     downloadAndInstall: "Download and install",
     downloadingUpdate: "Downloading update",
@@ -320,7 +322,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 1",
+    version: "Beta 2",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -548,6 +550,8 @@ const messages = {
     updateAvailableBody:
       "将下载并验证签名更新包，安装完成后 Codex Styler 会自动重启。",
     releaseNotes: "更新内容",
+    releaseHighlights: "主要更新",
+    releaseFixes: "问题修复",
     prerelease: "预览版本",
     downloadAndInstall: "下载并安装",
     downloadingUpdate: "正在下载更新",
@@ -628,7 +632,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 1",
+    version: "Beta 2",
   },
 } as const;
 

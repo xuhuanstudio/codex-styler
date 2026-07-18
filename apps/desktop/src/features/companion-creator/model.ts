@@ -43,6 +43,8 @@ export interface LogicalFrame {
   id: string;
   sourceIndex: number;
   sourceTimeMs?: number;
+  /** Cached extracted source frame for fast local draft restoration. */
+  storedPath?: string;
   excluded: boolean;
   visualDelta: number;
   baselineOffset: { x: number; y: number };
@@ -92,6 +94,9 @@ export interface CompanionCreatorProject {
   format: typeof COMPANION_PROJECT_FORMAT;
   id: string;
   name: string;
+  description: string;
+  author: string;
+  license: string;
   updatedAt: string;
   step: CreatorStep;
   source: SourceDescriptor | null;
@@ -103,12 +108,46 @@ export interface CompanionCreatorProject {
   motionRanges: MotionRange[];
   neutralFrame: number;
   reducedMotionFrame: number;
+  placement: {
+    align: number;
+    offsetX: number;
+    offsetY: number;
+    size: number;
+  };
   preview: {
     background: "transparent" | "black" | "white" | "theme";
     frameRate: number;
     followSmoothing: number;
     renderFps: 24 | 30 | 60;
   };
+}
+
+export function suggestedCompanionName(fileName: string): string {
+  const words = fileName
+    .replace(/\.[^.]+$/u, "")
+    .replace(/([\p{Ll}\d])(\p{Lu})/gu, "$1 $2")
+    .replace(/[_\-.]+/gu, " ")
+    .trim()
+    .split(/\s+/u)
+    .filter(Boolean);
+  while (
+    words.length > 1 &&
+    /^(?:portrait|sprite|spritesheet|atlas|frames?|sequence|cutout|transparent)$/iu.test(
+      words.at(-1) ?? "",
+    )
+  ) {
+    words.pop();
+  }
+  const name = words
+    .map((word) =>
+      /^[a-z]/u.test(word)
+        ? `${word.charAt(0).toUpperCase()}${word.slice(1)}`
+        : word,
+    )
+    .join(" ")
+    .slice(0, 64)
+    .trim();
+  return name || "Untitled companion";
 }
 
 export function createCompanionProject(
@@ -118,6 +157,9 @@ export function createCompanionProject(
     format: COMPANION_PROJECT_FORMAT,
     id,
     name: "Untitled companion",
+    description: "",
+    author: "",
+    license: "",
     updatedAt: new Date().toISOString(),
     step: "import",
     source: null,
@@ -138,11 +180,92 @@ export function createCompanionProject(
     motionRanges: [],
     neutralFrame: 0,
     reducedMotionFrame: 0,
+    placement: {
+      align: 0.82,
+      offsetX: 0,
+      offsetY: 2,
+      size: 120,
+    },
     preview: {
       background: "transparent",
       frameRate: 24,
       followSmoothing: 0.18,
       renderFps: 60,
     },
+  };
+}
+
+export function resetCompanionProjectDerivedState(
+  project: CompanionCreatorProject,
+): void {
+  const defaults = createCompanionProject(project.id);
+  project.frames = [];
+  project.sharedCrop = null;
+  project.groundLine = null;
+  project.cleanup = structuredClone(defaults.cleanup);
+  project.directionAnchors = [];
+  project.motionRanges = [];
+  project.neutralFrame = 0;
+  project.reducedMotionFrame = 0;
+  project.step = "import";
+}
+
+/**
+ * A newly opened studio should not become a visible draft until the user has
+ * imported media or changed meaningful project data. `updatedAt` and `id` are
+ * intentionally ignored because both are generated when the studio opens.
+ */
+export function companionProjectIsPristine(
+  project: CompanionCreatorProject,
+): boolean {
+  const defaults = createCompanionProject(project.id);
+  return (
+    project.step === defaults.step &&
+    (project.source === null || project.source.files.length === 0) &&
+    project.frames.length === 0 &&
+    project.sharedCrop === null &&
+    project.groundLine === null &&
+    project.directionAnchors.length === 0 &&
+    project.motionRanges.length === 0 &&
+    project.name === defaults.name &&
+    project.description === defaults.description &&
+    project.author === defaults.author &&
+    project.license === defaults.license
+  );
+}
+
+export function normalizeCompanionProject(
+  project: CompanionCreatorProject,
+): CompanionCreatorProject {
+  const defaults = createCompanionProject(project.id);
+  const directionAnchors = structuredClone(project.directionAnchors ?? []);
+  const anchorIds = new Set(directionAnchors.map((anchor) => anchor.id));
+  return {
+    ...defaults,
+    ...structuredClone(project),
+    description: project.description ?? defaults.description,
+    author: project.author ?? defaults.author,
+    license: project.license ?? defaults.license,
+    placement: {
+      ...defaults.placement,
+      ...(project.placement ?? {}),
+    },
+    preview: {
+      ...defaults.preview,
+      ...project.preview,
+    },
+    directionAnchors,
+    motionRanges: (project.motionRanges ?? []).map((motion) => {
+      const validPoseIds = (motion.poseAnchorIds ?? []).filter((id) =>
+        anchorIds.has(id),
+      );
+      return {
+        ...structuredClone(motion),
+        poseAnchorIds:
+          validPoseIds.length > 0
+            ? validPoseIds
+            : directionAnchors.map((anchor) => anchor.id),
+      };
+    }),
   };
 }

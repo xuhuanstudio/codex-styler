@@ -10,6 +10,7 @@ import {
 import { calibrateDirections, normalizeAngle } from "./calibration";
 import type { ExtractedFrame } from "./media";
 import type { CompanionCreatorProject, FrameBounds } from "./model";
+import { validateMotionRanges } from "./motions";
 
 export const decodedPageLimit = 48 * 1024 * 1024;
 const encodedFileLimit = 20 * 1024 * 1024;
@@ -136,9 +137,9 @@ export interface CompiledCompanion {
 export async function compileCompanion(
   project: CompanionCreatorProject,
   extractedFrames: ExtractedFrame[],
-  author: string,
-  license: string,
 ): Promise<CompiledCompanion> {
+  const author = project.author.trim();
+  const license = project.license.trim();
   const crop = project.sharedCrop;
   if (!crop || crop.width < 1 || crop.height < 1) {
     throw new Error("Set a shared crop before saving the companion");
@@ -195,10 +196,10 @@ export async function compileCompanion(
     const definition: CompanionPackageDefinition = {
       format: COMPANION_FORMAT,
       id,
-      version: "0.2.0-beta.1",
+      version: "0.2.0-beta.2",
       metadata: {
         name: project.name,
-        description: "A locally created static Codex Styler companion.",
+        description: project.description.trim(),
         author,
         license,
         tags: ["companion", "static"],
@@ -210,14 +211,17 @@ export async function compileCompanion(
         name: project.name,
         renderer: { type: "image", asset: path, normalization: "preserve" },
         behaviors: ["idle", "reduce-motion-fallback"],
-        anchor: { x: 82, y: 70 },
+        anchor: { x: project.placement.align * 100, y: 70 },
         attachment: {
           target: "composer",
           edge: "top",
-          align: 0.82,
-          offset: { x: 0, y: 2 },
+          align: project.placement.align,
+          offset: {
+            x: project.placement.offsetX,
+            y: project.placement.offsetY,
+          },
         },
-        size: 120,
+        size: project.placement.size,
         opacity: 1,
       },
       assets: [
@@ -287,6 +291,13 @@ export async function compileCompanion(
     project.frames,
     project.directionAnchors,
   );
+  if (activeLogicalFrames.length > 1 && !direction.ready) {
+    throw new Error(
+      "Complete direction calibration before building this companion",
+    );
+  }
+  const motionIssues = validateMotionRanges(project);
+  if (motionIssues.length > 0) throw new Error(motionIssues.join("; "));
   const motionFrames = new Set<number>();
   for (const motion of project.motionRanges) {
     for (let index = motion.startFrame; index <= motion.endFrame; index += 1) {
@@ -358,10 +369,7 @@ export async function compileCompanion(
       return [
         {
           id: slug(motion.name) + `-${motion.id.slice(-4)}`,
-          poseIds:
-            allowed.length > 0
-              ? [...new Set(allowed)]
-              : poses.map((pose) => pose.id),
+          poseIds: [...new Set(allowed)],
           frames: clipFrames,
           minimumDelayMs: motion.minimumDelayMs,
           maximumDelayMs: motion.maximumDelayMs,
@@ -373,10 +381,10 @@ export async function compileCompanion(
   const definition: CompanionPackageDefinition = {
     format: COMPANION_FORMAT,
     id,
-    version: "0.2.0-beta.1",
+    version: "0.2.0-beta.2",
     metadata: {
       name: project.name,
-      description: "A locally calibrated pointer-aware Codex Styler companion.",
+      description: project.description.trim(),
       author,
       license,
       tags: ["companion", "pointer-aware"],
@@ -410,14 +418,17 @@ export async function compileCompanion(
         alphaThreshold: 12,
       },
       behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
-      anchor: { x: 82, y: 70 },
+      anchor: { x: project.placement.align * 100, y: 70 },
       attachment: {
         target: "composer",
         edge: "top",
-        align: 0.82,
-        offset: { x: 0, y: 2 },
+        align: project.placement.align,
+        offset: {
+          x: project.placement.offsetX,
+          y: project.placement.offsetY,
+        },
       },
-      size: 120,
+      size: project.placement.size,
       opacity: 1,
     },
     assets: [

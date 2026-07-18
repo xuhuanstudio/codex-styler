@@ -80,7 +80,7 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     launchCodex: vi.fn(),
     quitCodex: vi.fn(),
     checkForUpdates: vi.fn().mockResolvedValue({
-      currentVersion: "0.2.0-beta.1",
+      currentVersion: "0.2.0-beta.2",
       update: null,
     }),
     downloadAndInstallUpdate: vi.fn(),
@@ -128,7 +128,7 @@ describe("Codex Styler shell", () => {
     vi.mocked(validateCodexInstallPath).mockResolvedValue(true);
     vi.mocked(checkForUpdates).mockReset();
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.2.0-beta.1",
+      currentVersion: "0.2.0-beta.2",
       update: null,
     });
     vi.mocked(downloadAndInstallUpdate).mockReset();
@@ -218,6 +218,15 @@ describe("Codex Styler shell", () => {
     expect(language.options[0]?.textContent).toBe("Follow system language");
   });
 
+  it("requests update notes in the selected application language", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const language = screen.getAllByRole("combobox")[0] as HTMLSelectElement;
+    fireEvent.change(language, { target: { value: "zh-CN" } });
+    fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
+    await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("zh-CN"));
+  });
+
   it("offers enhanced and conservative runtime strategies", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -256,18 +265,24 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.1")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.2")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
-    await waitFor(() => expect(checkForUpdates).toHaveBeenCalledOnce());
+    await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
   });
 
   it("downloads, installs, and restarts from the update dialog", async () => {
     vi.mocked(checkForUpdates).mockResolvedValue({
-      currentVersion: "0.2.0-beta.1",
+      currentVersion: "0.2.0-beta.2",
       update: {
-        version: "0.2.0-beta.1",
+        version: "0.2.0-beta.2",
         notes: "A safer updater and corrected companion thumbnails.",
+        releaseNotes: {
+          locale: "en",
+          summary: "A more reliable Companion Studio.",
+          highlights: ["Localized update details before download."],
+          fixes: ["Corrected companion portrait slicing."],
+        },
         publishedAt: "2026-07-17T08:00:00Z",
         prerelease: true,
       },
@@ -282,9 +297,15 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     expect(
       await screen.findByRole("dialog", {
-        name: "Codex Styler 0.2.0-beta.1",
+        name: "Codex Styler 0.2.0-beta.2",
       }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByText("A more reliable Companion Studio."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("A safer updater and corrected companion thumbnails."),
+    ).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Download and install" }),
     );
@@ -474,20 +495,18 @@ describe("Codex Styler shell", () => {
     ).toBeInTheDocument();
   });
 
-  it("clips companion thumbnails to exactly one atlas frame", () => {
+  it("uses independent portraits instead of decoding atlases in the list", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Companions" }));
     const pico = screen.getByRole("button", { name: /Pico/ });
     const viewport = pico.querySelector(".companion-option__visual--sprite");
     const frame = pico.querySelector<HTMLElement>(".companion-option__frame");
     expect(viewport).toContainElement(frame);
-    expect(frame?.style.backgroundImage).toContain("pico-parrot-atlas");
-    expect(Number.parseFloat(frame?.style.width ?? "0")).toBeLessThanOrEqual(
-      64,
-    );
-    expect(Number.parseFloat(frame?.style.height ?? "0")).toBeLessThanOrEqual(
-      64,
-    );
+    expect(frame).toHaveAttribute("data-preview-source", "portrait");
+    expect(frame?.style.backgroundImage).toContain("pico-parrot-portrait.webp");
+    expect(frame?.style.backgroundImage).not.toContain("pico-parrot-atlas");
+    expect(frame?.style.width).toBe("64px");
+    expect(frame?.style.height).toBe("64px");
   });
 
   it("uses each refined theme's default companion until the user disables it", () => {
