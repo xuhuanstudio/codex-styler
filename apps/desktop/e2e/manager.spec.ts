@@ -112,6 +112,50 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await expect(page).toHaveScreenshot("theme-editor-en-dark-960x680.png");
 });
 
+test("scroll surfaces use product chrome instead of platform defaults", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await page.getByRole("button", { name: "Themes", exact: true }).click();
+
+  const themeList = page.locator(".theme-list");
+  await expect(themeList).toBeVisible();
+  const themeScrollChrome = await themeList.evaluate((element) => {
+    const style = getComputedStyle(element);
+    const thumb = getComputedStyle(element, "::-webkit-scrollbar-thumb");
+    return {
+      color: style.scrollbarColor,
+      width: style.scrollbarWidth,
+      thumbRadius: thumb.borderRadius,
+    };
+  });
+  expect(themeScrollChrome.color).not.toBe("auto");
+  expect(themeScrollChrome.width).toBe("thin");
+  expect(themeScrollChrome.thumbRadius).toBe("999px");
+
+  await page.getByRole("button", { name: "Companions" }).click();
+  const companionList = page.locator(".companion-list");
+  await expect(companionList).toBeVisible();
+  await expect
+    .poll(() =>
+      companionList.evaluate(
+        (element) => getComputedStyle(element).scrollbarColor,
+      ),
+    )
+    .not.toBe("auto");
+
+  await page.getByRole("button", { name: "New companion" }).click();
+  const creatorSteps = page.locator(".creator-steps");
+  await expect(creatorSteps).toBeVisible();
+  await expect
+    .poll(() =>
+      creatorSteps.evaluate(
+        (element) => getComputedStyle(element).scrollbarColor,
+      ),
+    )
+    .not.toBe("auto");
+});
+
 test("settings controls share a stable professional layout", async ({
   page,
 }) => {

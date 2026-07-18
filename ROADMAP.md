@@ -48,8 +48,9 @@ The roadmap is organized by evidence gates, not calendar promises.
 1. `v0.2.0-beta.1`: functionally complete Creator Beta; macOS local validation; Windows CI build marked as awaiting community validation.
 2. `v0.2.0-beta.2`: Companion Studio refinement, safer import and editing, corrected portraits, and localized pre-download update notes.
 3. `v0.2.0-beta.3`: professional product-coherence pass for application state, resource libraries, focused workspaces, Settings, typography, and responsive visual regression.
-4. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
-5. `v0.2.0`: only when RC evidence supports it.
+4. `v0.2.0-beta.4`: bounded and silent Windows lifecycle recovery, resilient Microsoft Store activation, localized recovery guidance, and cross-platform interaction chrome.
+5. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
+6. `v0.2.0`: only when RC evidence supports it.
 
 ## v1 Stable
 

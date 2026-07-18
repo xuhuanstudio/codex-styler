@@ -1,0 +1,37 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.4",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "A Windows lifecycle and interaction-polish update rebuilds Store activation, bounds restart work, removes console windows, and unifies native controls.",
+      "highlights": [
+        "Windows restart now reuses the verified Codex path, caches valid Store locations, and bounds every shutdown and identity helper.",
+        "Microsoft Store builds resolve Start Menu and package-manifest identities before restricted same-package activation fallbacks.",
+        "Scrollbars, native selects, ranges, checkboxes, and color controls now share the manager design system across macOS and Windows.",
+        "Windows Store, permission, and expired-connection errors now provide localized recovery guidance."
+      ],
+      "fixes": [
+        "Fixed Windows release builds opening a terminal beside Codex Styler.",
+        "Fixed restart repeatedly running Get-AppxPackage during shutdown polling and appearing to remain stuck.",
+        "Fixed Store packages with target-name tokens or non-default application IDs failing identity resolution.",
+        "Fixed platform-default scrollbar and form-control chrome conflicting with the desktop visual system."
+      ]
+    },
+    "zh-CN": {
+      "summary": "本次 Windows 生命周期与交互精修更新重构了 Store 启动、限制重启等待时间、移除控制台窗口，并统一原生控件视觉。",
+      "highlights": [
+        "Windows 重启会复用已经验证的 Codex 路径、缓存有效的 Store 安装位置，并为所有退出与身份查询辅助程序设置时间上限。",
+        "Microsoft Store 版本会优先解析开始菜单注册和包清单身份，再尝试严格限制在同一包内的候选身份。",
+        "滚动条、原生下拉、滑杆、复选框和颜色控件现在在 macOS 与 Windows 上共用管理器设计系统。",
+        "Windows Store、权限级别和连接失效问题现在会显示本地化的可操作恢复建议。"
+      ],
+      "fixes": [
+        "修复 Windows 发布版启动 Codex Styler 时同时弹出终端窗口的问题。",
+        "修复重启期间反复运行 Get-AppxPackage，导致确认面板长时间停留的问题。",
+        "修复使用目标名称占位符或非默认应用 ID 的 Store 包无法解析启动身份的问题。",
+        "修复系统原生滚动条和表单控件样式与桌面端视觉系统不一致的问题。"
+      ]
+    }
+  }
+}

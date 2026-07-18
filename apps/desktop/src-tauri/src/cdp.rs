@@ -14,7 +14,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use crate::{codex::executable_from_install, error::StylerError};
 
 #[cfg(target_os = "windows")]
-use crate::codex::{is_windows_store_install, windows_store_app_user_model_id};
+use crate::codex::{is_windows_store_install, windows_store_app_user_model_ids};
 
 #[cfg(target_os = "windows")]
 fn launch_windows_packaged_app(
@@ -33,9 +33,13 @@ fn launch_windows_packaged_app(
     };
 
     unsafe {
-        CoInitializeEx(None, COINIT_MULTITHREADED)
-            .ok()
-            .map_err(|error| StylerError::Launch(error.to_string()))?;
+        let initialized_here = match CoInitializeEx(None, COINIT_MULTITHREADED).ok() {
+            Ok(()) => true,
+            // Tauri may call from an existing STA thread. COM is already
+            // available there; only the requested apartment model differs.
+            Err(error) if error.code().0 == 0x80010106u32 as i32 => false,
+            Err(error) => return Err(StylerError::Launch(error.to_string())),
+        };
         let result = (|| {
             let manager: IApplicationActivationManager =
                 CoCreateInstance(&ApplicationActivationManager, None, CLSCTX_LOCAL_SERVER)?;
@@ -45,7 +49,9 @@ fn launch_windows_packaged_app(
                 AO_NONE,
             )
         })();
-        CoUninitialize();
+        if initialized_here {
+            CoUninitialize();
+        }
         result.map_err(|error| StylerError::Launch(error.to_string()))
     }
 }
@@ -56,16 +62,26 @@ fn launch_codex_process(executable: &Path, port: u16) -> Result<u32, StylerError
 
     #[cfg(target_os = "windows")]
     if is_windows_store_install(executable) {
-        let app_user_model_id = windows_store_app_user_model_id(executable).ok_or_else(|| {
-            StylerError::Launch(
+        let app_user_model_ids = windows_store_app_user_model_ids(executable);
+        if app_user_model_ids.is_empty() {
+            return Err(StylerError::Launch(
                 "The Microsoft Store installation could not be resolved to an application identity"
                     .into(),
+            ));
+        }
+        let arguments = format!("{port_argument} {address_argument}");
+        let mut last_error = None;
+        for app_user_model_id in app_user_model_ids {
+            match launch_windows_packaged_app(&app_user_model_id, &arguments) {
+                Ok(process_id) => return Ok(process_id),
+                Err(error) => last_error = Some(error),
+            }
+        }
+        return Err(last_error.unwrap_or_else(|| {
+            StylerError::Launch(
+                "Windows could not activate the Microsoft Store Codex package".into(),
             )
-        })?;
-        return launch_windows_packaged_app(
-            &app_user_model_id,
-            &format!("{port_argument} {address_argument}"),
-        );
+        }));
     }
 
     Command::new(executable)
