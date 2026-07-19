@@ -1219,7 +1219,12 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
     fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
-    expect(screen.getByText("Contrast protected")).toBeInTheDocument();
+    expect(screen.getByText("Visual safety")).toBeInTheDocument();
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Visual safety"));
+    expect(screen.getByText("Primary text")).toBeInTheDocument();
+    expect(screen.getByText("Accent controls")).toBeInTheDocument();
+    expect(screen.getByText("Component boundaries")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     expect(
       screen.getByRole("menuitem", { name: "Revert to saved" }),

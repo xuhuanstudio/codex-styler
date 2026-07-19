@@ -50,6 +50,7 @@ import type { WorkspaceUiPreferences } from "../../lib/storage";
 import type { ThemeColorHarmonyId } from "../../lib/theme-color-harmony";
 import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
 import { ColorHarmonyPicker } from "./ColorHarmonyPicker";
+import { ThemeVisualQuality } from "./ThemeVisualQuality";
 import {
   themeEditorSectionCoverage,
   type ThemeEditorControlId,
@@ -1358,13 +1359,7 @@ export function ThemeEditorView({
                     />
                   </div>
                 </details>
-                <div className="contrast-note">
-                  <ShieldCheck size={14} />
-                  <span>
-                    <strong>{t("contrastProtected")}</strong>
-                    <small>{t("contrastProtectedBody")}</small>
-                  </span>
-                </div>
+                <ThemeVisualQuality theme={theme} variant={variant} t={t} />
               </InspectorSection>
             )}
             {activeLayer === "motion" && (

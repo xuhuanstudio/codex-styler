@@ -99,21 +99,64 @@ export function resolveThemePreviewPalette(
     statusDefaults.info,
   );
 
+  const canvas = safeSurface(custom.canvas, backgroundColor);
+  const surfaceRaised = safeSurface(
+    custom.surfaceRaised,
+    tint(strength.raised),
+  );
+  const surfaceOverlay = safeSurface(
+    custom.surfaceOverlay,
+    tint(strength.overlay),
+  );
+  const surfaceSunken = safeSurface(
+    custom.surfaceSunken,
+    mixColors(appearance.surface, backgroundColor, 0.12),
+  );
+  const control = safeSurface(custom.control, tint(strength.control));
+  const controlHover = safeSurface(
+    custom.controlHover,
+    tint(strength.controlHover),
+  );
+  const controlActive = safeSurface(
+    custom.controlActive,
+    tint(strength.controlActive),
+  );
+  const boundaryBackgrounds = [
+    appearance.surface,
+    surfaceRaised,
+    surfaceOverlay,
+    surfaceSunken,
+    control,
+    controlHover,
+    controlActive,
+  ];
+  // Keep low-emphasis separators quiet while guaranteeing that regular and
+  // strong component boundaries remain visible on every derived surface.
+  const border = adaptiveReadableColor(
+    appearance.border,
+    boundaryBackgrounds,
+    1.5,
+  );
+  const borderSubtle = adaptiveReadableColor(
+    custom.borderSubtle ?? mixColors(appearance.surface, border, 0.72),
+    boundaryBackgrounds,
+    1.25,
+  );
+  const borderStrong = adaptiveReadableColor(
+    custom.borderStrong ?? mixColors(border, contrastSystem.textPrimary, 0.3),
+    boundaryBackgrounds,
+    custom.borderStrong ? 3 : 2.5,
+  );
+
   return {
-    canvas: safeSurface(custom.canvas, backgroundColor),
+    canvas,
     surface: appearance.surface,
-    surfaceRaised: safeSurface(custom.surfaceRaised, tint(strength.raised)),
-    surfaceOverlay: safeSurface(custom.surfaceOverlay, tint(strength.overlay)),
-    surfaceSunken: safeSurface(
-      custom.surfaceSunken,
-      mixColors(appearance.surface, backgroundColor, 0.12),
-    ),
-    control: safeSurface(custom.control, tint(strength.control)),
-    controlHover: safeSurface(custom.controlHover, tint(strength.controlHover)),
-    controlActive: safeSurface(
-      custom.controlActive,
-      tint(strength.controlActive),
-    ),
+    surfaceRaised,
+    surfaceOverlay,
+    surfaceSunken,
+    control,
+    controlHover,
+    controlActive,
     textPrimary: contrastSystem.textPrimary,
     textSecondary: contrastSystem.textSecondary,
     textTertiary: contrastSystem.textTertiary,
@@ -123,13 +166,9 @@ export function resolveThemePreviewPalette(
       appearance.accent,
       4.5,
     ),
-    border: appearance.border,
-    borderSubtle:
-      custom.borderSubtle ??
-      `color-mix(in srgb, ${appearance.border} 52%, transparent)`,
-    borderStrong:
-      custom.borderStrong ??
-      `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
+    border,
+    borderSubtle,
+    borderStrong,
     focus: safeForeground(
       custom.focus ?? appearance.accent,
       statusDefaults.info,

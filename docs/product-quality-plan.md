@@ -220,6 +220,14 @@ working control behind another page, revert it.
   backgrounds, canvas contact, isolated residue, and sampled-color spill, then
   return the user to an affected cleanup frame. Heuristic findings never block
   packaging or replace the explicit three-surface review.
+- semantic theme rendering now protects component boundaries as part of the
+  same surface-aware color contract used for text, status colors, and accent
+  controls. Authored border hues are retained when safe and move only as far
+  as required to preserve subtle, regular, and strong interface hierarchy;
+- the Theme Editor replaces its generic contrast promise with an expandable
+  visual safety result derived from the exact preview/runtime palette. It shows
+  primary and secondary text, accent-control, boundary, and image-surface guard
+  evidence without mutating the authored theme data.
 
 ## RC — reliability proof
 

@@ -883,45 +883,70 @@
       [appearance.accent],
       readable(appearance.surface, appearance.accent),
     );
+    const canvas = safeSurface(custom.canvas, background.color);
+    const surfaceRaised = safeSurface(
+      custom.surfaceRaised,
+      mix(appearance.surface, appearance.accent, strength.raised),
+    );
+    const surfaceOverlay = safeSurface(
+      custom.surfaceOverlay,
+      mix(appearance.surface, appearance.accent, strength.overlay),
+    );
+    const surfaceSunken = safeSurface(
+      custom.surfaceSunken,
+      mix(appearance.surface, background.color, 0.12),
+    );
+    const control = safeSurface(
+      custom.control,
+      mix(appearance.surface, appearance.accent, strength.control),
+    );
+    const controlHover = safeSurface(
+      custom.controlHover,
+      mix(appearance.surface, appearance.accent, strength.controlHover),
+    );
+    const controlActive = safeSurface(
+      custom.controlActive,
+      mix(appearance.surface, appearance.accent, strength.controlActive),
+    );
+    const boundaryBackgrounds = [
+      appearance.surface,
+      surfaceRaised,
+      surfaceOverlay,
+      surfaceSunken,
+      control,
+      controlHover,
+      controlActive,
+    ];
+    // Mirrors the desktop preview contract: quiet separators stay subtle,
+    // while regular and strong component boundaries cannot disappear.
+    const border = readable(appearance.border, boundaryBackgrounds, 1.5);
+    const borderSubtle = readable(
+      custom.borderSubtle || mix(appearance.surface, border, 0.72),
+      boundaryBackgrounds,
+      1.25,
+    );
+    const borderStrong = readable(
+      custom.borderStrong || mix(border, textPrimary, 0.3),
+      boundaryBackgrounds,
+      custom.borderStrong ? 3 : 2.5,
+    );
     return {
-      canvas: safeSurface(custom.canvas, background.color),
+      canvas,
       surface: appearance.surface,
-      surfaceRaised: safeSurface(
-        custom.surfaceRaised,
-        mix(appearance.surface, appearance.accent, strength.raised),
-      ),
-      surfaceOverlay: safeSurface(
-        custom.surfaceOverlay,
-        mix(appearance.surface, appearance.accent, strength.overlay),
-      ),
-      surfaceSunken: safeSurface(
-        custom.surfaceSunken,
-        mix(appearance.surface, background.color, 0.12),
-      ),
-      control: safeSurface(
-        custom.control,
-        mix(appearance.surface, appearance.accent, strength.control),
-      ),
-      controlHover: safeSurface(
-        custom.controlHover,
-        mix(appearance.surface, appearance.accent, strength.controlHover),
-      ),
-      controlActive: safeSurface(
-        custom.controlActive,
-        mix(appearance.surface, appearance.accent, strength.controlActive),
-      ),
+      surfaceRaised,
+      surfaceOverlay,
+      surfaceSunken,
+      control,
+      controlHover,
+      controlActive,
       textPrimary,
       textSecondary,
       textTertiary,
       accent: appearance.accent,
       onAccent,
-      border: appearance.border,
-      borderSubtle:
-        custom.borderSubtle ||
-        `color-mix(in srgb, ${appearance.border} 52%, transparent)`,
-      borderStrong:
-        custom.borderStrong ||
-        `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
+      border,
+      borderSubtle,
+      borderStrong,
       focus: safeForeground(
         custom.focus || appearance.accent,
         contrastSystem.strongBackgrounds,
@@ -1169,7 +1194,8 @@
 
   const installStyles = (theme, variant, safeMode) => {
     const visual = theme.variants[variant];
-    const { appearance, background } = visual;
+    const { background } = visual;
+    const authoredAppearance = visual.appearance;
     const motionDuration = Math.round(120 + visual.motion.intensity * 110);
     const interactionLift = Math.max(
       1,
@@ -1183,8 +1209,16 @@
     const strongSurfacePercent = Math.round(
       contrastSystem.strongSurfaceOpacity * 100,
     );
-    const accentText = readable(appearance.surface, appearance.accent);
-    const palette = semanticPalette(appearance, background, contrastSystem);
+    const accentText = readable(
+      authoredAppearance.surface,
+      authoredAppearance.accent,
+    );
+    const palette = semanticPalette(
+      authoredAppearance,
+      background,
+      contrastSystem,
+    );
+    const appearance = { ...authoredAppearance, border: palette.border };
     const style = document.createElement("style");
     style.id = STYLE_ID;
     const semantic = safeMode

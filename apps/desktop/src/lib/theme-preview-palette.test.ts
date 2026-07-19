@@ -81,6 +81,38 @@ describe("theme preview semantic palette", () => {
     );
   });
 
+  it("preserves boundary hierarchy without allowing borders to disappear", () => {
+    const unsafe = appearance("subtle");
+    unsafe.border = unsafe.surface;
+    unsafe.palette = {
+      borderSubtle: unsafe.surface,
+      borderStrong: unsafe.surface,
+    };
+    const palette = resolveThemePreviewPalette(
+      unsafe,
+      "#101217",
+      contrastSystem,
+    );
+    const surfaces = [
+      palette.surface,
+      palette.surfaceRaised,
+      palette.surfaceOverlay,
+      palette.surfaceSunken,
+      palette.control,
+      palette.controlHover,
+      palette.controlActive,
+    ];
+
+    expect(
+      Math.min(...surfaces.map((item) => contrastRatio(palette.border, item))),
+    ).toBeGreaterThanOrEqual(1.49);
+    expect(
+      Math.min(
+        ...surfaces.map((item) => contrastRatio(palette.borderStrong, item)),
+      ),
+    ).toBeGreaterThanOrEqual(2.99);
+  });
+
   it("keeps functional and diff colors readable on focused surfaces", () => {
     const palette = resolveThemePreviewPalette(
       appearance("expressive"),

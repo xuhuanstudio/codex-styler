@@ -2652,33 +2652,6 @@ button:disabled {
   cursor: pointer;
 }
 
-.contrast-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  color: var(--accent-ink);
-  background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
-}
-
-.contrast-note span {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.contrast-note strong {
-  font-size: 9px;
-}
-.contrast-note small {
-  color: var(--ink-muted);
-  font-size: 8px;
-  line-height: 1.45;
-}
-
 .inspector-help {
   display: flex;
   align-items: center;
