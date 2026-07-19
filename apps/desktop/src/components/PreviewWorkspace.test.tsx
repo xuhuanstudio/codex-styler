@@ -1,7 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import {
+  composeThemeWithCompanion,
   gildedGrandeur,
   merryBigTop,
+  mossCompanion,
   nativeRefined,
 } from "@codex-styler/theme-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +14,7 @@ import { resolveThemePreviewPalette } from "../lib/theme-preview-palette";
 describe("PreviewWorkspace task views", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("lets the theme editor move between conversation, changes, and terminal", () => {
@@ -323,5 +326,64 @@ describe("PreviewWorkspace task views", () => {
     expect(container.querySelector(".workspace-preview")).not.toHaveAttribute(
       "data-motion-preview",
     );
+  });
+
+  it("keeps an attached companion grounded after React rerenders the preview", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.classList.contains("workspace-preview") ? 800 : 0;
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockImplementation(
+      function (this: HTMLElement) {
+        return this.classList.contains("workspace-preview") ? 400 : 0;
+      },
+    );
+    vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
+      function (this: HTMLElement) {
+        if (this.classList.contains("workspace-preview")) {
+          return DOMRect.fromRect({ x: 0, y: 0, width: 800, height: 400 });
+        }
+        if (this.classList.contains("workspace-composer__field")) {
+          return DOMRect.fromRect({ x: 200, y: 320, width: 500, height: 45 });
+        }
+        return DOMRect.fromRect();
+      },
+    );
+    const theme = composeThemeWithCompanion(nativeRefined, mossCompanion);
+    const { container, rerender } = render(
+      <PreviewWorkspace
+        theme={theme}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        compact
+      />,
+    );
+
+    const entity = container.querySelector<HTMLElement>(".scene-entity");
+    await waitFor(() => {
+      expect(entity?.style.getPropertyValue("--entity-x")).toBe("610px");
+      expect(
+        Number.parseFloat(entity?.style.getPropertyValue("--entity-y") ?? "0"),
+      ).toBeCloseTo(321.58, 1);
+    });
+
+    rerender(
+      <PreviewWorkspace
+        theme={theme}
+        variant="dark"
+        locale="en"
+        reduceMotion={false}
+        resolveAsset={(_, path) => path}
+        compact
+      />,
+    );
+
+    expect(entity?.style.getPropertyValue("--entity-x")).toBe("610px");
+    expect(
+      Number.parseFloat(entity?.style.getPropertyValue("--entity-y") ?? "0"),
+    ).toBeCloseTo(321.58, 1);
   });
 });

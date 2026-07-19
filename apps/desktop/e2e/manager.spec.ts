@@ -183,6 +183,7 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   const appearanceComparison = page.getByRole("group", {
     name: "Compare appearance",
   });
+  await page.getByRole("button", { name: "Task & composer" }).click();
   await appearanceComparison.getByRole("button", { name: "Official" }).click();
   await expect(
     page.locator(".featured-theme__preview .workspace-preview"),
@@ -647,9 +648,9 @@ test("keyboard companion creator completes a static-image project", async ({
   const globalSize = page.getByLabel("Global size percentage");
   await globalSize.fill("125");
   await expect(
-    page.getByRole("heading", { name: "Some frames need alignment" }),
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Fit to canvas" }).click();
+  await page.getByRole("button", { name: "Fit all frames to canvas" }).click();
   await expect(
     page.getByRole("heading", { name: "Shared canvas ready" }),
   ).toBeVisible();
@@ -662,7 +663,7 @@ test("keyboard companion creator completes a static-image project", async ({
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(globalSize).toHaveValue("125");
   await expect(
-    page.getByRole("heading", { name: "Some frames need alignment" }),
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Redo" }).click();
   await expect(

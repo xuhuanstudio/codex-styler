@@ -74,6 +74,10 @@ export function PreviewWorkspace({
   const [direction, setDirection] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [spriteReady, setSpriteReady] = useState(0);
+  const [attachedPosition, setAttachedPosition] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
   const [previewViewport, setPreviewViewport] = useState({
     width: 0,
     height: 0,
@@ -374,18 +378,23 @@ export function PreviewWorkspace({
     visual.motion.parallax,
   ]);
 
-  useEffect(() => {
-    const element = entityRef.current;
+  useLayoutEffect(() => {
     const preview = previewRef.current;
     const attachment = entity?.attachment;
-    if (!element || !preview || !attachment) return;
+    if (!preview || !attachment) {
+      setAttachedPosition(null);
+      return;
+    }
     const target =
       attachment.target === "composer"
         ? composerRef.current
         : attachment.target === "main-surface"
           ? mainRef.current
           : null;
-    if (!target) return;
+    if (!target) {
+      setAttachedPosition(null);
+      return;
+    }
 
     const update = () => {
       const previewBounds = preview.getBoundingClientRect();
@@ -419,8 +428,11 @@ export function PreviewWorkspace({
           height: preview.clientHeight,
         },
       );
-      element.style.left = `${position.x}px`;
-      element.style.top = `${position.y}px`;
+      setAttachedPosition((current) =>
+        current && current.x === position.x && current.y === position.y
+          ? current
+          : position,
+      );
     };
     update();
     let settleFrame = window.requestAnimationFrame(() => {
@@ -438,7 +450,14 @@ export function PreviewWorkspace({
       window.removeEventListener("resize", update);
       observer?.disconnect();
     };
-  }, [entity, previewEntity?.scale]);
+  }, [
+    entity,
+    previewEntity?.height,
+    previewEntity?.scale,
+    previewEntity?.width,
+    scenario,
+    sourceEntityHeight,
+  ]);
 
   const style = useMemo(() => {
     const officialPalette =
@@ -687,12 +706,20 @@ export function PreviewWorkspace({
   const entityStyle = entity
     ? ({
         "--entity-image": entityImage ? "url(" + entityImage + ")" : "none",
-        "--entity-x": safeFreePosition
-          ? `${safeFreePosition.x}px`
-          : entity.anchor.x + "%",
-        "--entity-y": safeFreePosition
-          ? `${safeFreePosition.y}px`
-          : entity.anchor.y + "%",
+        "--entity-x": entity.attachment
+          ? attachedPosition
+            ? `${attachedPosition.x}px`
+            : entity.anchor.x + "%"
+          : safeFreePosition
+            ? `${safeFreePosition.x}px`
+            : entity.anchor.x + "%",
+        "--entity-y": entity.attachment
+          ? attachedPosition
+            ? `${attachedPosition.y}px`
+            : entity.anchor.y + "%"
+          : safeFreePosition
+            ? `${safeFreePosition.y}px`
+            : entity.anchor.y + "%",
         "--entity-size": (previewEntity?.width ?? entity.size) + "px",
         "--entity-height": (previewEntity?.height ?? sourceEntityHeight) + "px",
         "--entity-opacity": entity.opacity,
