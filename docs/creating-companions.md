@@ -18,7 +18,7 @@ Supported video input depends on the system WebView. MP4 or MOV with H.264 is th
 4. **Align** — inspect opaque bounds, set one shared crop and ground line, then use baseline translation only. Never resize individual frames.
 5. **Calibrate** — select a frame and point the direction dial toward the pointer position that should use it. The dial, angle number, anchor, and timeline are bidirectionally linked. Set at least four anchors; eight is recommended.
 6. **Motions** — mark blink, breathing, or gesture ranges, their playback direction, speed, delay, and compatible direction poses. Exclude damaged or unrelated frames.
-7. **Test & Save** — move a real pointer, resize the simulated composer, drag and snap the companion, inspect reduced motion, then build and re-import the package.
+7. **Test & Save** — move a real pointer, resize the simulated composer, drag and snap the companion, inspect reduced motion, follow any automated edge-risk links back to the affected cleanup frame, review the final pixels on black, white, and theme-colored surfaces, then build and re-import the package. The local scan is advisory: it does not replace the visual review or block packaging by itself.
 
 ## Direction calibration
 

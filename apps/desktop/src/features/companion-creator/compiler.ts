@@ -9,6 +9,7 @@ import {
 } from "@codex-styler/theme-core";
 import { calibrateDirections, normalizeAngle } from "./calibration";
 import { companionPackageId, companionSlug } from "./companion-id";
+import { drawLogicalFrame } from "./frame-renderer";
 import type { ExtractedFrame } from "./media";
 import type {
   CompanionCreatorProject,
@@ -227,35 +228,6 @@ async function portraitAsset(
     height,
   );
   return encodedCanvasAsset(canvas);
-}
-
-function drawLogicalFrame(
-  context: CanvasRenderingContext2D,
-  bitmap: ImageBitmap,
-  logical: LogicalFrame,
-  crop: FrameBounds,
-  groundLine: number | null,
-  contentScale: number,
-  destinationX: number,
-  destinationY: number,
-  destinationWidth: number,
-  destinationHeight: number,
-): void {
-  const pivotX = crop.x + crop.width / 2;
-  const pivotY = groundLine ?? crop.y + crop.height;
-  context.save();
-  context.beginPath();
-  context.rect(destinationX, destinationY, destinationWidth, destinationHeight);
-  context.clip();
-  context.translate(destinationX, destinationY);
-  context.scale(destinationWidth / crop.width, destinationHeight / crop.height);
-  context.translate(-crop.x, -crop.y);
-  context.translate(pivotX, pivotY);
-  context.scale(contentScale, contentScale);
-  context.translate(-pivotX, -pivotY);
-  context.translate(logical.baselineOffset.x, logical.baselineOffset.y);
-  context.drawImage(bitmap, 0, 0);
-  context.restore();
 }
 
 export interface CompiledCompanion {

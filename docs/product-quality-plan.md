@@ -214,6 +214,12 @@ working control behind another page, revert it.
   background pixels. Review evidence is stored with a compact output
   fingerprint and automatically expires after any pixel, crop, scale,
   inclusion, or alignment change.
+- edge review now shares the compiler's exact crop, baseline, scale, and canvas
+  renderer and performs a bounded local scan across behavior-defining and
+  representative frames. Advisory findings identify likely retained
+  backgrounds, canvas contact, isolated residue, and sampled-color spill, then
+  return the user to an affected cleanup frame. Heuristic findings never block
+  packaging or replace the explicit three-surface review.
 
 ## RC — reliability proof
 

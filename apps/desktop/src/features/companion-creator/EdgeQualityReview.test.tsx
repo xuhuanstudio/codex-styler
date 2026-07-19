@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { EdgeQualityReview } from "./EdgeQualityReview";
+
+afterEach(cleanup);
 
 describe("EdgeQualityReview", () => {
   it("keeps inspection and confirmation as separate, understandable actions", () => {
@@ -18,6 +20,7 @@ describe("EdgeQualityReview", () => {
           complete: false,
           next: "black",
         }}
+        analysis={{ status: "running" }}
         onInspect={onInspect}
         onConfirm={onConfirm}
         onRepair={vi.fn()}
@@ -43,6 +46,10 @@ describe("EdgeQualityReview", () => {
           complete: true,
           next: null,
         }}
+        analysis={{
+          status: "ready",
+          result: { scannedFrameIndexes: [0], issues: [] },
+        }}
         onInspect={vi.fn()}
         onConfirm={vi.fn()}
         onRepair={vi.fn()}
@@ -51,5 +58,41 @@ describe("EdgeQualityReview", () => {
 
     expect(screen.getByText("已在三种代表性表面检查最终像素。")).toBeVisible();
     expect(screen.queryByText(/确认.*背景边缘正常/)).not.toBeInTheDocument();
+  });
+
+  it("routes an automated finding to the affected frame without blocking review", () => {
+    const onRepair = vi.fn();
+    render(
+      <EdgeQualityReview
+        locale="en"
+        currentBackdrop="white"
+        summary={{
+          reviewed: ["black"],
+          remaining: ["white", "theme"],
+          completed: 1,
+          total: 3,
+          complete: false,
+          next: "white",
+        }}
+        analysis={{
+          status: "ready",
+          result: {
+            scannedFrameIndexes: [0, 6],
+            issues: [{ kind: "floating-pixels", frameIndexes: [6] }],
+          },
+        }}
+        onInspect={vi.fn()}
+        onConfirm={vi.fn()}
+        onRepair={onRepair}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Isolated pixels appear outside the main subject/,
+      }),
+    );
+    expect(onRepair).toHaveBeenCalledWith(6);
+    expect(screen.getByRole("button", { name: /Confirm edges/ })).toBeEnabled();
   });
 });

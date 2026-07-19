@@ -370,6 +370,11 @@
   background: color-mix(in srgb, #16a36a 5%, var(--surface-base));
 }
 
+.edge-quality-review--attention {
+  border-color: color-mix(in srgb, #d97706 42%, var(--border-subtle));
+  background: color-mix(in srgb, #d97706 7%, var(--surface-base));
+}
+
 .edge-quality-review__heading {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
@@ -468,6 +473,111 @@
 
 .edge-quality-review__confirm {
   width: 100%;
+}
+
+.edge-quality-review__automatic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-subtle) 72%, transparent);
+}
+
+.edge-quality-review__automatic > span {
+  display: grid;
+  min-height: 18px;
+  place-items: center;
+  color: var(--text-tertiary);
+}
+
+.edge-quality-review__automatic[data-status="ready"] > span {
+  color: #16a36a;
+}
+
+.edge-quality-review--attention
+  .edge-quality-review__automatic[data-status="ready"]
+  > span {
+  color: #d97706;
+}
+
+.edge-quality-review__automatic > div,
+.edge-quality-review__automatic strong,
+.edge-quality-review__automatic small {
+  display: block;
+  min-width: 0;
+}
+
+.edge-quality-review__automatic strong {
+  color: var(--text-primary);
+  font-size: var(--type-caption);
+  line-height: 1.35;
+}
+
+.edge-quality-review__automatic small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--type-caption);
+  line-height: 1.4;
+}
+
+.edge-quality-review__issues {
+  display: grid;
+  gap: 5px;
+}
+
+.edge-quality-review__issues button {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid color-mix(in srgb, #d97706 28%, var(--border-subtle));
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color var(--motion-standard) var(--ease-standard),
+    background var(--motion-standard) var(--ease-standard);
+}
+
+.edge-quality-review__issues button:hover {
+  border-color: color-mix(in srgb, #d97706 48%, var(--border-strong));
+  background: var(--surface-hover);
+}
+
+.edge-quality-review__issues button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.edge-quality-review__issues button span,
+.edge-quality-review__issues button strong,
+.edge-quality-review__issues button small {
+  display: block;
+  min-width: 0;
+}
+
+.edge-quality-review__issues button strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--type-caption);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edge-quality-review__issues button small {
+  margin-top: 2px;
+  color: var(--text-tertiary);
+  font-size: var(--type-caption);
 }
 
 .edge-quality-review__repair {

@@ -111,6 +111,7 @@ import { AtlasGridPreview, SourceMediaPreview } from "./SourcePreview";
 import { CalibrationHealth, CalibrationSummary } from "./CalibrationStatus";
 import { AlignmentAssistant } from "./AlignmentAssistant";
 import { EdgeQualityReview } from "./EdgeQualityReview";
+import { useEdgeAnalysis } from "./use-edge-analysis";
 import { ImportStep } from "./ImportStep";
 import {
   markEdgeBackdropReviewed,
@@ -1357,6 +1358,11 @@ export function CompanionCreator({
   );
   const cleanupDirty =
     frames.length > 0 && cleanupAppliedSignature !== cleanupSignature;
+  const edgeAnalysis = useEdgeAnalysis(
+    project,
+    frames,
+    project.step === "test" && !cleanupDirty,
+  );
 
   const clearDerivedMedia = () => {
     setSourceFiles([]);
@@ -4817,6 +4823,7 @@ export function CompanionCreator({
                     locale={locale}
                     currentBackdrop={project.preview.background}
                     summary={edgeReview}
+                    analysis={edgeAnalysis}
                     onInspect={(backdrop) =>
                       updateProject((next) => {
                         next.preview.background = backdrop;
@@ -4824,7 +4831,10 @@ export function CompanionCreator({
                       })
                     }
                     onConfirm={confirmEdgeReviewBackdrop}
-                    onRepair={() => void navigateToStep("cleanup")}
+                    onRepair={(frameIndex) => {
+                      if (frameIndex !== undefined) setCurrentFrame(frameIndex);
+                      void navigateToStep("cleanup");
+                    }}
                   />
                   <section className="creator-readiness creator-build-section">
                     <div className="creator-readiness__heading">

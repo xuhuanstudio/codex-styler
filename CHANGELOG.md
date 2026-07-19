@@ -11,6 +11,11 @@ All notable changes will be documented here. The project follows Semantic Versio
   backdrops, remain part of the local draft, and automatically expire whenever
   source pixels, cleanup, shared crop, global scale, frame inclusion, or
   alignment changes.
+- Companion edge review now runs a bounded local preflight over neutral,
+  reduced-motion, direction-anchor, motion-boundary, and representative frames.
+  It flags retained backgrounds, canvas contact, isolated pixels, and sampled
+  color spill, then links each advisory finding back to an affected cleanup
+  frame without replacing the user's final visual review.
 
 ## [0.2.0-beta.6] - 2026-07-19
 
