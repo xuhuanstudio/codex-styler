@@ -18,12 +18,14 @@ export interface ThemeEffectCoverage {
 }
 
 export type ThemeGeometry = "precise" | "balanced" | "soft";
+export type ThemeMaterialCharacter = "solid" | "layered" | "frosted";
 export type ThemeMotionCharacter = "still" | "calm" | "fluid" | "expressive";
 export type ThemeTypographyCharacter = "balanced" | "editorial" | "cinematic";
 
 export interface ThemeVisualPersonality {
   layout: "native" | "editorial" | "immersive";
   geometry: ThemeGeometry;
+  material: ThemeMaterialCharacter;
   iconStyle: "native" | "contained" | "themed";
   decorations: "none" | "subtle" | "expressive";
   typography: ThemeTypographyCharacter;
@@ -42,10 +44,21 @@ export function resolveThemeVisualPersonality(
   const visual = theme.variants[variant];
   const radius = visual.appearance.radius;
   const intensity = visual.motion.intensity;
+  const materialOpacity = Math.min(
+    visual.appearance.surfaceOpacity,
+    visual.appearance.focusOpacity,
+  );
+  const material =
+    visual.appearance.focusBlur <= 4 && materialOpacity >= 0.93
+      ? "solid"
+      : visual.appearance.focusBlur >= 16 || materialOpacity <= 0.82
+        ? "frosted"
+        : "layered";
 
   return {
     layout: visual.appearance.layout ?? "native",
     geometry: radius <= 11 ? "precise" : radius >= 17 ? "soft" : "balanced",
+    material,
     iconStyle: visual.appearance.iconStyle ?? "native",
     decorations: visual.appearance.decorations ?? "none",
     typography:

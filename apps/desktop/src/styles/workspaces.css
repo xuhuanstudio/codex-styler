@@ -101,6 +101,71 @@
   overflow: hidden;
 }
 
+/* Surface material is derived from the existing opacity and blur controls.
+ * It changes paint, light diffusion and elevation only; component geometry,
+ * hit targets and Codex layout remain untouched. */
+.workspace-preview {
+  --preview-material-raised: color-mix(
+    in srgb,
+    var(--preview-surface-raised) 92%,
+    transparent
+  );
+  --preview-material-overlay: color-mix(
+    in srgb,
+    var(--preview-surface-overlay) 96%,
+    transparent
+  );
+  --preview-material-sunken: color-mix(
+    in srgb,
+    var(--preview-surface-sunken) 92%,
+    transparent
+  );
+  --preview-material-border: var(--preview-border);
+  --preview-material-filter: blur(var(--preview-focus-blur));
+  --preview-material-raised-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+  --preview-material-overlay-shadow: 0 18px 42px rgba(0, 0, 0, 0.16);
+}
+
+.workspace-preview[data-material="solid"] {
+  --preview-material-raised: var(--preview-surface-raised);
+  --preview-material-overlay: var(--preview-surface-overlay);
+  --preview-material-sunken: var(--preview-surface-sunken);
+  --preview-material-border: var(--preview-border-strong);
+  --preview-material-filter: none;
+  --preview-material-raised-shadow: 0 5px 14px rgba(0, 0, 0, 0.07);
+  --preview-material-overlay-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+}
+
+.workspace-preview[data-material="frosted"] {
+  --preview-material-raised: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--preview-surface-raised) 86%, transparent),
+    color-mix(in srgb, var(--preview-surface-overlay) 70%, transparent)
+  );
+  --preview-material-overlay: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--preview-surface-overlay) 88%, transparent),
+    color-mix(in srgb, var(--preview-surface-raised) 68%, transparent)
+  );
+  --preview-material-sunken: color-mix(
+    in srgb,
+    var(--preview-surface-sunken) 82%,
+    transparent
+  );
+  --preview-material-border: color-mix(
+    in srgb,
+    var(--preview-accent) 22%,
+    var(--preview-border)
+  );
+  --preview-material-filter: saturate(1.14) blur(var(--preview-focus-blur));
+  --preview-material-raised-shadow:
+    inset 0 1px color-mix(in srgb, var(--preview-text) 7%, transparent),
+    0 14px 34px rgba(0, 0, 0, 0.12);
+  --preview-material-overlay-shadow:
+    inset 0 1px color-mix(in srgb, var(--preview-text) 9%, transparent),
+    0 22px 52px rgba(0, 0, 0, 0.2);
+}
+
 .workspace-preview__chrome {
   min-width: 0;
   min-height: 0;
@@ -419,15 +484,11 @@
 .workspace-task-plan,
 .workspace-task-tool,
 .workspace-task-changes {
-  border: 1px solid color-mix(in srgb, var(--preview-border) 76%, transparent);
+  border: 1px solid var(--preview-material-border);
   border-radius: calc(var(--preview-radius) * 0.7);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-raised) 92%,
-    transparent
-  );
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
-  backdrop-filter: blur(var(--preview-focus-blur));
+  background: var(--preview-material-raised);
+  box-shadow: var(--preview-material-raised-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-task-plan {
@@ -562,11 +623,7 @@
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 84%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
 }
 
 .workspace-task-tool__body code {
@@ -747,16 +804,12 @@
   width: min(530px, 94%);
   margin: auto;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--preview-border) 82%, transparent);
+  border: 1px solid var(--preview-material-border);
   border-radius: var(--preview-radius);
   color: var(--preview-text);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-overlay) 96%,
-    transparent
-  );
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.14);
-  backdrop-filter: blur(var(--preview-focus-blur));
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-change-review__heading,
@@ -831,11 +884,7 @@
   padding: 8px;
   border-right: 1px solid
     color-mix(in srgb, var(--preview-border) 62%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 78%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
 }
 
 .workspace-change-files > span {
@@ -878,11 +927,7 @@
 .workspace-change-diff {
   min-width: 0;
   padding: 9px 10px;
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 90%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
 }
 
 .workspace-change-diff > header {
@@ -961,11 +1006,7 @@
   padding: 0 10px;
   border-bottom: 1px solid
     color-mix(in srgb, var(--preview-border) 58%, transparent);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 76%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
 }
 
 .workspace-terminal-tabs span {
@@ -1010,11 +1051,7 @@
   border: 0;
   border-radius: 0;
   color: var(--preview-muted);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 96%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 5.8px;
   line-height: 1.35;
@@ -1073,13 +1110,11 @@
   margin: auto;
   grid-template-columns: 120px minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--preview-border);
+  border: 1px solid var(--preview-material-border);
   border-radius: var(--preview-radius);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-overlay) 94%,
-    transparent
-  );
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-settings-state nav {
@@ -1191,16 +1226,12 @@
   flex-direction: column;
   gap: 8px;
   padding: 14px;
-  border: 1px solid var(--preview-border);
+  border: 1px solid var(--preview-material-border);
   border-radius: var(--preview-radius);
   color: var(--preview-text);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-overlay) 96%,
-    transparent
-  );
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.15);
-  backdrop-filter: blur(var(--preview-focus-blur));
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-components-state__heading,
@@ -1282,13 +1313,11 @@
 .workspace-component-card {
   min-width: 0;
   padding: 10px;
-  border: 1px solid var(--preview-border);
+  border: 1px solid var(--preview-material-border);
   border-radius: calc(var(--preview-radius) * 0.66);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-raised) 92%,
-    transparent
-  );
+  background: var(--preview-material-raised);
+  box-shadow: var(--preview-material-raised-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-component-card > strong,
@@ -1474,8 +1503,9 @@
   height: 52px;
   border-radius: 7px;
   color: var(--preview-text);
-  background: var(--preview-surface-raised);
-  box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1);
+  background: var(--preview-material-raised);
+  box-shadow: var(--preview-material-raised-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-component-depth__stack span[data-surface="overlay"] {
@@ -1488,18 +1518,15 @@
   );
   border-radius: 6px;
   color: var(--preview-text);
-  background: var(--preview-surface-overlay);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-component-diff {
   grid-column: 1 / -1;
   padding: 8px 10px 9px;
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-sunken) 90%,
-    transparent
-  );
+  background: var(--preview-material-sunken);
 }
 
 .workspace-component-diff__heading {
@@ -1552,15 +1579,11 @@
   margin: 8px 8px 8px 0;
   padding: 11px;
   overflow: hidden;
-  border: 1px solid var(--preview-border);
+  border: 1px solid var(--preview-material-border);
   border-radius: calc(var(--preview-radius) * 0.72);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-overlay) 96%,
-    transparent
-  );
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
-  backdrop-filter: blur(var(--preview-focus-blur));
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-right-panel__heading {
@@ -1642,15 +1665,12 @@
 .workspace-dialog-layer > div {
   width: min(300px, 62%);
   padding: 18px;
-  border: 1px solid var(--preview-border);
+  border: 1px solid var(--preview-material-border);
   border-radius: var(--preview-radius);
   color: var(--preview-text);
-  background: color-mix(
-    in srgb,
-    var(--preview-surface-overlay) 98%,
-    transparent
-  );
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+  background: var(--preview-material-overlay);
+  box-shadow: var(--preview-material-overlay-shadow);
+  backdrop-filter: var(--preview-material-filter);
 }
 
 .workspace-dialog-layer strong,

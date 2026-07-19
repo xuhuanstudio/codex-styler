@@ -159,7 +159,7 @@ export const themeEditorControlMappings: Readonly<
   "surfaces.material": semantic(
     "surfaces.material",
     "dialog",
-    "theme.appearance/surfaceOpacity+focusOpacity+focusBlur",
+    "html[data-codex-styler-material]+theme.appearance/surfaceOpacity+focusOpacity+focusBlur",
   ),
   "surfaces.layout": semantic(
     "surfaces.layout",

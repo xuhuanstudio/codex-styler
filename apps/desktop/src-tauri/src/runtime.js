@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 35) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 36) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -106,6 +106,16 @@
       ),
       y,
     };
+  };
+
+  const resolveMaterialCharacter = (appearance) => {
+    const opacity = Math.min(
+      appearance.surfaceOpacity,
+      appearance.focusOpacity,
+    );
+    if (appearance.focusBlur <= 4 && opacity >= 0.93) return "solid";
+    if (appearance.focusBlur >= 16 || opacity <= 0.82) return "frosted";
+    return "layered";
   };
 
   const rgb = (hex) =>
@@ -481,6 +491,7 @@
     document.documentElement.removeAttribute("data-codex-styler-icons");
     document.documentElement.removeAttribute("data-codex-styler-decorations");
     document.documentElement.removeAttribute("data-codex-styler-geometry");
+    document.documentElement.removeAttribute("data-codex-styler-material");
     document.documentElement.removeAttribute("data-codex-styler-typography");
     document.documentElement.removeAttribute("data-codex-styler-motion");
     document.documentElement.removeAttribute("data-codex-styler-variant");
@@ -1258,7 +1269,32 @@
           --codex-styler-motion-duration: ${motionDuration}ms;
           --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 26%, var(--codex-styler-border-strong));
           --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 52%, var(--codex-styler-border-strong));
+          --codex-styler-material-raised: color-mix(in srgb, var(--codex-styler-surface-raised) 92%, transparent);
+          --codex-styler-material-overlay: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent);
+          --codex-styler-material-sunken: color-mix(in srgb, var(--codex-styler-surface-sunken) 92%, transparent);
+          --codex-styler-material-border: var(--codex-styler-border);
+          --codex-styler-material-filter: saturate(1.04) blur(${Math.max(4, Math.round(appearance.focusBlur * 0.65))}px);
+          --codex-styler-material-raised-shadow: 0 10px 28px rgb(0 0 0 / 9%);
+          --codex-styler-material-overlay-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 5%, transparent), 0 20px 54px rgb(0 0 0 / 17%);
           ${codexColorTokenDeclarations(palette)}
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-material="solid"] {
+          --codex-styler-material-raised: var(--codex-styler-surface-raised);
+          --codex-styler-material-overlay: var(--codex-styler-surface-overlay);
+          --codex-styler-material-sunken: var(--codex-styler-surface-sunken);
+          --codex-styler-material-border: var(--codex-styler-border-strong);
+          --codex-styler-material-filter: none;
+          --codex-styler-material-raised-shadow: 0 5px 16px rgb(0 0 0 / 8%);
+          --codex-styler-material-overlay-shadow: 0 14px 34px rgb(0 0 0 / 16%);
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-material="frosted"] {
+          --codex-styler-material-raised: linear-gradient(145deg, color-mix(in srgb, var(--codex-styler-surface-raised) 86%, transparent), color-mix(in srgb, var(--codex-styler-surface-overlay) 70%, transparent));
+          --codex-styler-material-overlay: linear-gradient(145deg, color-mix(in srgb, var(--codex-styler-surface-overlay) 88%, transparent), color-mix(in srgb, var(--codex-styler-surface-raised) 68%, transparent));
+          --codex-styler-material-sunken: color-mix(in srgb, var(--codex-styler-surface-sunken) 82%, transparent);
+          --codex-styler-material-border: color-mix(in srgb, var(--codex-styler-accent) 22%, var(--codex-styler-border));
+          --codex-styler-material-filter: saturate(1.14) blur(${Math.max(14, appearance.focusBlur)}px);
+          --codex-styler-material-raised-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 7%, transparent), 0 15px 38px rgb(0 0 0 / 13%);
+          --codex-styler-material-overlay-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 9%, transparent), 0 24px 64px rgb(0 0 0 / 21%);
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] {
           --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 38%, var(--codex-styler-border-strong));
@@ -1404,16 +1440,24 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface article,
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface [data-message-author-role],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome,
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="dialog"],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="menu"],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="listbox"] {
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          border-color: ${appearance.border} !important;
+        html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome {
+          background: var(--codex-styler-material-raised) !important;
+          border-color: var(--codex-styler-material-border) !important;
           border-radius: ${appearance.radius}px !important;
           color: var(--codex-styler-text-primary) !important;
-          box-shadow: 0 1px 0 color-mix(in srgb, ${protectedText} 5%, transparent), 0 14px 40px rgb(0 0 0 / 9%) !important;
-          backdrop-filter: saturate(1.08) blur(${appearance.focusBlur}px) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="dialog"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="alertdialog"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="menu"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="listbox"] {
+          background: var(--codex-styler-material-overlay) !important;
+          border-color: var(--codex-styler-material-border) !important;
+          border-radius: ${appearance.radius}px !important;
+          color: var(--codex-styler-text-primary) !important;
+          box-shadow: var(--codex-styler-material-overlay-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome:focus-within {
           border-color: color-mix(in srgb, ${appearance.accent} 55%, ${appearance.border}) !important;
@@ -1430,11 +1474,11 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] {
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          border: 1px solid color-mix(in srgb, ${appearance.border} 88%, transparent) !important;
+          background: var(--codex-styler-material-overlay) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-radius: ${Math.max(12, appearance.radius + 4)}px !important;
-          box-shadow: 0 22px 70px rgb(0 0 0 / 16%), inset 0 1px color-mix(in srgb, ${protectedText} 5%, transparent) !important;
-          backdrop-filter: saturate(1.1) blur(${Math.max(12, appearance.focusBlur + 6)}px) !important;
+          box-shadow: var(--codex-styler-material-overlay-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] > div,
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] section {
@@ -1460,8 +1504,9 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="settings"] body > [${APP_ROOT_ATTRIBUTE}] .main-surface > :is(nav, [role="tablist"], [role="tabpanel"], section) {
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, var(--codex-styler-surface-raised) 76%, transparent) !important;
-          box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.border} 72%, transparent) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: inset 0 0 0 1px var(--codex-styler-material-border), var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is(input, textarea, select) {
           color: var(--codex-styler-text-primary) !important;
@@ -1745,12 +1790,12 @@
           position: relative !important;
           min-height: clamp(96px, 14cqh, 118px) !important;
           padding: clamp(12px, 1.8cqh, 15px) !important;
-          border: 1px solid color-mix(in srgb, ${appearance.accent} 20%, ${appearance.border}) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-radius: ${Math.max(16, appearance.radius + 5)}px !important;
           color: ${protectedText} !important;
-          background: linear-gradient(145deg, color-mix(in srgb, ${appearance.surface} ${Math.min(98, strongSurfacePercent + 4)}%, transparent), color-mix(in srgb, ${appearance.surface} ${Math.max(56, strongSurfacePercent - 8)}%, transparent)) !important;
-          box-shadow: 0 12px 30px rgb(0 0 0 / 12%), inset 0 1px color-mix(in srgb, ${protectedText} 6%, transparent) !important;
-          backdrop-filter: blur(${Math.max(10, appearance.focusBlur)}px) saturate(1.08) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
           transition: transform var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] .group\\/home-suggestions button:hover {
@@ -1773,11 +1818,11 @@
           /* Codex intentionally tucks the rail shell behind the composer.
              Keep its lower safe area so the interactive row never follows. */
           padding: clamp(26px, 4cqh, 32px) 10px 27px !important;
-          border: 1px solid color-mix(in srgb, ${appearance.accent} 14%, ${appearance.border}) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-bottom: 0 !important;
           border-radius: ${Math.max(14, appearance.radius + 3)}px ${Math.max(14, appearance.radius + 3)}px 0 0;
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          backdrop-filter: blur(${appearance.focusBlur}px) !important;
+          background: var(--codex-styler-material-raised) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector)::before {
           content: "WORKSPACE";
@@ -1850,8 +1895,8 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] pre {
           overflow: auto;
-          border: 1px solid color-mix(in srgb, ${appearance.border} 78%, transparent) !important;
-          background: color-mix(in srgb, var(--codex-styler-surface-sunken) 92%, transparent) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
+          background: var(--codex-styler-material-sunken) !important;
           box-shadow: inset 0 1px color-mix(in srgb, ${protectedText} 4%, transparent) !important;
           scrollbar-color: color-mix(in srgb, ${appearance.accent} 42%, transparent) transparent;
         }
@@ -1864,7 +1909,7 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] :not(pre) > code,
         html[data-codex-styler][data-codex-styler-mode="semantic"] kbd {
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, var(--codex-styler-surface-raised) 82%, transparent) !important;
+          background: var(--codex-styler-material-raised) !important;
           box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.border} 70%, transparent) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] blockquote {
@@ -1876,13 +1921,14 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] table {
           overflow: hidden;
-          border: 1px solid color-mix(in srgb, ${appearance.border} 82%, transparent) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-collapse: separate !important;
           border-spacing: 0 !important;
           border-radius: ${Math.max(8, appearance.radius - 2)}px !important;
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, var(--codex-styler-surface-raised) 78%, transparent) !important;
-          box-shadow: 0 8px 24px rgb(0 0 0 / 8%) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(th, td) {
           border-color: color-mix(in srgb, ${appearance.border} 68%, transparent) !important;
@@ -1896,11 +1942,12 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] details {
           overflow: hidden;
-          border-color: color-mix(in srgb, ${appearance.border} 78%, transparent) !important;
+          border-color: var(--codex-styler-material-border) !important;
           border-radius: ${Math.max(8, appearance.radius - 2)}px !important;
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, var(--codex-styler-surface-raised) 72%, transparent) !important;
-          box-shadow: 0 8px 24px rgb(0 0 0 / 7%) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] summary {
           color: var(--codex-styler-text-primary) !important;
@@ -2863,6 +2910,10 @@
           : "balanced",
     );
     document.documentElement.setAttribute(
+      "data-codex-styler-material",
+      resolveMaterialCharacter(appearance),
+    );
+    document.documentElement.setAttribute(
       "data-codex-styler-typography",
       appearance.layout === "editorial"
         ? "editorial"
@@ -3222,7 +3273,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 35,
+    version: 36,
     apply,
     updateEntity,
     pause: remove,

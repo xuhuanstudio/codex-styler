@@ -243,6 +243,11 @@ working control behind another page, revert it.
   heading spacing, and prose leading without replacing Codex fonts, resizing
   text, or changing component geometry; CJK headings keep neutral tracking and
   the library preview uses the same derived personality as the runtime.
+- theme surface controls now derive solid, layered, and frosted material
+  behavior without extending the public theme format. Preview and runtime use
+  the same raised, overlay, and sunken roles across cards, composer, code,
+  settings, dialogs, menus, and the right panel while preserving Codex layout,
+  hit targets, and component geometry.
 
 ## RC — reliability proof
 

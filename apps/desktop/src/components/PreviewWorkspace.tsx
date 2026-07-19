@@ -743,6 +743,7 @@ export function PreviewWorkspace({
         officialPreview ? "none" : (visual.appearance.decorations ?? "none")
       }
       data-geometry={officialPreview ? "native" : visualPersonality.geometry}
+      data-material={officialPreview ? undefined : visualPersonality.material}
       data-typography={
         officialPreview ? undefined : visualPersonality.typography
       }

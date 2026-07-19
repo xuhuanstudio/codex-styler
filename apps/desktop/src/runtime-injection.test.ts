@@ -145,8 +145,26 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(35);
+    expect(runtime().version).toBe(36);
   });
+
+  it.each([
+    [{ surfaceOpacity: 0.96, focusOpacity: 0.98, focusBlur: 0 }, "solid"],
+    [{ surfaceOpacity: 0.88, focusOpacity: 0.94, focusBlur: 10 }, "layered"],
+    [{ surfaceOpacity: 0.78, focusOpacity: 0.9, focusBlur: 20 }, "frosted"],
+  ] as const)(
+    "derives the %s surface recipe as %s material",
+    async (appearance, expectedMaterial) => {
+      const theme = structuredClone(nativeRefined);
+      Object.assign(theme.variants.dark.appearance, appearance);
+
+      await runtime().apply(theme, "dark", "compatibility");
+
+      expect(document.documentElement.dataset.codexStylerMaterial).toBe(
+        expectedMaterial,
+      );
+    },
+  );
 
   it.each([
     ["native", "balanced"],
@@ -547,6 +565,21 @@ describe("injected compatibility runtime", () => {
       'data-codex-styler-geometry="soft"] body > [data-codex-styler-app-root] [role="tab"]',
     );
     expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-material="solid"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-material="frosted"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-raised) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-overlay) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-sunken) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
       'data-codex-styler-typography="editorial"]',
     );
     expect(stylesheet?.textContent).toContain(
@@ -839,6 +872,9 @@ describe("injected compatibility runtime", () => {
     );
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-geometry",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-material",
     );
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-typography",

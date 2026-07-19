@@ -153,6 +153,11 @@ export function ThemesView({
     subtle: "decorationSubtle",
     expressive: "decorationExpressive",
   } satisfies Record<typeof personality.decorations, MessageKey>;
+  const materialLabels = {
+    solid: "materialSolid",
+    layered: "materialLayered",
+    frosted: "materialFrosted",
+  } satisfies Record<typeof personality.material, MessageKey>;
   const motionLabels = {
     still: "motionNone",
     calm: "motionCalm",
@@ -350,8 +355,9 @@ export function ThemesView({
                   <strong>{t(iconLabels[personality.iconStyle])}</strong>
                 </div>
                 <div>
-                  <small>{t("decorationTreatment")}</small>
+                  <small>{t("surfaceMaterial")}</small>
                   <strong>
+                    {t(materialLabels[personality.material])} ·{" "}
                     {t(decorationLabels[personality.decorations])}
                   </strong>
                 </div>

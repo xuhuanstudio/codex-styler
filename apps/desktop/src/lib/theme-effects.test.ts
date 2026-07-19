@@ -53,6 +53,7 @@ describe("resolveThemeVisualPersonality", () => {
     expect(resolveThemeVisualPersonality(gildedGrandeur, "dark")).toEqual({
       layout: "editorial",
       geometry: "precise",
+      material: "frosted",
       iconStyle: "themed",
       decorations: "expressive",
       typography: "editorial",
@@ -61,6 +62,7 @@ describe("resolveThemeVisualPersonality", () => {
     expect(resolveThemeVisualPersonality(merryBigTop, "dark")).toEqual({
       layout: "immersive",
       geometry: "soft",
+      material: "frosted",
       iconStyle: "themed",
       decorations: "expressive",
       typography: "cinematic",
@@ -79,4 +81,20 @@ describe("resolveThemeVisualPersonality", () => {
       motion: "still",
     });
   });
+
+  it.each([
+    [{ surfaceOpacity: 0.96, focusOpacity: 0.98, focusBlur: 0 }, "solid"],
+    [{ surfaceOpacity: 0.88, focusOpacity: 0.94, focusBlur: 10 }, "layered"],
+    [{ surfaceOpacity: 0.78, focusOpacity: 0.9, focusBlur: 20 }, "frosted"],
+  ] as const)(
+    "derives a %s surface recipe as %s material",
+    (appearance, expectedMaterial) => {
+      const theme = structuredClone(nativeRefined);
+      Object.assign(theme.variants.dark.appearance, appearance);
+
+      expect(resolveThemeVisualPersonality(theme, "dark").material).toBe(
+        expectedMaterial,
+      );
+    },
+  );
 });
