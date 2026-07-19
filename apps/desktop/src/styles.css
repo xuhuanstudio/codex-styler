@@ -1279,6 +1279,7 @@ button:disabled {
   inset: 0;
   display: grid;
   grid-template-columns: 24% minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace-sidebar {

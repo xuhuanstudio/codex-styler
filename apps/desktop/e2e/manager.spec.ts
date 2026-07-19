@@ -692,7 +692,7 @@ test("keyboard companion creator completes a static-image project", async ({
     .poll(async () => Number(await baselineX.inputValue()))
     .not.toBe(baselineXBefore);
   await expect(
-    page.getByRole("heading", { name: "Some frames need alignment" }),
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Snap current frame" }).click();
   await expect(
