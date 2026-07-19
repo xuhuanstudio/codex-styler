@@ -97,6 +97,14 @@
 
 .workspace-main {
   position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.workspace-preview__chrome {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-preview:is(
@@ -106,7 +114,12 @@
     [data-preview-scenario="right-panel"]
   )
   .workspace-main {
-  grid-template-rows: 43px 29px 1fr auto;
+  grid-template-rows: 43px 29px minmax(0, 1fr) auto;
+}
+
+.workspace-conversation {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-context-tabs :is(span, button) {

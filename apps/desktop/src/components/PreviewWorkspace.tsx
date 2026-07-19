@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -33,6 +34,7 @@ import {
 } from "@codex-styler/theme-core";
 import type { Locale } from "../lib/i18n";
 import type { PreviewScenario } from "../lib/storage";
+import { previewEntityDimensions } from "../lib/preview-entity-layout";
 import { drawSpriteFrame } from "../lib/sprite-normalization";
 import { resolveThemeContrast } from "../lib/theme-contrast";
 import { resolveThemeVisualPersonality } from "../lib/theme-effects";
@@ -83,6 +85,7 @@ export function PreviewWorkspace({
   const [direction, setDirection] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [spriteReady, setSpriteReady] = useState(0);
+  const [previewViewportHeight, setPreviewViewportHeight] = useState(0);
   const interactive = Boolean(
     onScenarioChange || onEntityAnchorChange || onEntityAttachmentChange,
   );
@@ -125,6 +128,32 @@ export function PreviewWorkspace({
       ),
     [contrastSystem, visual.appearance, visual.background.color],
   );
+  const sourceEntityHeight = entity
+    ? entity.renderer.type === "sprite-atlas"
+      ? entity.size * (entity.renderer.frameHeight / entity.renderer.frameWidth)
+      : entity.size
+    : 0;
+  const previewEntity = entity
+    ? previewEntityDimensions(
+        entity.size,
+        sourceEntityHeight,
+        previewViewportHeight,
+      )
+    : null;
+
+  useLayoutEffect(() => {
+    const preview = previewRef.current;
+    if (!preview) return;
+    const update = () => {
+      const nextHeight = preview.clientHeight;
+      if (nextHeight > 0) setPreviewViewportHeight(nextHeight);
+    };
+    update();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(update);
+    observer.observe(preview);
+    return () => observer.disconnect();
+  }, []);
 
   const clearSceneParallax = useCallback(() => {
     previewRef.current
@@ -229,17 +258,24 @@ export function PreviewWorkspace({
     const pageIndex = Math.floor(direction / framesPerPage);
     const image = spriteImageRefs.current[pageIndex];
     if (!image?.complete || !image.naturalWidth) return;
-    const height =
-      entity.size * (entity.renderer.frameHeight / entity.renderer.frameWidth);
+    const width = previewEntity?.width ?? entity.size;
+    const height = previewEntity?.height ?? sourceEntityHeight;
     drawSpriteFrame(
       spriteCanvasRef.current,
       image,
       entity.renderer,
       direction % framesPerPage,
-      entity.size,
+      width,
       height,
     );
-  }, [direction, entity, spriteReady]);
+  }, [
+    direction,
+    entity,
+    previewEntity?.height,
+    previewEntity?.width,
+    sourceEntityHeight,
+    spriteReady,
+  ]);
 
   useEffect(() => {
     if (
@@ -345,24 +381,41 @@ export function PreviewWorkspace({
     const update = () => {
       const previewBounds = preview.getBoundingClientRect();
       const targetBounds = target.getBoundingClientRect();
+      const scaleX = preview.clientWidth
+        ? previewBounds.width / preview.clientWidth
+        : 1;
+      const scaleY = preview.clientHeight
+        ? previewBounds.height / preview.clientHeight
+        : 1;
       const edgeY =
         attachment.edge === "bottom" ? targetBounds.bottom : targetBounds.top;
       element.style.left =
-        targetBounds.left -
-        previewBounds.left +
-        targetBounds.width * attachment.align +
-        attachment.offset.x +
+        (targetBounds.left - previewBounds.left) / scaleX +
+        (targetBounds.width / scaleX) * attachment.align +
+        attachment.offset.x * (previewEntity?.scale ?? 1) +
         "px";
       element.style.top =
-        edgeY - previewBounds.top + attachment.offset.y + "px";
+        (edgeY - previewBounds.top) / scaleY +
+        attachment.offset.y * (previewEntity?.scale ?? 1) +
+        "px";
     };
     update();
-    if (typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(update);
-    observer.observe(preview);
-    observer.observe(target);
-    return () => observer.disconnect();
-  }, [entity]);
+    let settleFrame = window.requestAnimationFrame(() => {
+      update();
+      settleFrame = window.requestAnimationFrame(update);
+    });
+    window.addEventListener("resize", update);
+    const observer =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
+    observer?.observe(preview);
+    observer?.observe(target);
+    if (mainRef.current) observer?.observe(mainRef.current);
+    return () => {
+      window.cancelAnimationFrame(settleFrame);
+      window.removeEventListener("resize", update);
+      observer?.disconnect();
+    };
+  }, [entity, previewEntity?.scale]);
 
   const style = useMemo(() => {
     const officialPalette =
@@ -575,13 +628,8 @@ export function PreviewWorkspace({
         "--entity-image": entityImage ? "url(" + entityImage + ")" : "none",
         "--entity-x": entity.anchor.x + "%",
         "--entity-y": entity.anchor.y + "%",
-        "--entity-size": entity.size + "px",
-        "--entity-height":
-          entity.renderer.type === "sprite-atlas"
-            ? entity.size *
-                (entity.renderer.frameHeight / entity.renderer.frameWidth) +
-              "px"
-            : entity.size + "px",
+        "--entity-size": (previewEntity?.width ?? entity.size) + "px",
+        "--entity-height": (previewEntity?.height ?? sourceEntityHeight) + "px",
         "--entity-opacity": entity.opacity,
       } as CSSProperties)
     : undefined;
@@ -1110,6 +1158,7 @@ export function PreviewWorkspace({
             data-dragging={dragging}
             data-attached={Boolean(entity.attachment)}
             data-attachment-edge={entity.attachment?.edge}
+            data-preview-scale={previewEntity?.scale.toFixed(3)}
             onPointerDown={handleEntityPointerDown}
             onPointerMove={handleEntityPointerMove}
             onPointerUp={handleEntityPointerUp}
@@ -1120,6 +1169,7 @@ export function PreviewWorkspace({
                 ref={spriteCanvasRef}
                 className="scene-entity__sprite"
                 data-ready={spriteReady > 0 ? "true" : "false"}
+                style={{ width: "100%", height: "100%" }}
               />
             ) : entityImage ? (
               <div className="scene-entity__image" />

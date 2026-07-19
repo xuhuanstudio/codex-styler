@@ -89,6 +89,91 @@ test("companion cards use independent portraits", async ({ page }) => {
   await expect(list).toHaveScreenshot("companion-list-en-dark.png");
 });
 
+test("resource libraries fit above the persistent setup bar", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1280, height: 720 });
+
+  const expectWorkspaceFit = async (selector: string) => {
+    const geometry = await page.locator(selector).evaluate((element) => {
+      const viewport = document.querySelector<HTMLElement>(
+        ".app-main__viewport",
+      )!;
+      const dock = document.querySelector<HTMLElement>(".configuration-dock")!;
+      const pageElement = element.closest<HTMLElement>(".page")!;
+      const bounds = element.getBoundingClientRect();
+      const viewportBounds = viewport.getBoundingClientRect();
+      const dockBounds = dock.getBoundingClientRect();
+      const pageBounds = pageElement.getBoundingClientRect();
+      return {
+        pageFitsViewport: pageBounds.bottom <= viewportBounds.bottom + 1,
+        workspaceClearsViewport: bounds.bottom <= viewportBounds.bottom - 16,
+        workspaceClearsDock: bounds.bottom <= dockBounds.top - 20,
+      };
+    });
+    expect(geometry).toEqual({
+      pageFitsViewport: true,
+      workspaceClearsViewport: true,
+      workspaceClearsDock: true,
+    });
+  };
+
+  const expectCompanionComposition = async (selector: string) => {
+    const composition = await page.locator(selector).evaluate((scope) => {
+      const preview = scope.querySelector<HTMLElement>(".workspace-preview")!;
+      const entity = scope.querySelector<HTMLElement>(".scene-entity")!;
+      const sprite = entity.querySelector<HTMLElement>(
+        ".scene-entity__sprite, .scene-entity__image",
+      )!;
+      const composer = scope.querySelector<HTMLElement>(
+        ".workspace-composer__field",
+      )!;
+      const previewBounds = preview.getBoundingClientRect();
+      const entityBounds = entity.getBoundingClientRect();
+      const spriteBounds = sprite.getBoundingClientRect();
+      const composerBounds = composer.getBoundingClientRect();
+      return {
+        heightOccupancy: entityBounds.height / previewBounds.height,
+        groundedDistance: Math.abs(entityBounds.bottom - composerBounds.top),
+        entityInsidePreview:
+          entityBounds.top >= previewBounds.top &&
+          entityBounds.right <= previewBounds.right,
+        spriteMatchesEntity:
+          Math.abs(spriteBounds.width - entityBounds.width) < 1 &&
+          Math.abs(spriteBounds.height - entityBounds.height) < 1,
+      };
+    });
+    expect(composition.heightOccupancy).toBeGreaterThanOrEqual(0.14);
+    expect(composition.heightOccupancy).toBeLessThanOrEqual(0.25);
+    expect(composition.groundedDistance).toBeLessThanOrEqual(2);
+    expect(composition.entityInsidePreview).toBe(true);
+    expect(composition.spriteMatchesEntity).toBe(true);
+  };
+
+  await page.getByRole("button", { name: "Themes", exact: true }).click();
+  await expectWorkspaceFit(".theme-library-workspace");
+  await expectCompanionComposition(".featured-theme__preview");
+  const themeDetails = page.locator(".featured-theme__copy");
+  await expect(themeDetails).toHaveCSS("overflow-y", "auto");
+  await expect(page).toHaveScreenshot("themes-en-dark-1280x720.png");
+
+  await page.getByRole("button", { name: "Companions", exact: true }).click();
+  await expectWorkspaceFit(".companions-layout");
+  await expectCompanionComposition(".companion-preview-panel");
+  await expect(page).toHaveScreenshot("companions-en-dark-1280x720.png");
+
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expectWorkspaceFit(".companions-layout");
+  const compactViewport = page.locator(".app-main__viewport");
+  await expect
+    .poll(() =>
+      compactViewport.evaluate(
+        (element) => element.scrollHeight === element.clientHeight,
+      ),
+    )
+    .toBe(true);
+});
+
 test("theme library and focused editor remain usable at compact sizes", async ({
   page,
 }) => {
