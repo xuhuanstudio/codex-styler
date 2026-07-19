@@ -196,7 +196,9 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   });
   await previewControlsTrigger.click();
   await appearanceComparison.getByRole("button", { name: "Styled" }).click();
+  await page.locator(".featured-theme__preview").hover();
   await expect(previewControlsTrigger).toBeVisible();
+  await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
   await expect(previewControlsTrigger).toHaveAttribute("aria-expanded", "false");
   await expect
     .poll(() =>

@@ -180,6 +180,7 @@
 }
 
 .theme-library-workspace .featured-theme__preview {
+  position: relative;
   isolation: isolate;
   display: grid;
   min-height: 280px;
@@ -188,14 +189,15 @@
   padding: 12px;
 }
 
-.theme-preview-controls {
+.featured-theme__preview > .theme-preview-controls {
   position: absolute;
-  z-index: 20;
+  z-index: 30;
   top: 12px;
   right: 12px;
   display: grid;
   justify-items: end;
   gap: 7px;
+  pointer-events: none;
 }
 
 .theme-preview-controls__trigger {
@@ -213,11 +215,23 @@
   font-weight: 650;
   box-shadow: 0 8px 22px rgb(0 0 0 / 16%);
   backdrop-filter: blur(14px) saturate(1.08);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
   transition:
+    opacity var(--motion-micro) var(--ease-standard),
     color var(--motion-micro) var(--ease-standard),
     border-color var(--motion-micro) var(--ease-standard),
     background var(--motion-micro) var(--ease-standard),
     transform var(--motion-micro) var(--ease-standard);
+}
+
+.featured-theme__preview:hover .theme-preview-controls__trigger,
+.theme-preview-controls:focus-within .theme-preview-controls__trigger,
+.theme-preview-controls[data-open="true"] .theme-preview-controls__trigger {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .theme-preview-controls__trigger:hover,
@@ -253,8 +267,17 @@
   background: rgb(12 14 18 / 86%);
   box-shadow: 0 16px 44px rgb(0 0 0 / 28%);
   backdrop-filter: blur(18px) saturate(1.08);
+  pointer-events: auto;
   animation: theme-preview-controls-in var(--motion-standard)
     var(--ease-emphasized) both;
+}
+
+@media (hover: none) {
+  .theme-preview-controls__trigger {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
 }
 
 .theme-preview-controls__panel[hidden] {
