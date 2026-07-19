@@ -3,7 +3,8 @@ import type { PreviewScenario } from "../../lib/storage";
 export type ThemeEditorSectionId =
   "background" | "scene" | "surfaces" | "motion" | "pairing";
 
-export type ThemeEditorRuntimeMode = "isolated" | "semantic" | "metadata";
+export type ThemeEditorRuntimeMode =
+  "isolated" | "semantic" | "hybrid" | "metadata";
 
 export type ThemeEditorControlId =
   | "background.import-image"
@@ -79,6 +80,18 @@ const semantic = (
   mode: "semantic",
   scenarios: allPreviewScenarios,
   recommendedScenario,
+  runtimeSignal,
+});
+
+const hybridMotion = (
+  id: "motion.recipe" | "motion.intensity",
+  runtimeSignal: string,
+): ThemeEditorControlMapping => ({
+  id,
+  section: "motion",
+  mode: "hybrid",
+  scenarios: allPreviewScenarios,
+  recommendedScenario: "task",
   runtimeSignal,
 });
 
@@ -216,17 +229,13 @@ export const themeEditorControlMappings: Readonly<
     "dialog",
     "[role=dialog]/border-radius",
   ),
-  "motion.recipe": isolated(
+  "motion.recipe": hybridMotion(
     "motion.recipe",
-    "motion",
-    "task",
-    "theme.motion/intensity+parallax+targetFps",
+    "theme.motion/profile+parallax+targetFps",
   ),
-  "motion.intensity": isolated(
+  "motion.intensity": hybridMotion(
     "motion.intensity",
-    "motion",
-    "task",
-    "#codex-styler-scene-root [data-parallax]/transform",
+    "html[data-codex-styler-motion]/micro-interactions+#codex-styler-scene-root [data-parallax]",
   ),
   "motion.parallax": isolated(
     "motion.parallax",

@@ -25,7 +25,10 @@ import {
 import { previewEntityDimensions } from "../lib/preview-entity-layout";
 import { drawSpriteFrame } from "../lib/sprite-normalization";
 import { resolveThemeContrast } from "../lib/theme-contrast";
-import { resolveThemeVisualPersonality } from "../lib/theme-effects";
+import {
+  resolveThemeMotionProfile,
+  resolveThemeVisualPersonality,
+} from "../lib/theme-effects";
 import { resolveThemePreviewPalette } from "../lib/theme-preview-palette";
 import { CodexPreviewShell } from "./preview/CodexPreviewShell";
 
@@ -82,6 +85,13 @@ export function PreviewWorkspace({
   const visualPersonality = useMemo(
     () => resolveThemeVisualPersonality(theme, variant),
     [theme, variant],
+  );
+  const motionProfile = useMemo(
+    () =>
+      resolveThemeMotionProfile(
+        officialPreview || reduceMotion ? 0 : visual.motion.intensity,
+      ),
+    [officialPreview, reduceMotion, visual.motion.intensity],
   );
   const entity = officialPreview ? undefined : theme.scene.entities[0];
   const backgroundImage =
@@ -565,15 +575,18 @@ export function PreviewWorkspace({
       "--preview-focus-blur": officialPreview
         ? "0px"
         : visual.appearance.focusBlur + "px",
-      "--preview-motion-duration": reduceMotion
-        ? "0ms"
-        : Math.round(120 + visual.motion.intensity * 110) + "ms",
+      "--preview-motion-duration": motionProfile.durationMs + "ms",
+      "--preview-motion-lift": motionProfile.hoverLiftPx + "px",
+      "--preview-motion-press-scale": motionProfile.pressScale,
+      "--preview-motion-overlay-opacity": motionProfile.overlayOpacity,
+      "--preview-motion-overlay-offset": motionProfile.overlayOffsetPx + "px",
+      "--preview-motion-overlay-scale": motionProfile.overlayScale,
     } as CSSProperties;
   }, [
     backgroundImage,
     contrastSystem,
     officialPreview,
-    reduceMotion,
+    motionProfile,
     semanticPalette,
     variant,
     visual,
@@ -747,9 +760,7 @@ export function PreviewWorkspace({
       data-typography={
         officialPreview ? undefined : visualPersonality.typography
       }
-      data-motion-character={
-        officialPreview ? "still" : visualPersonality.motion
-      }
+      data-motion-character={motionProfile.character}
       data-contrast-tone={officialPreview ? variant : contrastSystem.tone}
       data-preview-presentation={presentation}
       data-preview-scenario={scenario}

@@ -598,7 +598,7 @@ describe("injected compatibility runtime", () => {
       /(?:^|\n)\s*(?:font-family|font-size|width|height|padding|margin)\s*:/,
     );
     expect(stylesheet?.textContent).toContain(
-      "--codex-styler-motion-duration: 175ms",
+      "--codex-styler-motion-duration: 190ms",
     );
     const iconTreatments = stylesheet?.textContent
       ?.split("/*\n         * Icon treatments are semantic")[1]
@@ -882,6 +882,54 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-motion",
     );
+  });
+
+  it("maps theme intensity to geometry-safe runtime motion profiles", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const theme = structuredClone(nativeRefined);
+    theme.variants.dark.motion.intensity = 0.9;
+
+    await runtime().apply(theme, "dark", "developer");
+
+    const stylesheet = document.getElementById("codex-styler-runtime-style");
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-motion",
+      "expressive",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-duration: 240ms",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-lift: 3px",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "@keyframes codex-styler-surface-enter",
+    );
+    const overlayMotion = stylesheet?.textContent
+      ?.split("@keyframes codex-styler-surface-enter")[1]
+      ?.split('[role="tooltip"]')[0];
+    expect(overlayMotion).toBeDefined();
+    expect(overlayMotion).toContain(
+      "opacity: var(--codex-styler-motion-overlay-opacity)",
+    );
+    expect(overlayMotion).not.toContain("transform:");
+    expect(stylesheet?.textContent).toContain(
+      '[data-codex-styler-motion="fluid"]',
+    );
+    expect(stylesheet?.textContent).toContain("animation: none !important");
+
+    theme.variants.dark.motion.intensity = 0;
+    await runtime().apply(theme, "dark", "developer");
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-motion",
+      "still",
+    );
+    expect(
+      document.getElementById("codex-styler-runtime-style")?.textContent,
+    ).toContain("--codex-styler-motion-duration: 0ms");
+    expect(
+      document.getElementById("codex-styler-runtime-style")?.textContent,
+    ).toContain("transform: translateX(0px)");
   });
 
   it("repairs a stale Codex foreground without dropping the semantic theme", async () => {

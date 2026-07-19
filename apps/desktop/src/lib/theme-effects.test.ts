@@ -6,6 +6,7 @@ import {
 } from "@codex-styler/theme-core";
 import {
   resolveThemeEffectCoverage,
+  resolveThemeMotionProfile,
   resolveThemeVisualPersonality,
 } from "./theme-effects";
 
@@ -45,7 +46,51 @@ describe("resolveThemeEffectCoverage", () => {
     expect(coverage.find((effect) => effect.id === "typography")?.active).toBe(
       false,
     );
+
+    theme.variants.dark.motion.parallax = 0;
+    theme.scene.layers.forEach((layer) => {
+      layer.parallax = 0;
+    });
+    expect(
+      resolveThemeEffectCoverage(theme, "dark").find(
+        (effect) => effect.id === "motion",
+      )?.active,
+    ).toBe(false);
   });
+
+  it("reports UI motion even when background parallax is disabled", () => {
+    const theme = structuredClone(nativeRefined);
+    theme.variants.dark.motion.intensity = 0.58;
+    theme.variants.dark.motion.parallax = 0;
+    theme.scene.layers.forEach((layer) => {
+      layer.parallax = 0;
+    });
+
+    expect(
+      resolveThemeEffectCoverage(theme, "dark").find(
+        (effect) => effect.id === "motion",
+      )?.active,
+    ).toBe(true);
+  });
+});
+
+describe("resolveThemeMotionProfile", () => {
+  it.each([
+    [-1, "still", 0, 0],
+    [0.2, "calm", 140, 1],
+    [0.55, "fluid", 190, 2],
+    [0.9, "expressive", 240, 3],
+    [4, "expressive", 240, 3],
+  ] as const)(
+    "maps intensity %s to the %s motion tier",
+    (intensity, character, durationMs, hoverLiftPx) => {
+      expect(resolveThemeMotionProfile(intensity)).toMatchObject({
+        character,
+        durationMs,
+        hoverLiftPx,
+      });
+    },
+  );
 });
 
 describe("resolveThemeVisualPersonality", () => {

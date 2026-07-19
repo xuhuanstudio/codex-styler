@@ -101,7 +101,7 @@ describe("PreviewWorkspace task views", () => {
         theme={gildedGrandeur}
         variant="dark"
         locale="en"
-        reduceMotion
+        reduceMotion={false}
         resolveAsset={(_, path) => path}
       />,
     );
@@ -117,7 +117,7 @@ describe("PreviewWorkspace task views", () => {
         theme={merryBigTop}
         variant="dark"
         locale="en"
-        reduceMotion
+        reduceMotion={false}
         resolveAsset={(_, path) => path}
       />,
     );
@@ -126,6 +126,22 @@ describe("PreviewWorkspace task views", () => {
     expect(preview).toHaveAttribute("data-material", "frosted");
     expect(preview).toHaveAttribute("data-typography", "cinematic");
     expect(preview).toHaveAttribute("data-motion-character", "expressive");
+  });
+
+  it("collapses theme motion to still when reduced motion is enabled", () => {
+    const { container } = render(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+      />,
+    );
+
+    const preview = container.querySelector(".workspace-preview");
+    expect(preview).toHaveAttribute("data-motion-character", "still");
+    expect(preview).toHaveStyle("--preview-motion-duration: 0ms");
   });
 
   it("keeps the official comparison outside Styler material and typography", () => {

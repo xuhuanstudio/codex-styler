@@ -118,6 +118,47 @@
     return "layered";
   };
 
+  // Keep these thresholds aligned with resolveThemeMotionProfile in the
+  // desktop preview. Motion may change paint and transform only; it must not
+  // alter Codex layout measurements or hit targets.
+  const resolveMotionProfile = (intensity) => {
+    const normalized = Math.max(0, Math.min(1, intensity));
+    if (normalized <= 0.05) {
+      return {
+        character: "still",
+        duration: 0,
+        lift: 0,
+        pressScale: 1,
+        overlayOpacity: 1,
+      };
+    }
+    if (normalized < 0.4) {
+      return {
+        character: "calm",
+        duration: 140,
+        lift: 1,
+        pressScale: 0.995,
+        overlayOpacity: 0.96,
+      };
+    }
+    if (normalized < 0.72) {
+      return {
+        character: "fluid",
+        duration: 190,
+        lift: 2,
+        pressScale: 0.99,
+        overlayOpacity: 0.9,
+      };
+    }
+    return {
+      character: "expressive",
+      duration: 240,
+      lift: 3,
+      pressScale: 0.985,
+      overlayOpacity: 0.84,
+    };
+  };
+
   const rgb = (hex) =>
     [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
   const toHex = (channels) =>
@@ -1234,11 +1275,9 @@
     const visual = theme.variants[variant];
     const { background } = visual;
     const authoredAppearance = visual.appearance;
-    const motionDuration = Math.round(120 + visual.motion.intensity * 110);
-    const interactionLift = Math.max(
-      1,
-      Math.round(1 + visual.motion.intensity * 4),
-    );
+    const motionProfile = resolveMotionProfile(visual.motion.intensity);
+    const motionDuration = motionProfile.duration;
+    const interactionLift = motionProfile.lift;
     const contrastSystem = resolveContrastSystem(theme, variant);
     const protectedText = contrastSystem.textPrimary;
     const quietSurfacePercent = Math.round(
@@ -1267,6 +1306,9 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           color-scheme: ${variant} !important;
           --codex-styler-motion-duration: ${motionDuration}ms;
+          --codex-styler-motion-lift: ${motionProfile.lift}px;
+          --codex-styler-motion-press-scale: ${motionProfile.pressScale};
+          --codex-styler-motion-overlay-opacity: ${motionProfile.overlayOpacity};
           --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 26%, var(--codex-styler-border-strong));
           --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 52%, var(--codex-styler-border-strong));
           --codex-styler-material-raised: color-mix(in srgb, var(--codex-styler-surface-raised) 92%, transparent);
@@ -1491,7 +1533,7 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item-button"]:hover {
           background: color-mix(in srgb, ${appearance.accent} 11%, transparent) !important;
-          transform: translateX(${Math.max(1, Math.round(interactionLift * 0.5))}px);
+          transform: translateX(${Math.round(interactionLift * 0.5)}px);
         }
         /* Full-page settings replaces Codex's semantic <main> with a routed
            div. Keep that route inside the same material and palette system
@@ -1581,7 +1623,25 @@
           [role="option"],
           [role="switch"]
         ) {
-          transition: color var(--codex-styler-motion-duration) ease, background-color var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease !important;
+          transition: color var(--codex-styler-motion-duration) ease, background-color var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease, transform var(--codex-styler-motion-duration) ease !important;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          html[data-codex-styler][data-codex-styler-mode="semantic"]:not([data-codex-styler-motion="still"]) body > [${APP_ROOT_ATTRIBUTE}] :is(
+            aside.app-shell-left-panel nav button,
+            .composer-surface-chrome button,
+            [role="tab"],
+            [role="option"]
+          ):not(:disabled):not([aria-disabled="true"]):hover {
+            transform: translateY(calc(-1 * var(--codex-styler-motion-lift))) scale(1) !important;
+          }
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"]:not([data-codex-styler-motion="still"]) body > [${APP_ROOT_ATTRIBUTE}] :is(
+          aside.app-shell-left-panel nav button,
+          .composer-surface-chrome button,
+          [role="tab"],
+          [role="option"]
+        ):not(:disabled):not([aria-disabled="true"]):active {
+          transform: translateY(0) scale(var(--codex-styler-motion-press-scale)) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
           button,
@@ -1698,6 +1758,25 @@
           background: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent) !important;
           box-shadow: 0 20px 62px rgb(0 0 0 / 22%), inset 0 1px color-mix(in srgb, ${protectedText} 6%, transparent) !important;
           backdrop-filter: saturate(1.08) blur(${Math.max(12, appearance.focusBlur + 4)}px) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"]:is(
+          [data-codex-styler-motion="fluid"],
+          [data-codex-styler-motion="expressive"]
+        ) body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(
+          [role="dialog"],
+          [role="alertdialog"],
+          [role="menu"],
+          [role="listbox"]
+        ) {
+          animation: codex-styler-surface-enter var(--codex-styler-motion-duration) cubic-bezier(.2, .72, .2, 1) both !important;
+        }
+        @keyframes codex-styler-surface-enter {
+          from {
+            opacity: var(--codex-styler-motion-overlay-opacity);
+          }
+          to {
+            opacity: 1;
+          }
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] [role="tooltip"] {
           border-radius: ${Math.max(6, appearance.radius - 5)}px !important;
@@ -2158,6 +2237,14 @@
           html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item-button"]:hover,
           html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] .group\\/home-suggestions button:hover {
             transform: none !important;
+          }
+          html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(
+            [role="dialog"],
+            [role="alertdialog"],
+            [role="menu"],
+            [role="listbox"]
+          ) {
+            animation: none !important;
           }
         }
       `;
@@ -2923,13 +3010,7 @@
     );
     document.documentElement.setAttribute(
       "data-codex-styler-motion",
-      theme.variants[variant].motion.intensity <= 0.05
-        ? "still"
-        : theme.variants[variant].motion.intensity < 0.4
-          ? "calm"
-          : theme.variants[variant].motion.intensity < 0.72
-            ? "fluid"
-            : "expressive",
+      resolveMotionProfile(theme.variants[variant].motion.intensity).character,
     );
     updateStackingRoots();
     installStyles(theme, variant, Boolean(safeMode));

@@ -248,6 +248,10 @@ working control behind another page, revert it.
   the same raised, overlay, and sunken roles across cards, composer, code,
   settings, dialogs, menus, and the right panel while preserving Codex layout,
   hit targets, and component geometry.
+- theme motion intensity now resolves to still, calm, fluid, or expressive
+  interaction profiles in both preview and runtime. The profiles coordinate
+  geometry-safe control feedback, native overlay entry, scene parallax, and
+  reduced-motion fallback without changing Codex measurements or hit targets.
 - the final companion stage now auditions direction selection and saved idle
   motion as one runtime behavior. The inspector exposes the active direction,
   only offers clips assigned to that direction sector, uses compiled playback

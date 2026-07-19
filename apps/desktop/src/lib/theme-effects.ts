@@ -22,6 +22,16 @@ export type ThemeMaterialCharacter = "solid" | "layered" | "frosted";
 export type ThemeMotionCharacter = "still" | "calm" | "fluid" | "expressive";
 export type ThemeTypographyCharacter = "balanced" | "editorial" | "cinematic";
 
+export interface ThemeMotionProfile {
+  character: ThemeMotionCharacter;
+  durationMs: number;
+  hoverLiftPx: number;
+  pressScale: number;
+  overlayOpacity: number;
+  overlayOffsetPx: number;
+  overlayScale: number;
+}
+
 export interface ThemeVisualPersonality {
   layout: "native" | "editorial" | "immersive";
   geometry: ThemeGeometry;
@@ -30,6 +40,59 @@ export interface ThemeVisualPersonality {
   decorations: "none" | "subtle" | "expressive";
   typography: ThemeTypographyCharacter;
   motion: ThemeMotionCharacter;
+}
+
+/**
+ * Converts the portable intensity control into restrained, geometry-safe
+ * interaction parameters. These thresholds are mirrored by the standalone
+ * injected runtime; neither implementation is allowed to change layout size.
+ */
+export function resolveThemeMotionProfile(
+  intensity: number,
+): ThemeMotionProfile {
+  const normalized = Math.max(0, Math.min(1, intensity));
+  if (normalized <= 0.05) {
+    return {
+      character: "still",
+      durationMs: 0,
+      hoverLiftPx: 0,
+      pressScale: 1,
+      overlayOpacity: 1,
+      overlayOffsetPx: 0,
+      overlayScale: 1,
+    };
+  }
+  if (normalized < 0.4) {
+    return {
+      character: "calm",
+      durationMs: 140,
+      hoverLiftPx: 1,
+      pressScale: 0.995,
+      overlayOpacity: 0.96,
+      overlayOffsetPx: 4,
+      overlayScale: 0.995,
+    };
+  }
+  if (normalized < 0.72) {
+    return {
+      character: "fluid",
+      durationMs: 190,
+      hoverLiftPx: 2,
+      pressScale: 0.99,
+      overlayOpacity: 0.9,
+      overlayOffsetPx: 7,
+      overlayScale: 0.985,
+    };
+  }
+  return {
+    character: "expressive",
+    durationMs: 240,
+    hoverLiftPx: 3,
+    pressScale: 0.985,
+    overlayOpacity: 0.84,
+    overlayOffsetPx: 10,
+    overlayScale: 0.975,
+  };
 }
 
 /**
@@ -43,7 +106,7 @@ export function resolveThemeVisualPersonality(
 ): ThemeVisualPersonality {
   const visual = theme.variants[variant];
   const radius = visual.appearance.radius;
-  const intensity = visual.motion.intensity;
+  const motion = resolveThemeMotionProfile(visual.motion.intensity);
   const materialOpacity = Math.min(
     visual.appearance.surfaceOpacity,
     visual.appearance.focusOpacity,
@@ -67,14 +130,7 @@ export function resolveThemeVisualPersonality(
         : visual.appearance.layout === "immersive"
           ? "cinematic"
           : "balanced",
-    motion:
-      intensity <= 0.05
-        ? "still"
-        : intensity < 0.4
-          ? "calm"
-          : intensity < 0.72
-            ? "fluid"
-            : "expressive",
+    motion: motion.character,
   };
 }
 
@@ -89,10 +145,12 @@ export function resolveThemeEffectCoverage(
 ): ThemeEffectCoverage[] {
   const visual = theme.variants[variant];
   const semantic = theme.compatibility.codex.mode === "semantic";
-  const hasMotion =
-    visual.motion.intensity > 0 &&
-    ((visual.motion.parallax ?? 0) > 0 ||
-      theme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0));
+  const hasMotionIntensity =
+    resolveThemeMotionProfile(visual.motion.intensity).character !== "still";
+  const hasSceneMotion =
+    (visual.motion.parallax ?? 0) > 0 &&
+    theme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0);
+  const hasMotion = hasMotionIntensity && (semantic || hasSceneMotion);
 
   return [
     { id: "background", active: true },

@@ -46,5 +46,9 @@ describe("theme editor control mapping registry", () => {
       scenarios: [],
       recommendedScenario: null,
     });
+    expect(themeEditorSectionCoverage("motion").mode).toBe("hybrid");
+    expect(
+      themeEditorControlMappings["motion.intensity"].runtimeSignal,
+    ).toContain("data-codex-styler-motion");
   });
 });

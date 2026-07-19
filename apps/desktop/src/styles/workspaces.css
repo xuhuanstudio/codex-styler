@@ -235,6 +235,72 @@
     transform var(--preview-motion-duration) ease;
 }
 
+/* Motion character is a visual-system property, not a layout recipe. Keep
+ * movement on paint-only properties so the preview and Codex runtime retain
+ * identical geometry at every intensity. */
+.workspace-preview[role="group"]
+  :is(
+    .workspace-task,
+    .workspace-context-tabs button,
+    .workspace-component-actions button,
+    .workspace-composer button,
+    .workspace-dialog-actions button
+  ) {
+  transition:
+    color var(--preview-motion-duration) ease,
+    background-color var(--preview-motion-duration) ease,
+    border-color var(--preview-motion-duration) ease,
+    box-shadow var(--preview-motion-duration) ease,
+    transform var(--preview-motion-duration) ease;
+  transform: translateY(0) scale(1);
+  transform-origin: center;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .workspace-preview[role="group"]:not([data-motion-character="still"])
+    :is(
+      .workspace-task,
+      .workspace-context-tabs button,
+      .workspace-component-actions button,
+      .workspace-composer button,
+      .workspace-dialog-actions button
+    ):not(:disabled):hover {
+    transform: translateY(calc(-1 * var(--preview-motion-lift))) scale(1);
+  }
+}
+
+.workspace-preview[role="group"]:not([data-motion-character="still"])
+  :is(
+    .workspace-task,
+    .workspace-context-tabs button,
+    .workspace-component-actions button,
+    .workspace-composer button,
+    .workspace-dialog-actions button
+  ):not(:disabled):active {
+  transform: translateY(0) scale(var(--preview-motion-press-scale));
+}
+
+.workspace-preview[data-motion-character="fluid"]
+  :is(.workspace-dialog-layer > div, .workspace-right-panel),
+.workspace-preview[data-motion-character="expressive"]
+  :is(.workspace-dialog-layer > div, .workspace-right-panel) {
+  animation: preview-surface-enter var(--preview-motion-duration)
+    cubic-bezier(0.2, 0.72, 0.2, 1) both;
+}
+
+@keyframes preview-surface-enter {
+  from {
+    opacity: var(--preview-motion-overlay-opacity);
+    transform: translateY(var(--preview-motion-overlay-offset))
+      scale(var(--preview-motion-overlay-scale));
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .workspace-preview[data-geometry="precise"]
   .workspace-context-tabs
   :is(span, button).is-active::after {
@@ -378,6 +444,30 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .workspace-preview {
+    --preview-motion-duration: 0ms !important;
+    --preview-motion-lift: 0px !important;
+    --preview-motion-press-scale: 1 !important;
+    --preview-motion-overlay-opacity: 1 !important;
+    --preview-motion-overlay-offset: 0px !important;
+    --preview-motion-overlay-scale: 1 !important;
+  }
+
+  .workspace-preview
+    :is(
+      .workspace-task,
+      .workspace-context-tabs button,
+      .workspace-component-actions button,
+      .workspace-composer button,
+      .workspace-dialog-actions button,
+      .workspace-dialog-layer > div,
+      .workspace-right-panel
+    ) {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+
   .workspace-motion-cursor {
     display: none;
   }
