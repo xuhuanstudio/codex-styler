@@ -189,10 +189,10 @@
 }
 
 .theme-preview-controls {
-  position: relative;
+  position: absolute;
   z-index: 7;
-  grid-row: 1;
-  justify-self: end;
+  top: 12px;
+  right: 12px;
   display: grid;
   justify-items: end;
   gap: 7px;
