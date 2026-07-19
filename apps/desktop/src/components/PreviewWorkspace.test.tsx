@@ -6,6 +6,8 @@ import {
 } from "@codex-styler/theme-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { PreviewWorkspace } from "./PreviewWorkspace";
+import { resolveThemeContrast } from "../lib/theme-contrast";
+import { resolveThemePreviewPalette } from "../lib/theme-preview-palette";
 
 describe("PreviewWorkspace task views", () => {
   afterEach(() => {
@@ -63,6 +65,34 @@ describe("PreviewWorkspace task views", () => {
     );
 
     expect(screen.getByText("Theme verification")).toBeInTheDocument();
+  });
+
+  it("uses the versioned Codex shell without editor-only navigation in library previews", () => {
+    const { container } = render(
+      <PreviewWorkspace
+        theme={nativeRefined}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="task"
+      />,
+    );
+
+    expect(
+      container.querySelector('[data-codex-preview-shell="2026-07"]'),
+    ).toBeTruthy();
+    expect(container.querySelector(".workspace-sidebar__primary")).toBeTruthy();
+    expect(
+      container.querySelector(".workspace-header__navigation"),
+    ).toBeTruthy();
+    expect(container.querySelector(".workspace-content-shell")).toBeTruthy();
+    expect(container.querySelector(".workspace-composer__field")).toBeTruthy();
+    expect(
+      container.querySelector(
+        '.workspace-context-tabs[aria-label="Task views"]',
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("exposes the derived geometry and motion character to every preview", () => {
@@ -157,6 +187,44 @@ describe("PreviewWorkspace task views", () => {
     expect(
       container.querySelector(".workspace-component-scroll-sample"),
     ).toBeTruthy();
+  });
+
+  it("consumes the complete semantic text and border contract", () => {
+    const theme = structuredClone(nativeRefined);
+    const appearance = theme.variants.dark.appearance;
+    appearance.palette = {
+      ...appearance.palette,
+      textTertiary: "#A7AFBD",
+      borderSubtle: "#303640",
+      borderStrong: "#667084",
+    };
+    const contrastSystem = resolveThemeContrast(theme, "dark");
+    const palette = resolveThemePreviewPalette(
+      appearance,
+      theme.variants.dark.background.color,
+      contrastSystem,
+    );
+    const { container } = render(
+      <PreviewWorkspace
+        theme={theme}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="settings"
+      />,
+    );
+    const preview = container.querySelector<HTMLElement>(".workspace-preview");
+
+    expect(preview?.style.getPropertyValue("--preview-tertiary")).toBe(
+      palette.textTertiary,
+    );
+    expect(preview?.style.getPropertyValue("--preview-border-subtle")).toBe(
+      palette.borderSubtle,
+    );
+    expect(preview?.style.getPropertyValue("--preview-border-strong")).toBe(
+      palette.borderStrong,
+    );
   });
 
   it("runs a controlled motion preview and preserves each scene layer scale", () => {

@@ -1623,6 +1623,12 @@ describe("Codex Styler shell", () => {
   it("compares a styled theme with an uncluttered official baseline", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    const previewControls = screen.getByRole("button", {
+      name: "Task & composer",
+    });
+    expect(previewControls).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(previewControls);
+    expect(previewControls).toHaveAttribute("aria-expanded", "true");
 
     const comparison = screen.getByRole("group", {
       name: "Compare appearance",
@@ -1654,24 +1660,27 @@ describe("Codex Styler shell", () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
 
-    const scenarios = screen.getByRole("tablist", {
-      name: "Preview scenario",
-    });
-    const settings = within(scenarios).getByRole("tab", {
-      name: "Settings",
-    });
-    const dialog = within(scenarios).getByRole("tab", { name: "Dialog" });
     const preview = document.querySelector(
       ".featured-theme__preview .workspace-preview",
     );
 
     expect(preview).toHaveAttribute("data-preview-scenario", "task");
-    fireEvent.click(settings);
-    expect(settings).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Preview scenario" }),
+      { target: { value: "settings" } },
+    );
     expect(preview).toHaveAttribute("data-preview-scenario", "settings");
 
-    fireEvent.click(dialog);
-    expect(dialog).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(
+        ".theme-preview-controls__trigger",
+      ) as HTMLButtonElement,
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Preview scenario" }),
+      { target: { value: "dialog" } },
+    );
     expect(preview).toHaveAttribute("data-preview-scenario", "dialog");
 
     const controlsEffect = screen.getByRole("button", {
@@ -1680,8 +1689,8 @@ describe("Codex Styler shell", () => {
     fireEvent.click(controlsEffect);
     expect(preview).toHaveAttribute("data-preview-scenario", "components");
     expect(
-      within(scenarios).getByRole("tab", { name: "Components & states" }),
-    ).toHaveAttribute("aria-selected", "true");
+      screen.getByRole("button", { name: "Components & states" }),
+    ).toHaveAttribute("aria-expanded", "false");
   });
 
   it("deletes a local theme after confirmation", async () => {

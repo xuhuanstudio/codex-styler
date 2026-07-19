@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeRefined } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
-import { contrastRatio } from "./lib/contrast";
+import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
+import { resolveThemePreviewPalette } from "./lib/theme-preview-palette";
 import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
 
 interface InjectedRuntime {
@@ -25,10 +26,26 @@ interface InjectedRuntime {
   restore: () => void;
 }
 
+interface InjectedRuntimeInternals {
+  semanticPalette: (
+    appearance: (typeof nativeRefined)["variants"]["light"]["appearance"],
+    background: (typeof nativeRefined)["variants"]["light"]["background"],
+    contrastSystem: ReturnType<typeof resolveThemeContrast>,
+  ) => ReturnType<typeof resolveThemePreviewPalette>;
+}
+
 function runtime(): InjectedRuntime {
   return (
     window as typeof window & { __CODEX_STYLER_RUNTIME__: InjectedRuntime }
   ).__CODEX_STYLER_RUNTIME__;
+}
+
+function runtimeInternals(): InjectedRuntimeInternals {
+  return (
+    window as typeof window & {
+      __CODEX_STYLER_RUNTIME_INTERNALS__: InjectedRuntimeInternals;
+    }
+  ).__CODEX_STYLER_RUNTIME_INTERNALS__;
 }
 
 describe("injected compatibility runtime", () => {
@@ -37,6 +54,8 @@ describe("injected compatibility runtime", () => {
     document.body.innerHTML = "";
     delete (window as unknown as Record<string, unknown>)
       .__CODEX_STYLER_RUNTIME__;
+    delete (window as unknown as Record<string, unknown>)
+      .__CODEX_STYLER_RUNTIME_INTERNALS__;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(performance.now() + 20);
       return 1;
@@ -47,6 +66,8 @@ describe("injected compatibility runtime", () => {
 
   afterEach(() => {
     runtime().restore();
+    delete (window as unknown as Record<string, unknown>)
+      .__CODEX_STYLER_RUNTIME_INTERNALS__;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -75,7 +96,71 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(31);
+    expect(runtime().version).toBe(32);
+  });
+
+  it.each(["light", "dark"] as const)(
+    "keeps the %s preview palette identical to the injected runtime",
+    (variant) => {
+      const theme = structuredClone(nativeRefined);
+      const visual = theme.variants[variant];
+      const contrastSystem = resolveThemeContrast(theme, variant);
+      const previewPalette = resolveThemePreviewPalette(
+        visual.appearance,
+        visual.background.color,
+        contrastSystem,
+      );
+
+      expect(
+        runtimeInternals().semanticPalette(
+          visual.appearance,
+          visual.background,
+          contrastSystem,
+        ),
+      ).toEqual(previewPalette);
+    },
+  );
+
+  it("derives functional colors from the actual surface tone instead of the variant label", () => {
+    const theme = structuredClone(nativeRefined);
+    const visual = theme.variants.light;
+    visual.background.color = "#090B10";
+    visual.background.overlay = "#090B10";
+    visual.background.overlayOpacity = 1;
+    visual.appearance.surface = "#151820";
+    visual.appearance.text = "#F4F6FA";
+    visual.appearance.mutedText = "#C2C8D2";
+    visual.appearance.palette = {
+      ...visual.appearance.palette,
+      success: "#14311F",
+      warning: "#3A2910",
+    };
+    const contrastSystem = resolveThemeContrast(theme, "light");
+    const previewPalette = resolveThemePreviewPalette(
+      visual.appearance,
+      visual.background.color,
+      contrastSystem,
+    );
+    const injectedPalette = runtimeInternals().semanticPalette(
+      visual.appearance,
+      visual.background,
+      contrastSystem,
+    );
+
+    expect(contrastSystem.tone).toBe("light");
+    expect(injectedPalette).toEqual(previewPalette);
+    expect(
+      minimumContrast(
+        injectedPalette.success,
+        contrastSystem.strongBackgrounds,
+      ),
+    ).toBeGreaterThanOrEqual(4.49);
+    expect(
+      minimumContrast(
+        injectedPalette.warning,
+        contrastSystem.strongBackgrounds,
+      ),
+    ).toBeGreaterThanOrEqual(4.49);
   });
 
   it("renders validated scene layers and updates parallax without blocking Codex", async () => {

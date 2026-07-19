@@ -18,6 +18,7 @@ export interface ThemeContrastSystem {
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  /** Foreground tone selected for the composite UI surfaces. */
   tone: "light" | "dark";
 }
 

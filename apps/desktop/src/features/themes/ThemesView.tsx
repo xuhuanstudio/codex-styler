@@ -18,6 +18,7 @@ import {
   type ThemeEffectId,
 } from "../../lib/theme-effects";
 import { ThemeRow } from "./ThemeRow";
+import { ThemePreviewControls } from "./ThemePreviewControls";
 
 export type ThemeCollection = "builtIn" | "mine";
 
@@ -58,7 +59,6 @@ export function ThemesView({
   onImport,
   resolveAsset,
   liveThemeId,
-  busy,
 }: ThemesViewProps) {
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [browsedThemeId, setBrowsedThemeId] = useState(selectedTheme.id);
@@ -67,8 +67,9 @@ export function ThemesView({
   >("styled");
   const [previewScenario, setPreviewScenario] =
     useState<PreviewScenario>("task");
-  const [inspectedEffect, setInspectedEffect] =
-    useState<ThemeEffectId | null>(null);
+  const [inspectedEffect, setInspectedEffect] = useState<ThemeEffectId | null>(
+    null,
+  );
   const workspaceRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
@@ -148,14 +149,6 @@ export function ThemesView({
     expressive: "motionExpressive",
   } satisfies Record<typeof personality.motion, MessageKey>;
   const isSemanticTheme = browsedTheme.compatibility.codex.mode === "semantic";
-  const browsedThemeIsLive = liveThemeId === browsedTheme.id;
-  const previewScenarios = [
-    ["task", "previewTask"],
-    ["settings", "previewSettings"],
-    ["components", "previewComponents"],
-    ["dialog", "previewDialog"],
-    ["right-panel", "previewRightPanel"],
-  ] satisfies Array<[PreviewScenario, MessageKey]>;
   return (
     <div className="page page--themes">
       <section className="page-heading">
@@ -281,61 +274,16 @@ export function ThemesView({
               {t("backToThemes")}
             </button>
             <div className="featured-theme__preview">
-              <div className="featured-theme__preview-toolbar">
-                <div className="featured-theme__label">
-                  {busy
-                    ? t("applying")
-                    : browsedThemeIsLive
-                      ? t("liveInCodex")
-                      : t("previewOnly")}
-                </div>
-                <div
-                  className="featured-theme__scenario-switcher"
-                  role="tablist"
-                  aria-label={t("previewScenario")}
-                >
-                  {previewScenarios.map(([scenario, label]) => (
-                    <button
-                      key={scenario}
-                      role="tab"
-                      aria-selected={previewScenario === scenario}
-                      className={
-                        previewScenario === scenario ? "is-active" : ""
-                      }
-                      onClick={() => {
-                        setInspectedEffect(null);
-                        setPreviewScenario(scenario);
-                      }}
-                    >
-                      {t(label)}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  className="featured-theme__preview-mode"
-                  role="group"
-                  aria-label={t("compareAppearance")}
-                >
-                  <button
-                    className={
-                      previewPresentation === "styled" ? "is-active" : ""
-                    }
-                    aria-pressed={previewPresentation === "styled"}
-                    onClick={() => setPreviewPresentation("styled")}
-                  >
-                    {t("styledAppearance")}
-                  </button>
-                  <button
-                    className={
-                      previewPresentation === "official" ? "is-active" : ""
-                    }
-                    aria-pressed={previewPresentation === "official"}
-                    onClick={() => setPreviewPresentation("official")}
-                  >
-                    {t("officialAppearance")}
-                  </button>
-                </div>
-              </div>
+              <ThemePreviewControls
+                scenario={previewScenario}
+                presentation={previewPresentation}
+                t={t}
+                onScenarioChange={(nextScenario) => {
+                  setInspectedEffect(null);
+                  setPreviewScenario(nextScenario);
+                }}
+                onPresentationChange={setPreviewPresentation}
+              />
               <PreviewWorkspace
                 theme={previewThemeFor(browsedTheme)}
                 variant={variant}
@@ -405,7 +353,9 @@ export function ThemesView({
                           : undefined
                       }
                       disabled={!effect.active}
-                      aria-pressed={effect.active && inspectedEffect === effect.id}
+                      aria-pressed={
+                        effect.active && inspectedEffect === effect.id
+                      }
                       aria-label={`${t("inspectEffect")}: ${t(
                         effectLabels[effect.id],
                       )}`}

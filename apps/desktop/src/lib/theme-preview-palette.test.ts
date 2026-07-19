@@ -13,7 +13,7 @@ const contrastSystem: ThemeContrastSystem = {
   textPrimary: "#f2f4f8",
   textSecondary: "#c2c6ce",
   textTertiary: "#9da2ad",
-  tone: "dark",
+  tone: "light",
 };
 
 function appearance(

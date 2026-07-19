@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 31) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 32) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -203,6 +203,7 @@
       !finiteBetween(background.blur, 0, 40) ||
       !finiteBetween(background.overlayOpacity, 0, 1) ||
       !finiteBetween(appearance.surfaceOpacity, 0, 1) ||
+      !finiteBetween(appearance.focusOpacity, 0, 1) ||
       !finiteBetween(appearance.radius, 0, 32) ||
       !finiteBetween(appearance.focusBlur, 0, 32)
     ) {
@@ -742,7 +743,7 @@
     return true;
   };
 
-  const semanticPalette = (appearance, background, variant, contrastSystem) => {
+  const semanticPalette = (appearance, background, contrastSystem) => {
     const custom = appearance.palette || {};
     const strength = {
       none: {
@@ -787,11 +788,9 @@
       return readableSurface(fallback, minimum) ? fallback : appearance.surface;
     };
     const safeForeground = (candidate, backgrounds, fallback, minimum = 4.5) =>
-      candidate && minimumContrast(candidate, backgrounds) >= minimum
-        ? candidate
-        : readable(fallback, backgrounds, minimum);
+      readable(candidate || fallback, backgrounds, minimum);
     const statusDefaults =
-      variant === "dark"
+      contrastSystem.tone === "light"
         ? {
             success: "#4BC47D",
             warning: "#E7A645",
@@ -1130,12 +1129,7 @@
       contrastSystem.strongSurfaceOpacity * 100,
     );
     const accentText = readable(appearance.surface, appearance.accent);
-    const palette = semanticPalette(
-      appearance,
-      background,
-      variant,
-      contrastSystem,
-    );
+    const palette = semanticPalette(appearance, background, contrastSystem);
     const style = document.createElement("style");
     style.id = STYLE_ID;
     const semantic = safeMode
@@ -3027,8 +3021,12 @@
     };
   };
 
+  if (typeof process !== "undefined" && process.env?.NODE_ENV === "test") {
+    window.__CODEX_STYLER_RUNTIME_INTERNALS__ = { semanticPalette };
+  }
+
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 31,
+    version: 32,
     apply,
     updateEntity,
     pause: remove,

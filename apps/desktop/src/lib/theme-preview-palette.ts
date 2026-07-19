@@ -4,13 +4,21 @@ import type { ThemeContrastSystem } from "./theme-contrast";
 
 export interface ThemePreviewPalette {
   canvas: string;
+  surface: string;
   surfaceRaised: string;
   surfaceOverlay: string;
   surfaceSunken: string;
   control: string;
   controlHover: string;
   controlActive: string;
+  textPrimary: string;
+  textSecondary: string;
+  textTertiary: string;
+  accent: string;
   onAccent: string;
+  border: string;
+  borderSubtle: string;
+  borderStrong: string;
   focus: string;
   success: string;
   warning: string;
@@ -64,7 +72,7 @@ export function resolveThemePreviewPalette(
   const tint = (amount: number) =>
     mixColors(appearance.surface, appearance.accent, amount);
   const statusDefaults =
-    contrastSystem.tone === "dark"
+    contrastSystem.tone === "light"
       ? {
           success: "#4BC47D",
           warning: "#E7A645",
@@ -93,6 +101,7 @@ export function resolveThemePreviewPalette(
 
   return {
     canvas: safeSurface(custom.canvas, backgroundColor),
+    surface: appearance.surface,
     surfaceRaised: safeSurface(custom.surfaceRaised, tint(strength.raised)),
     surfaceOverlay: safeSurface(custom.surfaceOverlay, tint(strength.overlay)),
     surfaceSunken: safeSurface(
@@ -105,11 +114,22 @@ export function resolveThemePreviewPalette(
       custom.controlActive,
       tint(strength.controlActive),
     ),
+    textPrimary: contrastSystem.textPrimary,
+    textSecondary: contrastSystem.textSecondary,
+    textTertiary: contrastSystem.textTertiary,
+    accent: appearance.accent,
     onAccent: adaptiveReadableColor(
       custom.onAccent ?? appearance.surface,
       appearance.accent,
       4.5,
     ),
+    border: appearance.border,
+    borderSubtle:
+      custom.borderSubtle ??
+      `color-mix(in srgb, ${appearance.border} 52%, transparent)`,
+    borderStrong:
+      custom.borderStrong ??
+      `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
     focus: safeForeground(
       custom.focus ?? appearance.accent,
       statusDefaults.info,
