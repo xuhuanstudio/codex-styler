@@ -51,7 +51,18 @@ describe("built-in themes", () => {
     expect(JSON.stringify(theme)).not.toContain("--color-token");
   });
 
-  it("ships the two expressive themes with complete light and dark palettes", () => {
+  it("ships every built-in theme with a complete component-level palette", () => {
+    for (const theme of builtinThemes) {
+      for (const variant of Object.values(theme.variants)) {
+        expect(
+          Object.keys(variant.appearance.palette ?? {}),
+          `${theme.id} semantic palette`,
+        ).toHaveLength(19);
+      }
+    }
+  });
+
+  it("ships the two expressive themes with image-backed light and dark variants", () => {
     const expressiveThemeIds = new Set([
       "codex-styler.gilded-grandeur",
       "codex-styler.merry-big-top",
@@ -63,10 +74,6 @@ describe("built-in themes", () => {
     for (const theme of expressiveThemes) {
       for (const variant of Object.values(theme.variants)) {
         expect(variant.background.image, theme.id).toBeDefined();
-        expect(
-          Object.keys(variant.appearance.palette ?? {}),
-          `${theme.id} semantic palette`,
-        ).toHaveLength(19);
         expect(variant.appearance.iconStyle).toBe("themed");
         expect(variant.appearance.decorations).toBe("expressive");
       }

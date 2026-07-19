@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ThemeAppearance } from "@codex-styler/theme-core";
+import { builtinThemes, type ThemeAppearance } from "@codex-styler/theme-core";
 import { contrastRatio } from "./contrast";
-import type { ThemeContrastSystem } from "./theme-contrast";
+import {
+  resolveThemeContrast,
+  type ThemeContrastSystem,
+} from "./theme-contrast";
 import { resolveThemePreviewPalette } from "./theme-preview-palette";
 
 const contrastSystem: ThemeContrastSystem = {
@@ -96,5 +99,51 @@ describe("theme preview semantic palette", () => {
     ].forEach((color) => {
       expect(contrastRatio(color, "#1b1d22")).toBeGreaterThanOrEqual(4.5);
     });
+  });
+
+  it("keeps every authored built-in component palette readable and intact", () => {
+    for (const theme of builtinThemes) {
+      for (const variant of ["light", "dark"] as const) {
+        const appearance = theme.variants[variant].appearance;
+        const authored = appearance.palette!;
+        const contrast = resolveThemeContrast(theme, variant);
+        const palette = resolveThemePreviewPalette(
+          appearance,
+          theme.variants[variant].background.color,
+          contrast,
+        );
+
+        const authoredSurfaces = [
+          ["canvas", palette.canvas, authored.canvas],
+          ["raised", palette.surfaceRaised, authored.surfaceRaised],
+          ["overlay", palette.surfaceOverlay, authored.surfaceOverlay],
+          ["sunken", palette.surfaceSunken, authored.surfaceSunken],
+          ["control", palette.control, authored.control],
+          ["control hover", palette.controlHover, authored.controlHover],
+          ["control active", palette.controlActive, authored.controlActive],
+        ] as const;
+        authoredSurfaces.forEach(([label, resolved, expected]) => {
+          expect(resolved, `${theme.id} ${variant} ${label}`).toBe(expected);
+        });
+        [
+          palette.success,
+          palette.warning,
+          palette.danger,
+          palette.info,
+          palette.added,
+          palette.modified,
+          palette.deleted,
+        ].forEach((color) => {
+          expect(
+            Math.min(
+              ...contrast.strongBackgrounds.map((background) =>
+                contrastRatio(color, background),
+              ),
+            ),
+            `${theme.id} ${variant} functional color`,
+          ).toBeGreaterThanOrEqual(4.49);
+        });
+      }
+    }
   });
 });
