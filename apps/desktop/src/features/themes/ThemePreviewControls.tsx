@@ -1,4 +1,4 @@
-import { useId, useState, type PointerEvent } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, Play, SlidersHorizontal } from "lucide-react";
 import { SelectField } from "../../components/ui/SelectField";
 import type { MessageKey } from "../../lib/i18n";
@@ -37,27 +37,18 @@ export function ThemePreviewControls({
 }: ThemePreviewControlsProps) {
   const panelId = useId();
   const motionHelpId = useId();
-  const [hovered, setHovered] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const open = pinned || hovered;
+  const [open, setOpen] = useState(false);
   const scenarioLabel = t(
     scenarios.find(([value]) => value === scenario)?.[1] ?? "previewTask",
   );
-
-  function handlePointerEnter(event: PointerEvent<HTMLDivElement>) {
-    if (event.pointerType !== "touch") setHovered(true);
-  }
 
   return (
     <div
       className="theme-preview-controls"
       data-open={open || undefined}
-      data-pinned={pinned || undefined}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={() => setHovered(false)}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
-          setPinned(false);
+          setOpen(false);
           (
             event.currentTarget.querySelector(
               "button",
@@ -71,7 +62,7 @@ export function ThemePreviewControls({
         className="theme-preview-controls__trigger"
         aria-expanded={open}
         aria-controls={panelId}
-        onClick={() => setPinned((current) => !current)}
+        onClick={() => setOpen((current) => !current)}
       >
         <SlidersHorizontal size={12} />
         <span>{scenarioLabel}</span>
@@ -91,7 +82,7 @@ export function ThemePreviewControls({
           value={scenario}
           onChange={(event) => {
             onScenarioChange(event.target.value as PreviewScenario);
-            setPinned(false);
+            setOpen(false);
           }}
         >
           {scenarios.map(([value, label]) => (
@@ -108,7 +99,10 @@ export function ThemePreviewControls({
               type="button"
               className={presentation === "styled" ? "is-active" : undefined}
               aria-pressed={presentation === "styled"}
-              onClick={() => onPresentationChange("styled")}
+              onClick={() => {
+                onPresentationChange("styled");
+                setOpen(false);
+              }}
             >
               {t("styledAppearance")}
             </button>
@@ -116,7 +110,10 @@ export function ThemePreviewControls({
               type="button"
               className={presentation === "official" ? "is-active" : undefined}
               aria-pressed={presentation === "official"}
-              onClick={() => onPresentationChange("official")}
+              onClick={() => {
+                onPresentationChange("official");
+                setOpen(false);
+              }}
             >
               {t("officialAppearance")}
             </button>
@@ -128,7 +125,10 @@ export function ThemePreviewControls({
           className="theme-preview-controls__motion"
           disabled={motionPreviewDisabled || motionPreviewing}
           aria-describedby={motionHelpId}
-          onClick={onPreviewMotion}
+          onClick={() => {
+            onPreviewMotion();
+            setOpen(false);
+          }}
         >
           <Play size={13} aria-hidden="true" />
           <span>

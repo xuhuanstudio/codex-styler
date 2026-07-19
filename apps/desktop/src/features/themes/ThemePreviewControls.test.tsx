@@ -64,7 +64,9 @@ describe("ThemePreviewControls", () => {
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole("button", { name: "Official" }));
     expect(onPresentationChange).toHaveBeenCalledWith("official");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
 
+    fireEvent.click(trigger);
     fireEvent.keyDown(trigger.parentElement as HTMLElement, { key: "Escape" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveFocus();
@@ -107,6 +109,7 @@ describe("ThemePreviewControls", () => {
         onPreviewMotion={onPreviewMotion}
       />,
     );
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
     expect(
       screen.getByRole("button", { name: /Preview motion/ }),
     ).toBeDisabled();

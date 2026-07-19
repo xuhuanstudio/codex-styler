@@ -1677,6 +1677,7 @@ describe("Codex Styler shell", () => {
       document.querySelector(".featured-theme__preview .workspace-entity"),
     ).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
     fireEvent.click(styled);
     expect(preview).toHaveAttribute("data-preview-presentation", "styled");
   });

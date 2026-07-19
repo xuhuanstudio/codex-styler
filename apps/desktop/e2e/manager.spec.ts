@@ -190,6 +190,7 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await expect(
     page.locator(".featured-theme__preview .workspace-entity"),
   ).toHaveCount(0);
+  await page.getByRole("button", { name: "Task & composer" }).click();
   await appearanceComparison.getByRole("button", { name: "Styled" }).click();
   await expect(page).toHaveScreenshot("themes-en-dark-1320x840.png");
 
