@@ -19,6 +19,8 @@ describe("CompanionsView installed companion management", () => {
     const onEditProject = vi.fn();
     const onExport = vi.fn();
     const onDelete = vi.fn();
+    const onSizeChange = vi.fn();
+    const onResetPlacement = vi.fn();
 
     render(
       <CompanionsView
@@ -39,6 +41,10 @@ describe("CompanionsView installed companion management", () => {
         onImport={vi.fn()}
         onExport={onExport}
         onDelete={onDelete}
+        selectedSize={136}
+        placementCustomized
+        onSizeChange={onSizeChange}
+        onResetPlacement={onResetPlacement}
         onAnchorChange={vi.fn()}
         onAttachmentChange={vi.fn()}
         resolveAsset={() => ""}
@@ -65,5 +71,14 @@ describe("CompanionsView installed companion management", () => {
     expect(onEditProject).toHaveBeenCalledWith(project);
     expect(onExport).toHaveBeenCalledWith(companion);
     expect(onDelete).toHaveBeenCalledWith(companion);
+
+    fireEvent.change(screen.getByRole("slider", { name: "Companion size" }), {
+      target: { value: "180" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    );
+    expect(onSizeChange).toHaveBeenCalledWith(180);
+    expect(onResetPlacement).toHaveBeenCalledOnce();
   });
 });

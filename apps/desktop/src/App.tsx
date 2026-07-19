@@ -1241,6 +1241,27 @@ export function App() {
     scheduleLiveCompanionSync(next);
   }
 
+  function resetEntityPlacement() {
+    if (!selectedCompanion) return;
+    const current = settingsRef.current;
+    const companionAnchors = { ...current.companionAnchors };
+    const companionSizes = { ...current.companionSizes };
+    const companionAttachments = { ...current.companionAttachments };
+    delete companionAnchors[selectedCompanion.id];
+    delete companionSizes[selectedCompanion.id];
+    delete companionAttachments[selectedCompanion.id];
+    const next = updateSettings({
+      companionAnchors,
+      companionSizes,
+      companionAttachments,
+    });
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    });
+    scheduleLiveCompanionSync(next);
+  }
+
   function selectCompanion(companion: CompanionDefinition | null) {
     if (liveCompanionSyncRef.current !== null) {
       window.clearTimeout(liveCompanionSyncRef.current);
@@ -1908,6 +1929,29 @@ export function App() {
               onImport={() => companionImportRef.current?.click()}
               onExport={(companion) => void handleExportCompanion(companion)}
               onDelete={setPendingCompanionDelete}
+              selectedSize={
+                selectedCompanion
+                  ? (settings.companionSizes[selectedCompanion.id] ??
+                    selectedCompanion.entity.size)
+                  : null
+              }
+              placementCustomized={Boolean(
+                selectedCompanion &&
+                (Object.prototype.hasOwnProperty.call(
+                  settings.companionAnchors,
+                  selectedCompanion.id,
+                ) ||
+                  Object.prototype.hasOwnProperty.call(
+                    settings.companionSizes,
+                    selectedCompanion.id,
+                  ) ||
+                  Object.prototype.hasOwnProperty.call(
+                    settings.companionAttachments,
+                    selectedCompanion.id,
+                  )),
+              )}
+              onSizeChange={updateEntitySize}
+              onResetPlacement={resetEntityPlacement}
               onAnchorChange={updateEntityAnchor}
               onAttachmentChange={updateEntityAttachment}
               resolveAsset={resolveAsset}

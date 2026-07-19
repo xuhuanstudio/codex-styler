@@ -131,7 +131,7 @@
   font-size: var(--type-caption);
 }
 
-.companion-detail-summary strong {
+.companion-detail-summary > div:first-child > strong {
   font-size: var(--type-section);
 }
 

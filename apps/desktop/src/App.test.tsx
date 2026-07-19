@@ -1164,6 +1164,24 @@ describe("Codex Styler shell", () => {
     expect(
       document.querySelector('.scene-entity[data-draggable="true"]'),
     ).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "Companion size" }), {
+      target: { value: "180" },
+    });
+    expect(document.querySelector(".scene-entity")).toHaveStyle({
+      "--entity-size": "180px",
+    });
+    expect(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    );
+    expect(document.querySelector(".scene-entity")).toHaveStyle({
+      "--entity-size": "136px",
+    });
+    expect(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    ).toBeDisabled();
   });
 
   it("uses independent portraits instead of decoding atlases in the list", () => {

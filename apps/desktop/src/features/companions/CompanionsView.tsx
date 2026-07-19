@@ -9,11 +9,12 @@ import {
   MousePointer2,
   PencilLine,
   Plus,
+  RotateCcw,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   builtinCompanions,
   type CompanionDefinition,
@@ -80,6 +81,10 @@ export interface CompanionsViewProps {
   onImport: () => void;
   onExport: (companion: CompanionDefinition) => void;
   onDelete: (companion: CompanionDefinition) => void;
+  selectedSize: number | null;
+  placementCustomized: boolean;
+  onSizeChange: (size: number) => void;
+  onResetPlacement: () => void;
   onAnchorChange: (anchor: { x: number; y: number }) => void;
   onAttachmentChange: (attachment: EntityAttachment | null) => void;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
@@ -109,6 +114,10 @@ export function CompanionsView({
   onImport,
   onExport,
   onDelete,
+  selectedSize,
+  placementCustomized,
+  onSizeChange,
+  onResetPlacement,
   onAnchorChange,
   onAttachmentChange,
   resolveAsset,
@@ -172,6 +181,9 @@ export function CompanionsView({
     ? findCompanionSourceProject(browsedCompanion, projects)
     : null;
   const browsedIsSelected = browsedCompanion?.id === selected?.id;
+  const sizeProgress = selectedSize
+    ? ((selectedSize - 24) / (512 - 24)) * 100
+    : 0;
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     month: "short",
@@ -325,25 +337,27 @@ export function CompanionsView({
             <ArrowLeft size={14} />
             {t("backToCompanions")}
           </button>
-          <PreviewWorkspace
-            theme={previewThemeFor(browsedCompanion)}
-            variant={variant}
-            locale={locale}
-            reduceMotion={reduceMotion}
-            resolveAsset={resolveAsset}
-            onEntityAnchorChange={
-              browsedIsSelected ? onAnchorChange : undefined
-            }
-            onEntityAttachmentChange={
-              browsedIsSelected ? onAttachmentChange : undefined
-            }
-          />
-          {browsedCompanion && browsedIsSelected && (
-            <span className="drag-hint">
-              <MousePointer2 size={13} />
-              {t("dragCompanion")}
-            </span>
-          )}
+          <div className="companion-preview-stage">
+            <PreviewWorkspace
+              theme={previewThemeFor(browsedCompanion)}
+              variant={variant}
+              locale={locale}
+              reduceMotion={reduceMotion}
+              resolveAsset={resolveAsset}
+              onEntityAnchorChange={
+                browsedIsSelected ? onAnchorChange : undefined
+              }
+              onEntityAttachmentChange={
+                browsedIsSelected ? onAttachmentChange : undefined
+              }
+            />
+            {browsedCompanion && browsedIsSelected && (
+              <span className="drag-hint">
+                <MousePointer2 size={13} />
+                {t("dragCompanion")}
+              </span>
+            )}
+          </div>
           <div className="companion-detail-summary">
             <div>
               <span>
@@ -375,6 +389,51 @@ export function CompanionsView({
                         : t("statusPending")}
                 </span>
               </div>
+              {browsedCompanion && browsedIsSelected && selectedSize && (
+                <div
+                  className="companion-placement-controls"
+                  title={t("companionPlacementDetail")}
+                >
+                  <div className="companion-placement-controls__heading">
+                    <strong>{t("companionPlacement")}</strong>
+                    <small>
+                      {placementCustomized
+                        ? t("customized")
+                        : t("packageDefault")}
+                    </small>
+                  </div>
+                  <div className="companion-placement-controls__row">
+                    <label className="range-control companion-size-control">
+                      <input
+                        type="range"
+                        min={24}
+                        max={512}
+                        step={4}
+                        value={selectedSize}
+                        aria-label={t("companionSize")}
+                        style={
+                          {
+                            "--range-progress": `${sizeProgress}%`,
+                          } as CSSProperties
+                        }
+                        onChange={(event) =>
+                          onSizeChange(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <output>{selectedSize}px</output>
+                    <button
+                      className="secondary-button companion-placement-reset"
+                      onClick={onResetPlacement}
+                      disabled={!placementCustomized}
+                      aria-label={t("resetCompanionPlacement")}
+                    >
+                      <RotateCcw size={12} />
+                      {t("reset")}
+                    </button>
+                  </div>
+                </div>
+              )}
               {browsedCompanion && browsedIsLocal && (
                 <div
                   className="companion-detail-summary__actions"
