@@ -109,6 +109,7 @@ import {
 } from "./restore-flow";
 import { AtlasGridPreview, SourceMediaPreview } from "./SourcePreview";
 import { CalibrationHealth, CalibrationSummary } from "./CalibrationStatus";
+import { AlignmentAssistant } from "./AlignmentAssistant";
 import { ImportStep } from "./ImportStep";
 import {
   CleanupBrushStage,
@@ -3401,199 +3402,68 @@ export function CompanionCreator({
                   </p>
                 </div>
                 <aside className="creator-inspector-panel creator-inspector-panel--align">
-                  <section
-                    className={`alignment-readiness ${
-                      alignmentDiagnostics.ready
-                        ? "alignment-readiness--ready"
-                        : "alignment-readiness--warning"
-                    }`}
-                  >
-                    <div className="alignment-readiness__heading">
-                      <span>
-                        {alignmentDiagnostics.ready ? (
-                          <Check size={15} />
-                        ) : (
-                          <AlertTriangle size={15} />
-                        )}
-                      </span>
-                      <div>
-                        <h3>
-                          {alignmentDiagnostics.ready
-                            ? locale === "zh-CN"
-                              ? "共享画布已就绪"
-                              : "Shared canvas ready"
-                            : locale === "zh-CN"
-                              ? "仍有帧需要对齐"
-                              : "Some frames need alignment"}
-                        </h3>
-                        <p>
-                          {alignmentDiagnostics.ready
-                            ? locale === "zh-CN"
-                              ? "所有有效帧都在画布内，并落在同一地面线上。"
-                              : "Every included frame fits the canvas and meets one ground line."
-                            : locale === "zh-CN"
-                              ? "先自动对齐，再用叠影和当前帧工具检查偏差。"
-                              : "Auto-align first, then inspect drift with onion skin and the current-frame tool."}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className="alignment-metrics"
-                      aria-label={
-                        locale === "zh-CN"
-                          ? "对齐诊断"
-                          : "Alignment diagnostics"
-                      }
-                    >
-                      <div>
-                        <strong>
-                          {alignmentDiagnostics.boundedFrames}/
-                          {alignmentDiagnostics.includedFrames}
-                        </strong>
-                        <span>
-                          {locale === "zh-CN" ? "已识别" : "Detected"}
-                        </span>
-                      </div>
-                      <div
-                        className={
-                          alignmentDiagnostics.outsideCrop ? "has-warning" : ""
+                  <AlignmentAssistant
+                    locale={locale}
+                    diagnostics={alignmentDiagnostics}
+                    currentScale={project.contentScale}
+                    fittedScale={fittedContentScale}
+                    canExpand={Boolean(expandedAlignmentCanvas)}
+                    onFit={() =>
+                      updateProject((next) => {
+                        const fitted = fitSharedContentScale(
+                          next.frames,
+                          next.sharedCrop,
+                          next.groundLine,
+                        );
+                        if (
+                          fitted !== null &&
+                          fitted < next.contentScale - 0.001
+                        ) {
+                          next.contentScale = fitted;
                         }
-                      >
-                        <strong>{alignmentDiagnostics.outsideCrop}</strong>
-                        <span>
-                          {locale === "zh-CN" ? "超出画布" : "Outside"}
-                        </span>
-                      </div>
-                      <div
-                        className={
-                          alignmentDiagnostics.baselineOutliers ||
-                          alignmentDiagnostics.centerOutliers
-                            ? "has-warning"
-                            : ""
-                        }
-                      >
-                        <strong>
-                          {Math.round(
-                            Math.max(
-                              alignmentDiagnostics.maximumBaselineDelta,
-                              alignmentDiagnostics.maximumCenterDelta,
-                            ),
-                          )}{" "}
-                          px
-                        </strong>
-                        <span>
-                          {locale === "zh-CN"
-                            ? "最大对齐偏差"
-                            : "Max alignment drift"}
-                        </span>
-                      </div>
-                    </div>
-                    {alignmentDiagnostics.missingBounds > 0 && (
-                      <p className="alignment-readiness__issue">
-                        {locale === "zh-CN"
-                          ? `${alignmentDiagnostics.missingBounds} 帧没有可识别主体；请返回背景处理或排除这些帧。`
-                          : `${alignmentDiagnostics.missingBounds} frame(s) have no detectable subject; clean them up or exclude them.`}
-                      </p>
-                    )}
-                    <div className="alignment-resolution-actions">
-                      <button
-                        type="button"
-                        className={`button ${alignmentDiagnostics.outsideCrop ? "button--primary" : "button--ghost"}`}
-                        disabled={
-                          fittedContentScale === null ||
-                          Math.abs(fittedContentScale - project.contentScale) <
-                            0.001
-                        }
-                        onClick={() =>
-                          updateProject((next) => {
-                            const fitted = fitSharedContentScale(
-                              next.frames,
-                              next.sharedCrop,
-                              next.groundLine,
-                            );
-                            if (fitted !== null) next.contentScale = fitted;
-                            return next;
-                          })
-                        }
-                      >
-                        <ScanLine size={14} />
-                        {locale === "zh-CN" ? "适合画布" : "Fit to canvas"}
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        disabled={!expandedAlignmentCanvas}
-                        title={
-                          !expandedAlignmentCanvas
-                            ? locale === "zh-CN"
-                              ? "当前源画布已无法继续扩大"
-                              : "The source canvas cannot expand further"
-                            : undefined
-                        }
-                        onClick={() =>
-                          updateProject((next) => {
-                            const expanded = expandSharedCanvasToContent(
-                              next.frames,
-                              next.sharedCrop,
-                              next.groundLine,
-                              next.contentScale,
-                              alignmentCanvas,
-                            );
-                            if (!expanded) return next;
-                            next.sharedCrop = expanded.crop;
-                            next.groundLine = expanded.groundLine;
-                            next.frames.forEach((frame) => {
-                              frame.baselineOffset.x += expanded.offsetDelta.x;
-                              frame.baselineOffset.y += expanded.offsetDelta.y;
-                            });
-                            return next;
-                          })
-                        }
-                      >
-                        <Crop size={14} />
-                        {locale === "zh-CN" ? "扩大画布" : "Expand canvas"}
-                      </button>
-                      <button
-                        type="button"
-                        className="button button--ghost"
-                        disabled={alignmentDiagnostics.ready}
-                        onClick={() => {
-                          const outlier = alignmentDiagnostics.frames.find(
-                            (diagnostic) =>
-                              diagnostic.missingBounds ||
-                              diagnostic.outsideCrop ||
-                              Math.abs(diagnostic.baselineDelta ?? 0) > 2 ||
-                              Math.abs(diagnostic.centerDelta ?? 0) > 2,
-                          );
-                          if (!outlier) return;
-                          selectCalibrationFrame(outlier.frameIndex);
-                          setAlignmentTool("frame");
-                          setAlignmentView("overlay");
-                        }}
-                      >
-                        <Eye size={14} />
-                        {locale === "zh-CN" ? "检查异常帧" : "Inspect outliers"}
-                      </button>
-                    </div>
-                    <button
-                      className="button button--ghost creator-inspector-action"
-                      onClick={() => {
-                        updateProject((next) => {
-                          applySuggestedSharedAlignment(next, frames);
-                          return next;
+                        return next;
+                      })
+                    }
+                    onExpand={() =>
+                      updateProject((next) => {
+                        const expanded = expandSharedCanvasToContent(
+                          next.frames,
+                          next.sharedCrop,
+                          next.groundLine,
+                          next.contentScale,
+                          alignmentCanvas,
+                        );
+                        if (!expanded) return next;
+                        next.sharedCrop = expanded.crop;
+                        next.groundLine = expanded.groundLine;
+                        next.frames.forEach((frame) => {
+                          frame.baselineOffset.x += expanded.offsetDelta.x;
+                          frame.baselineOffset.y += expanded.offsetDelta.y;
                         });
-                      }}
-                    >
-                      <Sparkles size={15} />
-                      {alignmentDiagnostics.ready
-                        ? locale === "zh-CN"
-                          ? "重新对齐全部有效帧"
-                          : "Re-align included frames"
-                        : locale === "zh-CN"
-                          ? "自动对齐全部有效帧"
-                          : "Auto-align included frames"}
-                    </button>
-                  </section>
+                        return next;
+                      })
+                    }
+                    onInspect={() => {
+                      const outlier = alignmentDiagnostics.frames.find(
+                        (diagnostic) =>
+                          diagnostic.missingBounds ||
+                          diagnostic.outsideCrop ||
+                          Math.abs(diagnostic.baselineDelta ?? 0) > 2 ||
+                          Math.abs(diagnostic.centerDelta ?? 0) > 2,
+                      );
+                      if (!outlier) return;
+                      selectCalibrationFrame(outlier.frameIndex);
+                      setAlignmentTool("frame");
+                      setAlignmentView("overlay");
+                    }}
+                    onAutoAlign={() =>
+                      updateProject((next) => {
+                        applySuggestedSharedAlignment(next, frames);
+                        return next;
+                      })
+                    }
+                    onReturnCleanup={() => setStep("cleanup")}
+                  />
                   <section>
                     <div className="creator-section-heading">
                       <div>
