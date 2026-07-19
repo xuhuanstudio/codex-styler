@@ -1,0 +1,39 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.7",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "A coordinated theme system, faithful Codex previews, safe companion placement, and explicit creator-quality review bring Beta 7 to its release gate.",
+      "highlights": [
+        "Themes now coordinate surfaces, text, icons, borders, status and diff colors, typography, materials, depth, and reduced-motion-safe animation through one preview/runtime contract.",
+        "Theme previews use a structurally faithful Codex shell for Home, Task and composer, Settings, Dialog, Components and states, and Right panel scenarios.",
+        "Companion Studio adds shared-canvas scaling and alignment assistance, placement modes, behavior audition, compiler-ready output summaries, and final edge review.",
+        "Theme and companion libraries use responsive master-detail workspaces with accurate previews and one persistent application action."
+      ],
+      "fixes": [
+        "Fixed preview controls covering themed workspaces or relying on an invented Codex layout.",
+        "Fixed companion previews using arbitrary scale or placement that did not match runtime attachment rules.",
+        "Fixed global frame scaling allowing out-of-bounds output or per-frame size drift instead of preserving a shared canvas and ground line.",
+        "Fixed theme motion recipes interfering with Codex-owned transforms or ignoring reduced-motion preferences.",
+        "Fixed unreadable semantic text, icon, border, status, and code-change combinations by validating them against the surfaces where they actually render."
+      ]
+    },
+    "zh-CN": {
+      "summary": "统一的主题视觉系统、忠实的 Codex 预览、安全的伙伴定位与明确的创作质量验收，让 Beta 7 达到发布门槛。",
+      "highlights": [
+        "主题现在通过同一套预览与运行时合同统一协调表面、文字、图标、边框、状态与代码变更色、排版、材质、层次和减少动态效果。",
+        "主题预览使用更贴近真实结构的 Codex 骨架，覆盖主页、任务与输入区、设置、弹窗、组件状态和右侧面板。",
+        "伙伴工作室新增共享画布缩放与对齐辅助、定位模式、行为联调、编译输出摘要和最终边缘质量验收。",
+        "主题库与伙伴库使用响应式主从工作区、准确预览和唯一的全局应用操作。"
+      ],
+      "fixes": [
+        "修复预览控件长期遮挡主题内容，以及使用与真实 Codex 不一致的虚构布局问题。",
+        "修复伙伴预览使用随意尺寸或位置、与运行时贴合规则不一致的问题。",
+        "修复全帧缩放导致输出越界或逐帧大小漂移，而不是保持共享画布与落脚线的问题。",
+        "修复主题动效干扰 Codex 自有 transform 或忽略减少动态偏好的问题。",
+        "修复语义文字、图标、边框、状态色与代码变更色没有依据实际承载表面进行可读性校验的问题。"
+      ]
+    }
+  }
+}

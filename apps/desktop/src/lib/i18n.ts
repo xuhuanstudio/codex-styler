@@ -595,7 +595,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 6",
+    version: "Beta 7",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -1158,7 +1158,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 6",
+    version: "Beta 7",
   },
 } as const;
 
