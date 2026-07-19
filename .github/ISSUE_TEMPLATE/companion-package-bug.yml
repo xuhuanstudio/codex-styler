@@ -7,7 +7,7 @@ body:
     id: styler-version
     attributes:
       label: Codex Styler version
-      placeholder: 0.2.0-beta.3
+      placeholder: 0.2.0-beta.6
     validations:
       required: true
   - type: dropdown

@@ -43,6 +43,60 @@ The roadmap is organized by evidence gates, not calendar promises.
 - Windows 11 x64 community device evidence: still required before RC and not claimed by either Beta build;
 - dependency audits, package-size checks, complete upgrade/restore/uninstall evidence, and P0/P1 closure.
 
+### Gate 5: Usability and visual completion — in progress
+
+This gate treats usability and visual quality as measurable product work rather
+than an open-ended polish pass.
+
+The detailed task model, quality scorecard, and release evidence are maintained
+in [docs/product-quality-plan.md](docs/product-quality-plan.md).
+
+#### Beta 6 — ordinary-user foundation
+
+- replace page-specific apply controls with one persistent setup bar showing the
+  selected theme, independent companion, runtime state, and safest next action;
+- turn first run into a complete safety check → setup choice → review and apply
+  journey, including missing-install recovery;
+- make compact theme and companion libraries use an explicit list → detail flow
+  instead of silently removing previews;
+- raise product copy to a readable type scale while keeping miniature Codex
+  previews spatially accurate;
+- verify English and Simplified Chinese in light and dark appearance at
+  1320×840 and 960×680, including keyboard focus, scrolling, Toasts, and dialogs.
+
+Exit evidence: a new user can install, choose a theme and optional companion,
+start Codex, understand the resulting state, and restore the official interface
+without consulting documentation.
+
+#### Beta 7 — creator completion
+
+- run a task-based audit of every Companion Studio stage using still image,
+  sequence, video, and atlas inputs; remove controls that have no observable
+  output and expose recoverable errors next to the operation that caused them;
+- add persistent history visibility, before/after inspection, processing
+  estimates, and explicit output-quality checks for edge contamination,
+  baseline stability, pose coverage, and atlas page limits;
+- give Theme Editor the same validation model: every visible control must map to
+  a fixture assertion and a real Codex effect;
+- finish empty, loading, partial, unsupported, and recovery states across both
+  creators without introducing new package formats.
+
+Exit evidence: prepared media can become a validated companion in ten minutes,
+and every correction remains non-destructive and reversible.
+
+#### RC readiness — reliability proof
+
+- complete current-version Codex injection runs for Home, Task, Settings,
+  Dialog, Right panel, dynamic composer, route changes, sleep/wake, and restore;
+- collect at least two independent Windows 11 x64 and two macOS Apple Silicon
+  full-lifecycle reports covering install, update, restart, apply, recovery,
+  restore, and uninstall;
+- close every P0/P1, keep package and memory budgets, and require screenshot,
+  accessibility, migration, updater, and dependency checks in CI.
+
+Exit evidence: failures are diagnosable and recoverable, and no supported flow
+depends on an undocumented manual restart or hidden application state.
+
 ## Release sequence
 
 1. `v0.2.0-beta.1`: functionally complete Creator Beta; macOS local validation; Windows CI build marked as awaiting community validation.
@@ -50,8 +104,10 @@ The roadmap is organized by evidence gates, not calendar promises.
 3. `v0.2.0-beta.3`: professional product-coherence pass for application state, resource libraries, focused workspaces, Settings, typography, and responsive visual regression.
 4. `v0.2.0-beta.4`: bounded and silent Windows lifecycle recovery, resilient Microsoft Store activation, localized recovery guidance, and cross-platform interaction chrome.
 5. `v0.2.0-beta.5`: theme-aware text contrast across actual UI surfaces, targeted readability recovery, and conservative fallback only after repair or structural health failure.
-6. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
-7. `v0.2.0`: only when RC evidence supports it.
+6. `v0.2.0-beta.6`: ordinary-user setup journey, one application model, compact resource details, and readability/accessibility convergence.
+7. `v0.2.0-beta.7`: creator task completion, observable validation, and full error/recovery coverage without new formats.
+8. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
+9. `v0.2.0`: only when RC evidence supports it.
 
 ## v1 Stable
 

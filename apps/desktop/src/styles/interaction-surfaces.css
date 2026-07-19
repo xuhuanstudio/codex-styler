@@ -47,6 +47,7 @@
 
 :where(
   .app-main,
+  .app-main__viewport,
   .theme-list,
   .companion-list,
   .layer-stack,
@@ -54,7 +55,9 @@
   .creator-inspector-panel,
   .creator-frame-strip__items,
   .new-theme-existing-list,
+  .new-theme-options,
   .onboarding,
+  .onboarding-content,
   .update-dialog__notes,
   .diagnostics-dialog,
   .diagnostics-dialog pre,

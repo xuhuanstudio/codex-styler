@@ -11,7 +11,7 @@ import {
   Sparkles,
   Sun,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { SelectField } from "../../components/ui/SelectField";
 import type { LocalePreference, MessageKey } from "../../lib/i18n";
 import type { CodexDetection } from "../../lib/runtime";
@@ -37,6 +37,10 @@ export interface SettingsViewProps {
   diagnosticsBusy: boolean;
   onRunDiagnostics: () => void;
   onOpenOnboarding: () => void;
+  focusRequest: {
+    target: "codex" | "diagnostics";
+    revision: number;
+  } | null;
 }
 
 export function SettingsView({
@@ -53,8 +57,25 @@ export function SettingsView({
   diagnosticsBusy,
   onRunDiagnostics,
   onOpenOnboarding,
+  focusRequest,
 }: SettingsViewProps) {
   const lastChecked = formatLastChecked(settings.lastUpdateCheckAt, t);
+  const codexLocationRef = useRef<HTMLElement>(null);
+  const diagnosticsRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!focusRequest) return;
+    const target =
+      focusRequest.target === "codex"
+        ? codexLocationRef.current
+        : diagnosticsRef.current;
+    if (!target) return;
+    target.scrollIntoView?.({
+      block: "center",
+      behavior: settings.reduceMotion ? "auto" : "smooth",
+    });
+    target.focus({ preventScroll: true });
+  }, [focusRequest, settings.reduceMotion]);
 
   return (
     <div className="page settings-page">
@@ -145,7 +166,11 @@ export function SettingsView({
           </div>
         </section>
 
-        <section className="settings-group codex-location-setting">
+        <section
+          ref={codexLocationRef}
+          className="settings-group codex-location-setting settings-recovery-target"
+          tabIndex={-1}
+        >
           <div className="settings-group__title">
             <FolderOpen size={17} />
             <div>
@@ -224,7 +249,11 @@ export function SettingsView({
               : t("checkForUpdates")}
           </button>
         </section>
-        <section className="settings-group settings-group--row diagnostics-settings-row">
+        <section
+          ref={diagnosticsRef}
+          className="settings-group settings-group--row diagnostics-settings-row settings-recovery-target"
+          tabIndex={-1}
+        >
           <div className="settings-group__title">
             <ShieldCheck size={17} />
             <div>

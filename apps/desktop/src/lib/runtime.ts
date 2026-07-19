@@ -71,7 +71,7 @@ export type UpdateDownloadEvent =
   | { event: "Progress"; data: { chunkLength: number } }
   | { event: "Finished" };
 
-const browserStatus: RuntimeStatus = {
+let browserStatus: RuntimeStatus = {
   state: "disconnected",
   connected: false,
   startedByStyler: false,
@@ -82,6 +82,39 @@ const browserStatus: RuntimeStatus = {
   revision: 0,
 };
 
+function browserPreviewStatus(): RuntimeStatus | null {
+  if (typeof window === "undefined") return null;
+  const preview = browserPreviewMode();
+  const message =
+    preview === "windows-store"
+      ? "Codex could not be launched: The Microsoft Store installation could not be resolved to an application identity"
+      : preview === "permission"
+        ? "Codex could not be launched: Access is denied (os error 5)"
+        : preview === "connection"
+          ? "Could not open the Codex debugging socket: Connection refused"
+          : preview === "timeout"
+            ? "Codex did not expose a trusted page target before the connection timeout"
+            : preview === "unknown"
+              ? "Codex could not be launched: An unexpected desktop error occurred"
+              : null;
+  return message
+    ? {
+        ...browserStatus,
+        state: "error",
+        connected: false,
+        startedByStyler: false,
+        port: null,
+        compatibility: "safe",
+        message,
+      }
+    : null;
+}
+
+function browserPreviewMode(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("runtimePreview");
+}
+
 function isTauri(): boolean {
   return "__TAURI_INTERNALS__" in window;
 }
@@ -90,6 +123,16 @@ export async function detectCodex(
   customPath?: string | null,
 ): Promise<CodexDetection> {
   if (!isTauri()) {
+    const preview = browserPreviewMode();
+    if (preview === "windows-store" || preview === "permission") {
+      return {
+        installed: true,
+        running: false,
+        path: "C:\\Program Files\\WindowsApps\\OpenAI.Codex_26.0.0.0_x64__2p2nqsd0c76g0\\app\\Codex.exe",
+        version: "26.0.0.0",
+        platform: "win32",
+      };
+    }
     return {
       installed: true,
       running: false,
@@ -102,7 +145,7 @@ export async function detectCodex(
 }
 
 export async function getRuntimeStatus(): Promise<RuntimeStatus> {
-  if (!isTauri()) return { ...browserStatus };
+  if (!isTauri()) return { ...(browserPreviewStatus() ?? browserStatus) };
   return invoke<RuntimeStatus>("runtime_status");
 }
 
@@ -110,7 +153,7 @@ export async function launchCodex(
   customPath?: string | null,
 ): Promise<RuntimeStatus> {
   if (!isTauri()) {
-    return {
+    browserStatus = {
       ...browserStatus,
       state: "connected",
       connected: true,
@@ -118,6 +161,7 @@ export async function launchCodex(
       port: 9229,
       message: "Browser preview connection",
     };
+    return { ...browserStatus };
   }
   return invoke<RuntimeStatus>("launch_codex", { customPath });
 }
@@ -164,7 +208,7 @@ export async function applyTheme(
 ): Promise<RuntimeStatus> {
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
   if (!isTauri()) {
-    return {
+    browserStatus = {
       ...browserStatus,
       state: "applied",
       connected: true,
@@ -173,6 +217,7 @@ export async function applyTheme(
       revision,
       message: "Theme applied in preview mode",
     };
+    return { ...browserStatus };
   }
   return invoke<RuntimeStatus>("apply_theme", {
     theme: payload,
@@ -212,7 +257,7 @@ export async function updateCompanion(
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
   const entity = payload.scene.entities[0] ?? null;
   if (!isTauri()) {
-    return {
+    browserStatus = {
       ...browserStatus,
       state: "applied",
       connected: true,
@@ -221,6 +266,7 @@ export async function updateCompanion(
       revision,
       message: "Companion updated in preview mode",
     };
+    return { ...browserStatus };
   }
   return invoke<RuntimeStatus>("update_companion", { entity, revision });
 }
@@ -268,19 +314,30 @@ export function prepareMotionPreference(
 
 export async function pauseTheme(): Promise<RuntimeStatus> {
   if (!isTauri()) {
-    return {
+    browserStatus = {
       ...browserStatus,
       state: "paused",
       connected: true,
       startedByStyler: true,
       port: 9229,
     };
+    return { ...browserStatus };
   }
   return invoke<RuntimeStatus>("pause_theme");
 }
 
 export async function restoreOfficial(): Promise<RuntimeStatus> {
-  if (!isTauri()) return { ...browserStatus };
+  if (!isTauri()) {
+    browserStatus = {
+      ...browserStatus,
+      state: "disconnected",
+      connected: false,
+      startedByStyler: false,
+      port: null,
+      message: null,
+    };
+    return { ...browserStatus };
+  }
   return invoke<RuntimeStatus>("restore_official");
 }
 
@@ -288,7 +345,7 @@ export async function checkForUpdates(
   locale: "en" | "zh-CN",
 ): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.2.0-beta.5", update: null };
+    return { currentVersion: "0.2.0-beta.6", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates", { locale });
 }

@@ -19,11 +19,11 @@
   --control-large: 46px;
 
   --type-caption: 11px;
-  --type-meta: 12px;
-  --type-body: 13px;
-  --type-label: 14px;
+  --type-meta: 12.5px;
+  --type-body: 14px;
+  --type-label: 15px;
   --type-section: 18px;
-  --type-page: 30px;
+  --type-page: 32px;
 
   --motion-micro: 120ms;
   --motion-standard: 180ms;

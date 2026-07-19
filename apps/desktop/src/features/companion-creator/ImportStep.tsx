@@ -37,6 +37,7 @@ export interface ImportStepProps {
   dropzoneRef: RefObject<HTMLButtonElement | null>;
   inputRef: RefObject<HTMLInputElement | null>;
   chooseKind: (kind: CompanionImportKind) => void;
+  onUseAutomaticDetection: () => void;
   onDragEnter: (event: DragEvent<HTMLButtonElement>) => void;
   onDragOver: (event: DragEvent<HTMLButtonElement>) => void;
   onDragLeave: (event: DragEvent<HTMLButtonElement>) => void;
@@ -60,6 +61,7 @@ export function ImportStep({
   dropzoneRef,
   inputRef,
   chooseKind,
+  onUseAutomaticDetection,
   onDragEnter,
   onDragOver,
   onDragLeave,
@@ -67,6 +69,14 @@ export function ImportStep({
   onFiles,
   onRemoveSource,
 }: ImportStepProps) {
+  const sourceHint = project.source
+    ? locale === "zh-CN"
+      ? `当前限定为${c[project.source.kind]}；点击或拖入素材即可继续。`
+      : `Currently limited to ${c[project.source.kind]}. Click or drop source files to continue.`
+    : locale === "zh-CN"
+      ? "支持图片、图片序列、视频和图集；直接导入时会自动识别。"
+      : "Images, image sequences, videos, and atlases are detected automatically.";
+
   return (
     <section className="creator-panel creator-import">
       <div className="creator-panel__intro">
@@ -75,39 +85,6 @@ export function ImportStep({
           <h2>{c.steps.import}</h2>
           <p>{c.importHelp}</p>
         </div>
-      </div>
-      <div className="creator-source-types">
-        {(
-          [
-            ["image", c.image, ImageIcon],
-            ["sequence", c.sequence, Sparkles],
-            ["video", c.video, Film],
-            ["atlas", c.atlas, Grid3X3],
-          ] as const
-        ).map(([kind, label, Icon]) => (
-          <button
-            key={kind}
-            className={
-              project.source?.kind === kind
-                ? "source-type source-type--active"
-                : "source-type"
-            }
-            onClick={() => chooseKind(kind)}
-            aria-pressed={project.source?.kind === kind}
-          >
-            <Icon size={21} />
-            <strong>{label}</strong>
-            <span>
-              {kind === "video"
-                ? c.videoHint
-                : kind === "sequence"
-                  ? c.sequenceHint
-                  : kind === "atlas"
-                    ? c.atlasHint
-                    : c.imageHint}
-            </span>
-          </button>
-        ))}
       </div>
       <div className="creator-dropzone-shell">
         <button
@@ -123,6 +100,11 @@ export function ImportStep({
           onDragOver={onDragOver}
           onDragLeave={onDragLeave}
           onDrop={onDrop}
+          aria-describedby={
+            project.source?.files.length
+              ? undefined
+              : "creator-source-detection-hint"
+          }
         >
           {project.source?.files.length ? (
             <>
@@ -159,7 +141,7 @@ export function ImportStep({
             <>
               <Upload size={22} />
               <strong>{dragActive ? c.releaseFiles : c.chooseFiles}</strong>
-              <span>{c.noSource}</span>
+              <span id="creator-source-detection-hint">{sourceHint}</span>
             </>
           )}
         </button>
@@ -189,6 +171,85 @@ export function ImportStep({
         }
         onChange={onFiles}
       />
+      <section
+        className="creator-source-choice"
+        aria-labelledby="creator-source-choice-label"
+      >
+        <div className="creator-source-choice__heading">
+          <div>
+            <strong id="creator-source-choice-label">
+              {locale === "zh-CN"
+                ? "可选：限定素材类型"
+                : "Optional: limit source type"}
+            </strong>
+            <span>
+              {locale === "zh-CN"
+                ? "不选择时自动识别；只有需要约束文件选择器时才选择。"
+                : "Leave this unset for automatic detection, or choose a type to constrain the file picker."}
+            </span>
+          </div>
+          {project.source && project.source.files.length === 0 ? (
+            <button
+              type="button"
+              className="creator-source-choice__mode"
+              onClick={onUseAutomaticDetection}
+            >
+              {locale === "zh-CN" ? "恢复自动识别" : "Use automatic detection"}
+            </button>
+          ) : (
+            <small>
+              {project.source
+                ? locale === "zh-CN"
+                  ? `已识别：${c[project.source.kind]}`
+                  : `Detected: ${c[project.source.kind]}`
+                : locale === "zh-CN"
+                  ? "自动识别（推荐）"
+                  : "Auto detect (recommended)"}
+            </small>
+          )}
+        </div>
+        <div className="creator-source-types">
+          {(
+            [
+              ["image", c.image, ImageIcon],
+              ["sequence", c.sequence, Sparkles],
+              ["video", c.video, Film],
+              ["atlas", c.atlas, Grid3X3],
+            ] as const
+          ).map(([kind, label, Icon]) => {
+            const active = project.source?.kind === kind;
+            return (
+              <button
+                key={kind}
+                className={
+                  active ? "source-type source-type--active" : "source-type"
+                }
+                onClick={() => chooseKind(kind)}
+                aria-pressed={active}
+              >
+                <Icon size={21} />
+                <strong>{label}</strong>
+                <span>
+                  {kind === "video"
+                    ? c.videoHint
+                    : kind === "sequence"
+                      ? c.sequenceHint
+                      : kind === "atlas"
+                        ? c.atlasHint
+                        : c.imageHint}
+                </span>
+                {active ? (
+                  <Check
+                    className="source-type__state"
+                    size={14}
+                    aria-hidden="true"
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+      </section>
       <section className="creator-import-guide" aria-label={c.importGuideTitle}>
         <div>
           <Sparkles size={16} />

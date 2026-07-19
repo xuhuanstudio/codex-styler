@@ -63,6 +63,7 @@ export function PreviewWorkspace({
   const [direction, setDirection] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [spriteReady, setSpriteReady] = useState(0);
+  const interactive = Boolean(onEntityAnchorChange || onEntityAttachmentChange);
   const visual = theme.variants[variant];
   const entity = theme.scene.entities[0];
   const backgroundImage = visual.background.image
@@ -344,8 +345,16 @@ export function PreviewWorkspace({
       data-decorations={visual.appearance.decorations ?? "none"}
       data-contrast-tone={contrastSystem.tone}
       data-preview-scenario={scenario}
-      role="group"
-      aria-label={isChinese ? "Codex 主题预览" : "Codex theme preview"}
+      role={interactive ? "group" : undefined}
+      aria-label={
+        interactive
+          ? isChinese
+            ? "Codex 主题预览"
+            : "Codex theme preview"
+          : undefined
+      }
+      aria-hidden={interactive ? undefined : true}
+      inert={interactive ? undefined : true}
     >
       <div
         className="workspace-preview__backdrop"

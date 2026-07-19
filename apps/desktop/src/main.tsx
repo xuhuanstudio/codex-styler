@@ -11,6 +11,7 @@ import "./styles/editor.css";
 import "./styles/creator-beta3.css";
 import "./styles/interaction-surfaces.css";
 import "./styles/typography.css";
+import "./styles/experience-beta6.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
