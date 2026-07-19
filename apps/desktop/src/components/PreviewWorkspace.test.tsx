@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import {
   composeThemeWithCompanion,
   gildedGrandeur,
@@ -13,6 +19,7 @@ import { resolveThemePreviewPalette } from "../lib/theme-preview-palette";
 
 describe("PreviewWorkspace task views", () => {
   afterEach(() => {
+    cleanup();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });

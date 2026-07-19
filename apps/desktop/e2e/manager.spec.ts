@@ -198,6 +198,21 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await appearanceComparison.getByRole("button", { name: "Styled" }).click();
   await expect(previewControlsTrigger).toBeVisible();
   await expect(previewControlsTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect
+    .poll(() =>
+      previewControlsTrigger.evaluate((trigger) => {
+        const bounds = trigger.getBoundingClientRect();
+        const topmostElement = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        return (
+          topmostElement === trigger ||
+          (topmostElement !== null && trigger.contains(topmostElement))
+        );
+      }),
+    )
+    .toBe(true);
   await expect(page).toHaveScreenshot("themes-en-dark-1320x840.png");
 
   await page.setViewportSize({ width: 960, height: 680 });
