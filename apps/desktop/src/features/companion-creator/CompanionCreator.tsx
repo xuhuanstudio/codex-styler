@@ -52,9 +52,11 @@ import {
   fitSharedContentScale,
   nearestDirectionFrame,
   normalizeAngle,
+  pointerAngle,
   suggestSharedAlignment,
   type DirectionCalibration,
 } from "./calibration";
+import { BehaviorAudition } from "./BehaviorAudition";
 import { compileCompanion } from "./compiler";
 import { DirectionDial } from "./DirectionDial";
 import {
@@ -93,6 +95,7 @@ import {
   diagnoseMotionRange,
   motionPreviewFrames,
   motionRangeSignature,
+  resolveMotionAudition,
   type MotionPlayback,
 } from "./motions";
 import {
@@ -234,7 +237,7 @@ const copy = {
       "Mark blinks, breathing and small gestures as idle ranges. They remain attached to poses instead of becoming duplicate directions.",
     addMotion: "Add current idle range",
     testHelp:
-      "Move the pointer in the stage to test direction selection. The final package contains compiled atlases, not your source video.",
+      "Test direction selection and saved idle motions together. Pointer movement interrupts an idle motion just like the final runtime.",
     save: "Build and install companion",
     building: "Building companion…",
     description: "Description",
@@ -411,7 +414,7 @@ const copy = {
       "将眨眼、呼吸和小动作标记为空闲区间，它们会关联姿态，而不会伪装成重复方向。",
     addMotion: "添加当前小动作区间",
     testHelp:
-      "在舞台内移动光标测试方向选择。最终包只包含编译后的图集，不包含源视频。",
+      "在同一舞台联调方向选择与已保存的小动作；移动光标会像实际运行时一样立即中断动作。",
     save: "构建并安装伙伴",
     building: "正在构建伙伴…",
     description: "伙伴描述",
@@ -793,6 +796,13 @@ export function CompanionCreator({
   const [calibrationStart, setCalibrationStart] = useState(0);
   const [calibrationEnd, setCalibrationEnd] = useState(0);
   const [pointer, setPointer] = useState({ x: 50, y: 18 });
+  const [testMotionSelectionId, setTestMotionSelectionId] = useState<
+    string | null
+  >(null);
+  const [testMotionPlayback, setTestMotionPlayback] = useState<{
+    motionId: string;
+    frameIndex: number;
+  } | null>(null);
   const [testComposerHeight, setTestComposerHeight] = useState(70);
   const [brushMode, setBrushMode] = useState<"keep" | "erase">("erase");
   const [brushScope, setBrushScope] = useState<"current" | "all">("current");
@@ -1321,16 +1331,58 @@ export function CompanionCreator({
       setAngle(currentDirectionAnchor.angle);
     }
   }, [currentDirectionAnchor?.angle, currentDirectionAnchor?.id, project.step]);
+  const pointerDirection = useMemo(
+    () => pointerAngle(pointer.x, pointer.y, 50, 50),
+    [pointer.x, pointer.y],
+  );
   const previewFrameIndex = useMemo(() => {
-    const pointerAngle = normalizeAngle(
-      (Math.atan2(pointer.x - 50, 50 - pointer.y) * 180) / Math.PI,
-    );
     return nearestDirectionFrame(
       calibration.frameAngles,
-      pointerAngle,
+      pointerDirection,
       project.neutralFrame,
     );
-  }, [calibration.frameAngles, pointer, project.neutralFrame]);
+  }, [calibration.frameAngles, pointerDirection, project.neutralFrame]);
+  const testMotionPlan = useMemo(
+    () => resolveMotionAudition(project, pointerDirection),
+    [pointerDirection, project],
+  );
+  const selectedTestMotion =
+    testMotionPlan.motions.find(
+      (motion) => motion.id === testMotionSelectionId,
+    ) ??
+    testMotionPlan.motions[0] ??
+    null;
+  const playingTestMotion = testMotionPlayback
+    ? (testMotionPlan.motions.find(
+        (motion) => motion.id === testMotionPlayback.motionId,
+      ) ?? null)
+    : null;
+  const displayedTestFrameIndex = playingTestMotion
+    ? testMotionPlayback!.frameIndex
+    : previewFrameIndex;
+  useEffect(() => {
+    if (project.step !== "test" || !testMotionPlayback) return;
+    if (!playingTestMotion) {
+      setTestMotionPlayback(null);
+      return;
+    }
+    const currentPosition = Math.max(
+      0,
+      playingTestMotion.frames.indexOf(testMotionPlayback.frameIndex),
+    );
+    const timeout = window.setTimeout(() => {
+      const nextPosition = currentPosition + 1;
+      if (nextPosition >= playingTestMotion.frames.length) {
+        setTestMotionPlayback(null);
+        return;
+      }
+      setTestMotionPlayback({
+        motionId: playingTestMotion.id,
+        frameIndex: playingTestMotion.frames[nextPosition]!,
+      });
+    }, playingTestMotion.frameDurationMs);
+    return () => window.clearTimeout(timeout);
+  }, [playingTestMotion, project.step, testMotionPlayback]);
   const motionDiagnostics = useMemo(
     () => diagnoseMotionRange(project, motionStart, motionEnd),
     [motionEnd, motionStart, project],
@@ -4794,14 +4846,17 @@ export function CompanionCreator({
                     frame={frames.find(
                       (item) =>
                         item.sourceIndex ===
-                        project.frames[previewFrameIndex]?.sourceIndex,
+                        project.frames[displayedTestFrameIndex]?.sourceIndex,
                     )}
-                    logicalFrame={project.frames[previewFrameIndex]}
+                    logicalFrame={project.frames[displayedTestFrameIndex]}
                     crop={project.sharedCrop}
                     groundLine={project.groundLine}
                     contentScale={project.contentScale}
                     pointer={pointer}
-                    onPointer={setPointer}
+                    onPointer={(nextPointer) => {
+                      setTestMotionPlayback(null);
+                      setPointer(nextPointer);
+                    }}
                     placement={project.placement}
                     backdrop={project.preview.background}
                     composerHeight={testComposerHeight}
@@ -4819,6 +4874,28 @@ export function CompanionCreator({
                   />
                 </div>
                 <aside className="creator-inspector-panel creator-inspector-panel--test">
+                  <BehaviorAudition
+                    locale={locale}
+                    plan={testMotionPlan}
+                    selectedMotionId={selectedTestMotion?.id ?? null}
+                    playing={Boolean(playingTestMotion)}
+                    onSelect={(motionId) => {
+                      setTestMotionPlayback(null);
+                      setTestMotionSelectionId(motionId);
+                    }}
+                    onToggle={() => {
+                      if (testMotionPlayback) {
+                        setTestMotionPlayback(null);
+                        return;
+                      }
+                      if (!selectedTestMotion) return;
+                      setTestMotionSelectionId(selectedTestMotion.id);
+                      setTestMotionPlayback({
+                        motionId: selectedTestMotion.id,
+                        frameIndex: selectedTestMotion.frames[0]!,
+                      });
+                    }}
+                  />
                   <EdgeQualityReview
                     locale={locale}
                     currentBackdrop={project.preview.background}

@@ -1,4 +1,4 @@
-import { calibrateDirections } from "./calibration";
+import { calibrateDirections, normalizeAngle } from "./calibration";
 import type {
   CompanionCreatorProject,
   DirectionAnchor,
@@ -19,6 +19,24 @@ export interface MotionRangeDiagnostics {
   recommendedPoseAngle: number | null;
   canPreview: boolean;
   hasDirectionDrift: boolean;
+}
+
+export interface MotionAuditionOption {
+  id: string;
+  name: string;
+  frames: number[];
+  frameDurationMs: number;
+  durationMs: number;
+}
+
+export interface MotionAuditionPlan {
+  activeAnchor: DirectionAnchor | null;
+  motions: MotionAuditionOption[];
+}
+
+export interface DirectionalPoseReference {
+  id: string;
+  angle: number;
 }
 
 export function clampMotionRange(
@@ -64,6 +82,88 @@ export function motionPreviewFrames(
     return [...included, ...included.slice(1, -1).reverse()];
   }
   return included;
+}
+
+function circularAngleDistance(left: number, right: number): number {
+  const distance = Math.abs(normalizeAngle(left) - normalizeAngle(right));
+  return Math.min(distance, 360 - distance);
+}
+
+function nearestAnchor(
+  anchors: DirectionAnchor[],
+  angle: number,
+): DirectionAnchor | null {
+  return anchors.reduce<DirectionAnchor | null>((closest, anchor) => {
+    if (!closest) return anchor;
+    return circularAngleDistance(anchor.angle, angle) <
+      circularAngleDistance(closest.angle, angle)
+      ? anchor
+      : closest;
+  }, null);
+}
+
+/**
+ * Expands an anchor assignment across every compiled pose in that anchor's
+ * angular sector. This keeps creator wording, the final audition and runtime
+ * behavior aligned even when calibration produces many interpolated poses.
+ */
+export function assignedPoseIdsForMotion(
+  poses: DirectionalPoseReference[],
+  anchors: DirectionAnchor[],
+  assignedAnchorIds: string[],
+): string[] {
+  const assigned = new Set(assignedAnchorIds);
+  return poses.flatMap((pose) => {
+    const anchor = nearestAnchor(anchors, pose.angle);
+    return anchor && assigned.has(anchor.id) ? [pose.id] : [];
+  });
+}
+
+/**
+ * Builds the same pose-scoped idle sequence the compiled runtime can play.
+ * The final creator stage uses this plan to audition direction selection and
+ * saved idle motion together instead of testing them as unrelated features.
+ */
+export function resolveMotionAudition(
+  project: CompanionCreatorProject,
+  pointerAngle: number,
+): MotionAuditionPlan {
+  const activeAnchors = project.directionAnchors.filter(
+    (anchor) =>
+      anchor.frameIndex >= 0 &&
+      anchor.frameIndex < project.frames.length &&
+      !project.frames[anchor.frameIndex]?.excluded,
+  );
+  const activeAnchor = nearestAnchor(activeAnchors, pointerAngle);
+  if (!activeAnchor) return { activeAnchor: null, motions: [] };
+
+  const motions = project.motionRanges.flatMap<MotionAuditionOption>(
+    (motion) => {
+      if (!motion.poseAnchorIds.includes(activeAnchor.id)) return [];
+      const frames = motionPreviewFrames(
+        project.frames,
+        motion.startFrame,
+        motion.endFrame,
+        motion.playback,
+      );
+      if (frames.length < 2) return [];
+      const safeSpeed = Number.isFinite(motion.speed)
+        ? Math.min(4, Math.max(0.1, motion.speed))
+        : 1;
+      const frameDurationMs = Math.max(16, Math.round(1000 / (24 * safeSpeed)));
+      return [
+        {
+          id: motion.id,
+          name: motion.name.trim() || "Idle motion",
+          frames,
+          frameDurationMs,
+          durationMs: frames.length * frameDurationMs,
+        },
+      ];
+    },
+  );
+
+  return { activeAnchor, motions };
 }
 
 function circularDistance(left: number, right: number): number {

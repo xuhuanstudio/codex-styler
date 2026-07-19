@@ -248,6 +248,12 @@ working control behind another page, revert it.
   the same raised, overlay, and sunken roles across cards, composer, code,
   settings, dialogs, menus, and the right panel while preserving Codex layout,
   hit targets, and component geometry.
+- the final companion stage now auditions direction selection and saved idle
+  motion as one runtime behavior. The inspector exposes the active direction,
+  only offers clips assigned to that direction sector, uses compiled playback
+  timing, and cancels the motion as soon as the pointer moves. Compiler pose
+  assignments use the same angular sectors, so interpolated poses no longer
+  make a valid idle motion practically unreachable after installation.
 
 ## RC — reliability proof
 

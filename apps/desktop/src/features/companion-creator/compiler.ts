@@ -16,7 +16,7 @@ import type {
   FrameBounds,
   LogicalFrame,
 } from "./model";
-import { validateMotionRanges } from "./motions";
+import { assignedPoseIdsForMotion, validateMotionRanges } from "./motions";
 
 export const decodedPageLimit = 48 * 1024 * 1024;
 export const encodedFileLimit = 20 * 1024 * 1024;
@@ -432,16 +432,11 @@ export async function compileCompanion(
     );
   }
 
-  const anchorPoseIds = new Map(
-    project.directionAnchors.map((anchor) => [
-      anchor.id,
-      poses.reduce((nearest, pose) => {
-        const frame = nearestPackedFrame(anchor.frameIndex, packedIndexes);
-        return Math.abs(pose.frame - frame) < Math.abs(nearest.frame - frame)
-          ? pose
-          : nearest;
-      }, poses[0]!).id,
-    ]),
+  const activeDirectionAnchors = project.directionAnchors.filter(
+    (anchor) =>
+      anchor.frameIndex >= 0 &&
+      anchor.frameIndex < project.frames.length &&
+      !project.frames[anchor.frameIndex]?.excluded,
   );
   const idleClips: CompanionIdleClip[] = project.motionRanges.flatMap(
     (motion) => {
@@ -464,9 +459,11 @@ export async function compileCompanion(
       });
       if (clipFrames.length === 0) return [];
       clipFrames = expandMotionFrames(clipFrames, motion.playback);
-      const allowed = motion.poseAnchorIds
-        .map((anchorId) => anchorPoseIds.get(anchorId))
-        .filter((poseId): poseId is string => Boolean(poseId));
+      const allowed = assignedPoseIdsForMotion(
+        poses,
+        activeDirectionAnchors,
+        motion.poseAnchorIds,
+      );
       return [
         {
           id: companionSlug(motion.name) + `-${motion.id.slice(-4)}`,
