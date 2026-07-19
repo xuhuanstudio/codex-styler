@@ -5,7 +5,10 @@ import {
   resolveThemeContrast,
   type ThemeContrastSystem,
 } from "./theme-contrast";
-import { resolveThemePreviewPalette } from "./theme-preview-palette";
+import {
+  resolveThemePreviewPalette,
+  themeFeedbackBackgrounds,
+} from "./theme-preview-palette";
 
 const contrastSystem: ThemeContrastSystem = {
   hasImageBackdrop: false,
@@ -150,6 +153,15 @@ describe("theme preview semantic palette", () => {
       contrastSystem,
     );
 
+    const surfaces = [
+      palette.surface,
+      palette.surfaceRaised,
+      palette.surfaceOverlay,
+      palette.surfaceSunken,
+      palette.control,
+      palette.controlHover,
+      palette.controlActive,
+    ];
     [
       palette.success,
       palette.warning,
@@ -159,7 +171,13 @@ describe("theme preview semantic palette", () => {
       palette.modified,
       palette.deleted,
     ].forEach((color) => {
-      expect(contrastRatio(color, "#1b1d22")).toBeGreaterThanOrEqual(4.5);
+      expect(
+        Math.min(
+          ...[...surfaces, ...themeFeedbackBackgrounds(color, surfaces)].map(
+            (background) => contrastRatio(color, background),
+          ),
+        ),
+      ).toBeGreaterThanOrEqual(4.49);
     });
   });
 
@@ -212,11 +230,21 @@ describe("theme preview semantic palette", () => {
           palette.modified,
           palette.deleted,
         ].forEach((color) => {
+          const functionalSurfaces = [
+            palette.surface,
+            palette.surfaceRaised,
+            palette.surfaceOverlay,
+            palette.surfaceSunken,
+            palette.control,
+            palette.controlHover,
+            palette.controlActive,
+          ];
           expect(
             Math.min(
-              ...contrast.strongBackgrounds.map((background) =>
-                contrastRatio(color, background),
-              ),
+              ...[
+                ...functionalSurfaces,
+                ...themeFeedbackBackgrounds(color, functionalSurfaces),
+              ].map((background) => contrastRatio(color, background)),
             ),
             `${theme.id} ${variant} functional color`,
           ).toBeGreaterThanOrEqual(4.49);

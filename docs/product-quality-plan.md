@@ -232,6 +232,12 @@ working control behind another page, revert it.
   roles instead of raw accent/text mixing. Their non-layout visual plates keep
   the original SVG size, padding, and stroke geometry intact, while preview,
   injected Codex tokens, and visual-safety evidence share the same result.
+- status, validation, and inline diff foregrounds are now validated against
+  both the component surface and the tinted feedback surface they actually
+  render on. Success, warning, error, info, added, modified, and deleted roles
+  retain authored hues when safe and receive the smallest necessary neutral
+  correction otherwise; the Theme Editor exposes status and code-change
+  evidence from the same preview/runtime contract.
 
 ## RC — reliability proof
 

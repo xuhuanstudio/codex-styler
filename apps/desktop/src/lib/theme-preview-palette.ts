@@ -31,6 +31,15 @@ export interface ThemePreviewPalette {
   deleted: string;
 }
 
+export type ThemeFeedbackRole =
+  "success" | "warning" | "danger" | "info" | "added" | "modified" | "deleted";
+
+// These are the actual foreground-bearing treatments in the Codex runtime:
+// inline diff marks use 11%, while status and validation surfaces use 16%.
+// Stronger 23–30% editor fills carry normal text and are checked by the base
+// text contract instead of forcing a status hue to fight its own background.
+export const themeFeedbackTintAmounts = [0.11, 0.16] as const;
+
 const profileStrength = {
   none: {
     raised: 0.04,
@@ -71,6 +80,63 @@ export function preferredThemeIconColor(
   return mixColors(base, appearance.accent, accentAmount);
 }
 
+export function preferredThemeFeedbackColor(
+  appearance: ThemeAppearance,
+  contrastSystem: ThemeContrastSystem,
+  role: ThemeFeedbackRole,
+): string {
+  const custom = appearance.palette ?? {};
+  const defaults =
+    contrastSystem.tone === "light"
+      ? {
+          success: "#4BC47D",
+          warning: "#E7A645",
+          danger: "#F06A67",
+          info: "#83C3FF",
+        }
+      : {
+          success: "#197A43",
+          warning: "#9A5B12",
+          danger: "#B93232",
+          info: "#1F5F99",
+        };
+
+  if (role === "success") return custom.success ?? defaults.success;
+  if (role === "warning") return custom.warning ?? defaults.warning;
+  if (role === "danger") return custom.danger ?? defaults.danger;
+  if (role === "info") return custom.info ?? appearance.accent;
+  if (role === "added")
+    return custom.added ?? custom.success ?? defaults.success;
+  if (role === "modified")
+    return custom.modified ?? custom.warning ?? defaults.warning;
+  return custom.deleted ?? custom.danger ?? defaults.danger;
+}
+
+export function themeFeedbackBackgrounds(
+  foreground: string,
+  surfaces: string[],
+): string[] {
+  return surfaces.flatMap((surface) =>
+    themeFeedbackTintAmounts.map((amount) =>
+      mixColors(surface, foreground, amount),
+    ),
+  );
+}
+
+function adaptiveFeedbackColor(preferred: string, surfaces: string[]): string {
+  let resolved = adaptiveReadableColor(preferred, surfaces, 4.5);
+  for (let iteration = 0; iteration < 8; iteration += 1) {
+    const next = adaptiveReadableColor(
+      resolved,
+      [...surfaces, ...themeFeedbackBackgrounds(resolved, surfaces)],
+      4.5,
+    );
+    if (next === resolved) break;
+    resolved = next;
+  }
+  return resolved;
+}
+
 export function resolveThemePreviewPalette(
   appearance: ThemeAppearance,
   backgroundColor: string,
@@ -89,33 +155,12 @@ export function resolveThemePreviewPalette(
   };
   const tint = (amount: number) =>
     mixColors(appearance.surface, appearance.accent, amount);
-  const statusDefaults =
-    contrastSystem.tone === "light"
-      ? {
-          success: "#4BC47D",
-          warning: "#E7A645",
-          danger: "#F06A67",
-          info: "#83C3FF",
-        }
-      : {
-          success: "#197A43",
-          warning: "#9A5B12",
-          danger: "#B93232",
-          info: "#1F5F99",
-        };
   const safeForeground = (candidate: string | undefined, fallback: string) =>
     adaptiveReadableColor(
       candidate ?? fallback,
       contrastSystem.strongBackgrounds,
       4.5,
     );
-  const success = safeForeground(custom.success, statusDefaults.success);
-  const warning = safeForeground(custom.warning, statusDefaults.warning);
-  const danger = safeForeground(custom.danger, statusDefaults.danger);
-  const info = safeForeground(
-    custom.info ?? appearance.accent,
-    statusDefaults.info,
-  );
 
   const canvas = safeSurface(custom.canvas, backgroundColor);
   const surfaceRaised = safeSurface(
@@ -175,6 +220,16 @@ export function resolveThemePreviewPalette(
     boundaryBackgrounds,
     3,
   );
+  const feedbackBackgrounds = boundaryBackgrounds;
+  const feedbackColor = (role: ThemeFeedbackRole) =>
+    adaptiveFeedbackColor(
+      preferredThemeFeedbackColor(appearance, contrastSystem, role),
+      feedbackBackgrounds,
+    );
+  const success = feedbackColor("success");
+  const warning = feedbackColor("warning");
+  const danger = feedbackColor("danger");
+  const info = feedbackColor("info");
 
   return {
     canvas,
@@ -201,14 +256,14 @@ export function resolveThemePreviewPalette(
     borderStrong,
     focus: safeForeground(
       custom.focus ?? appearance.accent,
-      statusDefaults.info,
+      contrastSystem.tone === "light" ? "#83C3FF" : "#1F5F99",
     ),
     success,
     warning,
     danger,
     info,
-    added: safeForeground(custom.added, success),
-    modified: safeForeground(custom.modified, warning),
-    deleted: safeForeground(custom.deleted, danger),
+    added: feedbackColor("added"),
+    modified: feedbackColor("modified"),
+    deleted: feedbackColor("deleted"),
   };
 }

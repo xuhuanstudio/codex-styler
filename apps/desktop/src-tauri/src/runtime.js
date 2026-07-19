@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 33) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 34) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -866,26 +866,17 @@
             danger: "#B93232",
             info: "#1F5F99",
           };
-    const success = safeForeground(
-      custom.success,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.success,
-    );
-    const warning = safeForeground(
-      custom.warning,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.warning,
-    );
-    const danger = safeForeground(
-      custom.danger,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.danger,
-    );
-    const info = safeForeground(
-      custom.info || appearance.accent,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.info,
-    );
+    const preferredFeedbackColor = (role) => {
+      if (role === "success") return custom.success || statusDefaults.success;
+      if (role === "warning") return custom.warning || statusDefaults.warning;
+      if (role === "danger") return custom.danger || statusDefaults.danger;
+      if (role === "info") return custom.info || appearance.accent;
+      if (role === "added")
+        return custom.added || custom.success || statusDefaults.success;
+      if (role === "modified")
+        return custom.modified || custom.warning || statusDefaults.warning;
+      return custom.deleted || custom.danger || statusDefaults.danger;
+    };
     const onAccent = safeForeground(
       custom.onAccent,
       [appearance.accent],
@@ -944,6 +935,35 @@
       boundaryBackgrounds,
       3,
     );
+    const feedbackSurfaces = boundaryBackgrounds;
+    // Mirrors the foreground-bearing inline diff (11%) and status (16%)
+    // surfaces. Stronger editor fills use normal text, not the status hue.
+    const feedbackTintAmounts = [0.11, 0.16];
+    const tintedFeedbackBackgrounds = (foreground) =>
+      feedbackSurfaces.flatMap((surface) =>
+        feedbackTintAmounts.map((amount) => mix(surface, foreground, amount)),
+      );
+    const feedbackColor = (role) => {
+      let resolved = readable(
+        preferredFeedbackColor(role),
+        feedbackSurfaces,
+        4.5,
+      );
+      for (let iteration = 0; iteration < 8; iteration += 1) {
+        const next = readable(
+          resolved,
+          [...feedbackSurfaces, ...tintedFeedbackBackgrounds(resolved)],
+          4.5,
+        );
+        if (next === resolved) break;
+        resolved = next;
+      }
+      return resolved;
+    };
+    const success = feedbackColor("success");
+    const warning = feedbackColor("warning");
+    const danger = feedbackColor("danger");
+    const info = feedbackColor("info");
     return {
       canvas,
       surface: appearance.surface,
@@ -972,21 +992,9 @@
       warning,
       danger,
       info,
-      added: safeForeground(
-        custom.added,
-        contrastSystem.strongBackgrounds,
-        success,
-      ),
-      modified: safeForeground(
-        custom.modified,
-        contrastSystem.strongBackgrounds,
-        warning,
-      ),
-      deleted: safeForeground(
-        custom.deleted,
-        contrastSystem.strongBackgrounds,
-        danger,
-      ),
+      added: feedbackColor("added"),
+      modified: feedbackColor("modified"),
+      deleted: feedbackColor("deleted"),
     };
   };
 
@@ -3169,7 +3177,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 33,
+    version: 34,
     apply,
     updateEntity,
     pause: remove,

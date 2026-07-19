@@ -145,7 +145,7 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(33);
+    expect(runtime().version).toBe(34);
   });
 
   it.each(["light", "dark"] as const)(
@@ -691,6 +691,12 @@ describe("injected compatibility runtime", () => {
       controlHover: "#303741",
       success: "#52C982",
     };
+    const contrastSystem = resolveThemeContrast(theme, "dark");
+    const previewPalette = resolveThemePreviewPalette(
+      theme.variants.dark.appearance,
+      theme.variants.dark.background.color,
+      contrastSystem,
+    );
 
     await runtime().apply(theme, "dark", "developer");
 
@@ -703,12 +709,15 @@ describe("injected compatibility runtime", () => {
       "--codex-styler-control-hover: #303741",
     );
     expect(stylesheet?.textContent).toContain(
-      "--codex-styler-success: #52C982",
+      `--codex-styler-success: ${previewPalette.success}`,
     );
     expect(stylesheet?.textContent).toContain("--codex-styler-icon:");
     expect(stylesheet?.textContent).toContain("--codex-styler-icon-emphasis:");
     expect(stylesheet?.textContent).toContain(
       "--color-icon-primary: var(--codex-styler-icon-emphasis)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-background-status-success: color-mix(in srgb, var(--codex-styler-success) 16%, var(--codex-styler-surface))",
     );
   });
 

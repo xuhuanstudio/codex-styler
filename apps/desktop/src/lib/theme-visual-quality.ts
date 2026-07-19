@@ -6,11 +6,20 @@ import { minimumContrast } from "./contrast";
 import { resolveThemeContrast } from "./theme-contrast";
 import {
   preferredThemeIconColor,
+  preferredThemeFeedbackColor,
   resolveThemePreviewPalette,
+  themeFeedbackBackgrounds,
+  type ThemeFeedbackRole,
 } from "./theme-preview-palette";
 
 export type ThemeVisualQualityCheckId =
-  "primary-text" | "secondary-text" | "icons" | "accent-content" | "boundaries";
+  | "primary-text"
+  | "secondary-text"
+  | "icons"
+  | "status-feedback"
+  | "diff-feedback"
+  | "accent-content"
+  | "boundaries";
 
 export interface ThemeVisualQualityCheck {
   id: ThemeVisualQualityCheckId;
@@ -65,6 +74,22 @@ export function resolveThemeVisualQuality(
       palette.borderSubtle !== authoredBoundaryPalette?.borderSubtle) ||
     (Boolean(authoredBoundaryPalette?.borderStrong) &&
       palette.borderStrong !== authoredBoundaryPalette?.borderStrong);
+  const feedbackRatio = (roles: ThemeFeedbackRole[]) =>
+    Math.min(
+      ...roles.map((role) => {
+        const foreground = palette[role];
+        return minimumContrast(foreground, [
+          ...boundarySurfaces,
+          ...themeFeedbackBackgrounds(foreground, boundarySurfaces),
+        ]);
+      }),
+    );
+  const feedbackProtected = (roles: ThemeFeedbackRole[]) =>
+    roles.some(
+      (role) =>
+        palette[role] !==
+        preferredThemeFeedbackColor(visual.appearance, contrast, role),
+    );
   const checks: ThemeVisualQualityCheck[] = [
     {
       id: "primary-text",
@@ -89,6 +114,18 @@ export function resolveThemeVisualQuality(
         palette.icon !== preferredThemeIconColor(visual.appearance, contrast) ||
         palette.iconEmphasis !==
           preferredThemeIconColor(visual.appearance, contrast, true),
+    },
+    {
+      id: "status-feedback",
+      ratio: feedbackRatio(["success", "warning", "danger", "info"]),
+      minimum: 4.5,
+      protected: feedbackProtected(["success", "warning", "danger", "info"]),
+    },
+    {
+      id: "diff-feedback",
+      ratio: feedbackRatio(["added", "modified", "deleted"]),
+      minimum: 4.5,
+      protected: feedbackProtected(["added", "modified", "deleted"]),
     },
     {
       id: "accent-content",

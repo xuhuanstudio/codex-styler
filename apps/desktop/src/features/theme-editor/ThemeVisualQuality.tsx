@@ -11,6 +11,8 @@ const labelKeys: Record<ThemeVisualQualityCheckId, MessageKey> = {
   "primary-text": "visualPrimaryText",
   "secondary-text": "visualSecondaryText",
   icons: "visualIcons",
+  "status-feedback": "visualStatusFeedback",
+  "diff-feedback": "visualDiffFeedback",
   "accent-content": "visualAccentContent",
   boundaries: "visualBoundaries",
 };

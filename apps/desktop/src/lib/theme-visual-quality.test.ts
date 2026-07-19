@@ -54,4 +54,27 @@ describe("theme visual quality", () => {
       report.authoredSurfaceOpacity,
     );
   });
+
+  it("reports unsafe authored status and diff hues as protected", () => {
+    const theme = structuredClone(builtinThemes[0]);
+    const appearance = theme.variants.dark.appearance;
+    appearance.palette = {
+      ...appearance.palette,
+      success: appearance.surface,
+      added: appearance.surface,
+    };
+
+    const report = resolveThemeVisualQuality(theme, "dark");
+    const status = report.checks.find(
+      (check) => check.id === "status-feedback",
+    );
+    const diff = report.checks.find((check) => check.id === "diff-feedback");
+
+    expect(status).toMatchObject({ minimum: 4.5, protected: true });
+    expect(diff).toMatchObject({ minimum: 4.5, protected: true });
+    expect(status!.ratio).toBeGreaterThanOrEqual(4.49);
+    expect(diff!.ratio).toBeGreaterThanOrEqual(4.49);
+    expect(appearance.palette.success).toBe(appearance.surface);
+    expect(appearance.palette.added).toBe(appearance.surface);
+  });
 });

@@ -1224,6 +1224,8 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByText("Visual safety"));
     expect(screen.getByText("Primary text")).toBeInTheDocument();
     expect(screen.getByText("Interface icons")).toBeInTheDocument();
+    expect(screen.getByText("Status feedback")).toBeInTheDocument();
+    expect(screen.getByText("Code changes")).toBeInTheDocument();
     expect(screen.getByText("Accent controls")).toBeInTheDocument();
     expect(screen.getByText("Component boundaries")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
