@@ -12,6 +12,7 @@ import { PreviewWorkspace } from "../../components/PreviewWorkspace";
 import type { ThemeVariantName } from "../../lib/app-session";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { PreviewScenario } from "../../lib/storage";
+import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
 import {
   resolveThemeEffectCoverage,
   resolveThemeVisualPersonality,
@@ -70,6 +71,12 @@ export function ThemesView({
   const [inspectedEffect, setInspectedEffect] = useState<ThemeEffectId | null>(
     null,
   );
+  const {
+    revision: motionPreviewRevision,
+    playing: motionPreviewing,
+    play: playMotionPreview,
+    stop: stopMotionPreview,
+  } = useGuidedMotionPreview();
   const workspaceRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
@@ -113,6 +120,8 @@ export function ThemesView({
     readability: "effectReadability",
   };
   const effectCoverage = resolveThemeEffectCoverage(browsedTheme, variant);
+  const motionEffectActive =
+    effectCoverage.find((effect) => effect.id === "motion")?.active ?? false;
   const effectPreviewScenarios = {
     background: "task",
     surfaces: "dialog",
@@ -149,6 +158,23 @@ export function ThemesView({
     expressive: "motionExpressive",
   } satisfies Record<typeof personality.motion, MessageKey>;
   const isSemanticTheme = browsedTheme.compatibility.codex.mode === "semantic";
+  const motionPreviewDisabled =
+    reduceMotion || previewPresentation === "official" || !motionEffectActive;
+  const motionPreviewHelp = reduceMotion
+    ? t("motionPreviewReduced")
+    : previewPresentation === "official"
+      ? t("motionPreviewOfficialLibrary")
+      : !motionEffectActive
+        ? t("motionPreviewDisabled")
+        : t("motionPreviewDescription");
+  useEffect(() => stopMotionPreview, [browsedTheme.id, stopMotionPreview]);
+
+  function previewMotion() {
+    if (motionPreviewDisabled) return;
+    setPreviewScenario("task");
+    setInspectedEffect("motion");
+    playMotionPreview();
+  }
   return (
     <div className="page page--themes">
       <section className="page-heading">
@@ -278,11 +304,18 @@ export function ThemesView({
                 scenario={previewScenario}
                 presentation={previewPresentation}
                 t={t}
+                motionPreviewing={motionPreviewing}
+                motionPreviewDisabled={motionPreviewDisabled}
+                motionPreviewHelp={motionPreviewHelp}
                 onScenarioChange={(nextScenario) => {
                   setInspectedEffect(null);
                   setPreviewScenario(nextScenario);
                 }}
-                onPresentationChange={setPreviewPresentation}
+                onPresentationChange={(presentation) => {
+                  stopMotionPreview();
+                  setPreviewPresentation(presentation);
+                }}
+                onPreviewMotion={previewMotion}
               />
               <PreviewWorkspace
                 theme={previewThemeFor(browsedTheme)}
@@ -292,6 +325,7 @@ export function ThemesView({
                 resolveAsset={resolveAsset}
                 presentation={previewPresentation}
                 scenario={previewScenario}
+                motionPreviewRevision={motionPreviewRevision}
               />
             </div>
             <div className="featured-theme__copy">
@@ -367,6 +401,12 @@ export function ThemesView({
                       onClick={() => {
                         setInspectedEffect(effect.id);
                         setPreviewScenario(effectPreviewScenarios[effect.id]);
+                        if (effect.id === "motion") {
+                          setPreviewPresentation("styled");
+                          if (!reduceMotion) playMotionPreview();
+                        } else {
+                          stopMotionPreview();
+                        }
                       }}
                     >
                       <i aria-hidden="true" />

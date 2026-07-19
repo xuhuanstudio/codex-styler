@@ -16,8 +16,12 @@ describe("ThemePreviewControls", () => {
         scenario="task"
         presentation="styled"
         t={t}
+        motionPreviewing={false}
+        motionPreviewDisabled={false}
+        motionPreviewHelp="Runs a guided preview."
         onScenarioChange={onScenarioChange}
         onPresentationChange={onPresentationChange}
+        onPreviewMotion={vi.fn()}
       />,
     );
 
@@ -47,8 +51,12 @@ describe("ThemePreviewControls", () => {
         scenario="task"
         presentation="styled"
         t={t}
+        motionPreviewing={false}
+        motionPreviewDisabled={false}
+        motionPreviewHelp="Runs a guided preview."
         onScenarioChange={vi.fn()}
         onPresentationChange={onPresentationChange}
+        onPreviewMotion={vi.fn()}
       />,
     );
 
@@ -60,5 +68,47 @@ describe("ThemePreviewControls", () => {
     fireEvent.keyDown(trigger.parentElement as HTMLElement, { key: "Escape" });
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(trigger).toHaveFocus();
+  });
+
+  it("exposes a described motion preview action with explicit states", () => {
+    const onPreviewMotion = vi.fn();
+    const { rerender } = render(
+      <ThemePreviewControls
+        scenario="task"
+        presentation="styled"
+        t={t}
+        motionPreviewing={false}
+        motionPreviewDisabled={false}
+        motionPreviewHelp="Runs a guided preview."
+        onScenarioChange={vi.fn()}
+        onPresentationChange={vi.fn()}
+        onPreviewMotion={onPreviewMotion}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
+    const motionButton = screen.getByRole("button", {
+      name: /Preview motion/,
+    });
+    expect(motionButton).toHaveAccessibleDescription("Runs a guided preview.");
+    fireEvent.click(motionButton);
+    expect(onPreviewMotion).toHaveBeenCalledOnce();
+
+    rerender(
+      <ThemePreviewControls
+        scenario="task"
+        presentation="official"
+        t={t}
+        motionPreviewing={false}
+        motionPreviewDisabled
+        motionPreviewHelp="Switch to Styled first."
+        onScenarioChange={vi.fn()}
+        onPresentationChange={vi.fn()}
+        onPreviewMotion={onPreviewMotion}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: /Preview motion/ }),
+    ).toBeDisabled();
   });
 });

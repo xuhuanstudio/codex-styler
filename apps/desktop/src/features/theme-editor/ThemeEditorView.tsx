@@ -47,6 +47,7 @@ import type {
 } from "../../lib/adaptive-theme";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { WorkspaceUiPreferences } from "../../lib/storage";
+import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
 import {
   themeEditorSectionCoverage,
   type ThemeEditorControlId,
@@ -212,15 +213,17 @@ export function ThemeEditorView({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToggleRef = useRef<HTMLButtonElement>(null);
   const recipeHistoryRevision = useRef(0);
-  const motionPreviewTimerRef = useRef<number | null>(null);
   const [activeLayer, setActiveLayer] = useState<string>("background");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState<"fit" | "actual">("fit");
   const [previewVersion, setPreviewVersion] =
     useState<PreviewVersion>("current");
-  const [motionPreviewRevision, setMotionPreviewRevision] = useState(0);
-  const [motionPreviewing, setMotionPreviewing] = useState(false);
+  const {
+    revision: motionPreviewRevision,
+    playing: motionPreviewing,
+    play: playMotionPreview,
+  } = useGuidedMotionPreview();
   const visual = theme.variants[variant];
   const previewTheme = previewVersion === "saved" ? savedTheme : theme;
   const previewReadOnly = previewVersion !== "current";
@@ -252,14 +255,6 @@ export function ThemeEditorView({
   useEffect(() => {
     if (!dirty) setPreviewVersion("current");
   }, [dirty]);
-  useEffect(
-    () => () => {
-      if (motionPreviewTimerRef.current !== null) {
-        window.clearTimeout(motionPreviewTimerRef.current);
-      }
-    },
-    [],
-  );
   useEffect(() => {
     const handleHistoryShortcut = (event: KeyboardEvent) => {
       if (busy || event.altKey || (!event.metaKey && !event.ctrlKey)) return;
@@ -305,15 +300,7 @@ export function ThemeEditorView({
     }
     setPreviewVersion("current");
     onUiPreferencesChange({ themeEditorPreviewScenario: "task" });
-    setMotionPreviewing(true);
-    setMotionPreviewRevision((revision) => revision + 1);
-    if (motionPreviewTimerRef.current !== null) {
-      window.clearTimeout(motionPreviewTimerRef.current);
-    }
-    motionPreviewTimerRef.current = window.setTimeout(() => {
-      setMotionPreviewing(false);
-      motionPreviewTimerRef.current = null;
-    }, 1_500);
+    playMotionPreview();
   }
   function closeInspector() {
     setInspectorOpen(false);

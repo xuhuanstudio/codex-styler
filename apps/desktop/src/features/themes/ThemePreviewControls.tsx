@@ -1,5 +1,5 @@
 import { useId, useState, type PointerEvent } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Play, SlidersHorizontal } from "lucide-react";
 import { SelectField } from "../../components/ui/SelectField";
 import type { MessageKey } from "../../lib/i18n";
 import type { PreviewScenario } from "../../lib/storage";
@@ -8,8 +8,12 @@ interface ThemePreviewControlsProps {
   scenario: PreviewScenario;
   presentation: "styled" | "official";
   t: (key: MessageKey) => string;
+  motionPreviewing: boolean;
+  motionPreviewDisabled: boolean;
+  motionPreviewHelp: string;
   onScenarioChange: (scenario: PreviewScenario) => void;
   onPresentationChange: (presentation: "styled" | "official") => void;
+  onPreviewMotion: () => void;
 }
 
 const scenarios = [
@@ -24,10 +28,15 @@ export function ThemePreviewControls({
   scenario,
   presentation,
   t,
+  motionPreviewing,
+  motionPreviewDisabled,
+  motionPreviewHelp,
   onScenarioChange,
   onPresentationChange,
+  onPreviewMotion,
 }: ThemePreviewControlsProps) {
   const panelId = useId();
+  const motionHelpId = useId();
   const [hovered, setHovered] = useState(false);
   const [pinned, setPinned] = useState(false);
   const open = pinned || hovered;
@@ -113,6 +122,26 @@ export function ThemePreviewControls({
             </button>
           </div>
         </div>
+
+        <button
+          type="button"
+          className="theme-preview-controls__motion"
+          disabled={motionPreviewDisabled || motionPreviewing}
+          aria-describedby={motionHelpId}
+          onClick={onPreviewMotion}
+        >
+          <Play size={13} aria-hidden="true" />
+          <span>
+            <strong>
+              {motionPreviewing
+                ? t("previewMotionPlaying")
+                : t("previewMotion")}
+            </strong>
+            <small id={motionHelpId} aria-live="polite">
+              {motionPreviewHelp}
+            </small>
+          </span>
+        </button>
       </div>
     </div>
   );

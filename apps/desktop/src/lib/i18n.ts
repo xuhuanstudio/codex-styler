@@ -185,6 +185,8 @@ const messages = {
       "Choose Calm, Fluid, or Expressive to preview a responsive theme.",
     motionPreviewOfficial:
       "Switch to Current edit or Saved to preview authored motion.",
+    motionPreviewOfficialLibrary:
+      "Switch to Styled to preview the theme's authored motion.",
     parallaxDepth: "Parallax depth",
     companion: "Companion",
     noCompanion: "No companion",
@@ -744,6 +746,7 @@ const messages = {
       "当前已启用“减少动态”，因此光标跟随与视差会保持静止。",
     motionPreviewDisabled: "选择“平静”“流畅”或“强化”后即可预演响应效果。",
     motionPreviewOfficial: "切换到“当前编辑”或“已保存”后即可预演主题动态。",
+    motionPreviewOfficialLibrary: "切换到“主题效果”后即可预演主题动态。",
     parallaxDepth: "视差深度",
     companion: "互动伙伴",
     noCompanion: "不使用伙伴",
