@@ -6,6 +6,7 @@ export const MIN_CONTENT_SCALE = 0.25;
 export const MAX_CONTENT_SCALE = 1.5;
 
 export type CompanionImportKind = "image" | "sequence" | "video" | "atlas";
+export type EdgeReviewBackdrop = "black" | "white" | "theme";
 export type CreatorStep =
   "import" | "extract" | "cleanup" | "align" | "calibrate" | "motions" | "test";
 
@@ -126,6 +127,12 @@ export interface CompanionCreatorProject {
     followSmoothing: number;
     renderFps: 24 | 30 | 60;
   };
+  qualityReview: {
+    /** Backdrops explicitly inspected against the latest compiled pixels. */
+    edgeBackdrops: EdgeReviewBackdrop[];
+    /** Fingerprint of the pixels, crop and alignment that were inspected. */
+    edgeSignature: string | null;
+  };
 }
 
 export function suggestedCompanionName(fileName: string): string {
@@ -199,6 +206,10 @@ export function createCompanionProject(
       followSmoothing: 0.18,
       renderFps: 60,
     },
+    qualityReview: {
+      edgeBackdrops: [],
+      edgeSignature: null,
+    },
   };
 }
 
@@ -213,6 +224,7 @@ export function resetCompanionProjectDerivedState(
   project.cleanup = structuredClone(defaults.cleanup);
   project.directionAnchors = [];
   project.motionRanges = [];
+  project.qualityReview = structuredClone(defaults.qualityReview);
   project.neutralFrame = 0;
   project.reducedMotionFrame = 0;
   project.step = "import";
@@ -271,6 +283,22 @@ export function normalizeCompanionProject(
     preview: {
       ...defaults.preview,
       ...project.preview,
+    },
+    qualityReview: {
+      edgeBackdrops: [
+        ...new Set(
+          (project.qualityReview?.edgeBackdrops ?? []).filter(
+            (backdrop): backdrop is EdgeReviewBackdrop =>
+              backdrop === "black" ||
+              backdrop === "white" ||
+              backdrop === "theme",
+          ),
+        ),
+      ],
+      edgeSignature:
+        typeof project.qualityReview?.edgeSignature === "string"
+          ? project.qualityReview.edgeSignature
+          : null,
     },
     directionAnchors,
     motionRanges: (project.motionRanges ?? []).map((motion) => {

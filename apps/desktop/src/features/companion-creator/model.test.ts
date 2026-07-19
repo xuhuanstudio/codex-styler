@@ -56,6 +56,7 @@ describe("companion creator project model", () => {
     delete legacy.license;
     delete legacy.placement;
     delete legacy.contentScale;
+    delete legacy.qualityReview;
 
     const migrated = normalizeCompanionProject(
       legacy as CompanionCreatorProject,
@@ -65,6 +66,10 @@ describe("companion creator project model", () => {
     expect(migrated.author).toBe("");
     expect(migrated.license).toBe("");
     expect(migrated.contentScale).toBe(1);
+    expect(migrated.qualityReview).toEqual({
+      edgeBackdrops: [],
+      edgeSignature: null,
+    });
     expect(migrated.placement).toEqual({
       align: 0.82,
       offsetX: 0,
@@ -147,6 +152,7 @@ describe("companion creator project model", () => {
       minimumDelayMs: 1_000,
       maximumDelayMs: 2_000,
     });
+    project.qualityReview.edgeBackdrops = ["black", "white", "theme"];
 
     resetCompanionProjectDerivedState(project);
 
@@ -161,6 +167,7 @@ describe("companion creator project model", () => {
       contentScale: 1,
       directionAnchors: [],
       motionRanges: [],
+      qualityReview: { edgeBackdrops: [], edgeSignature: null },
       neutralFrame: 0,
       reducedMotionFrame: 0,
     });

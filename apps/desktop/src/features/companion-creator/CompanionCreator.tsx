@@ -110,7 +110,14 @@ import {
 import { AtlasGridPreview, SourceMediaPreview } from "./SourcePreview";
 import { CalibrationHealth, CalibrationSummary } from "./CalibrationStatus";
 import { AlignmentAssistant } from "./AlignmentAssistant";
+import { EdgeQualityReview } from "./EdgeQualityReview";
 import { ImportStep } from "./ImportStep";
+import {
+  markEdgeBackdropReviewed,
+  pendingEdgeReview,
+  resetEdgeReview,
+  summarizeEdgeReview,
+} from "./quality-review";
 import {
   CleanupBrushStage,
   DirectionTimeline,
@@ -246,6 +253,7 @@ const copy = {
     clips: "clips",
     excludedFrames: "excluded",
     packageLimitsReady: "Compiled assets fit package limits",
+    edgeReviewReady: "Edges reviewed on black, white and theme surfaces",
     packageLimits:
       "Limits: 512 frames · 8192 px per side · 8 atlas pages · 48 MiB decoded per page · 20 MiB encoded per asset",
     outputIssue: {
@@ -273,6 +281,9 @@ const copy = {
     reviewFrames: "Restore an included frame",
     reviewDirections: "Complete direction calibration",
     reviewOutput: "Fix compiled output",
+    reviewEdges: "Inspect final edges",
+    reviewEdgesDetail:
+      "Check the final pixels on black, white and theme surfaces before building.",
     reviewIssue: "Open the step that needs attention",
     dragCompanion: "Drag companion position",
     previewHeight: "Composer height (preview)",
@@ -419,6 +430,7 @@ const copy = {
     clips: "个片段",
     excludedFrames: "帧已排除",
     packageLimitsReady: "编译资源符合伙伴包限制",
+    edgeReviewReady: "已在黑、白和主题色表面检查边缘",
     packageLimits:
       "限制：512 帧 · 单边 8192 px · 8 页图集 · 每页解码 48 MiB · 单个编码资源 20 MiB",
     outputIssue: {
@@ -445,6 +457,8 @@ const copy = {
     reviewFrames: "恢复至少一个有效帧",
     reviewDirections: "完成方向校准",
     reviewOutput: "修复编译输出",
+    reviewEdges: "检查最终边缘",
+    reviewEdgesDetail: "构建前请在黑色、白色和主题色表面检查最终像素。",
     reviewIssue: "打开需要处理的步骤",
     dragCompanion: "拖动伙伴位置",
     previewHeight: "输入框高度（仅预览）",
@@ -1286,6 +1300,13 @@ export function CompanionCreator({
     () => summarizeCompanionOutput(project, calibration),
     [calibration, project],
   );
+  const edgeReview = useMemo(
+    () =>
+      project.step === "test"
+        ? summarizeEdgeReview(project)
+        : pendingEdgeReview(),
+    [project],
+  );
   const currentDirectionAnchor = project.directionAnchors.find(
     (anchor) => anchor.frameIndex === currentFrame,
   );
@@ -1651,6 +1672,7 @@ export function CompanionCreator({
         // Direction cannot be inferred safely from frame order. Users assign
         // visual keyframes explicitly in the calibration workspace.
         next.directionAnchors = [];
+        resetEdgeReview(next);
         next.neutralFrame = 0;
         next.reducedMotionFrame = 0;
         next.step = "cleanup";
@@ -1692,6 +1714,7 @@ export function CompanionCreator({
         next.frames.forEach((frame, index) => {
           frame.subjectBounds = bounds[index] ?? undefined;
         });
+        resetEdgeReview(next);
         if (!applySuggestedSharedAlignment(next, cleaned)) {
           next.sharedCrop =
             commonSubjectCrop(next.frames, 8) ?? next.sharedCrop;
@@ -1981,13 +2004,15 @@ export function CompanionCreator({
     Number(includedFrameCount > 0) +
     Number(alignmentDiagnostics.ready) +
     Number(directionSetupValid) +
-    Number(outputSummary.withinLimits);
+    Number(outputSummary.withinLimits) +
+    Number(edgeReview.complete);
   const buildReady =
     metadataValid &&
     includedFrameCount > 0 &&
     alignmentDiagnostics.ready &&
     directionSetupValid &&
-    outputSummary.withinLimits;
+    outputSummary.withinLimits &&
+    edgeReview.complete;
   const stepHasChanges =
     projectStateSignature(project) !==
     projectStateSignature(stepBaseline.current);
@@ -2124,6 +2149,20 @@ export function CompanionCreator({
       const target: CreatorStep =
         outputSummary.issue === "frame-limit" ? "extract" : "align";
       void navigateToStep(target);
+      return;
+    }
+    if (!edgeReview.complete) {
+      if (edgeReview.next) {
+        updateProject((next) => {
+          next.preview.background = edgeReview.next!;
+          return next;
+        });
+      }
+      window.requestAnimationFrame(() => {
+        const review = document.getElementById("companion-edge-quality-review");
+        review?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        review?.focus({ preventScroll: true });
+      });
     }
   };
 
@@ -2146,7 +2185,18 @@ export function CompanionCreator({
                 title: c.reviewOutput,
                 detail: c.outputIssue[outputSummary.issue],
               }
-            : null;
+            : !edgeReview.complete
+              ? { title: c.reviewEdges, detail: c.reviewEdgesDetail }
+              : null;
+
+  const confirmEdgeReviewBackdrop = (backdrop: "black" | "white" | "theme") => {
+    updateProject((next) => {
+      markEdgeBackdropReviewed(next, backdrop);
+      const updatedReview = summarizeEdgeReview(next);
+      next.preview.background = updatedReview.next ?? backdrop;
+      return next;
+    });
+  };
 
   const resetCurrentStep = () => {
     const baseline = structuredClone(stepBaseline.current);
@@ -4763,11 +4813,24 @@ export function CompanionCreator({
                   />
                 </div>
                 <aside className="creator-inspector-panel creator-inspector-panel--test">
+                  <EdgeQualityReview
+                    locale={locale}
+                    currentBackdrop={project.preview.background}
+                    summary={edgeReview}
+                    onInspect={(backdrop) =>
+                      updateProject((next) => {
+                        next.preview.background = backdrop;
+                        return next;
+                      })
+                    }
+                    onConfirm={confirmEdgeReviewBackdrop}
+                    onRepair={() => void navigateToStep("cleanup")}
+                  />
                   <section className="creator-readiness creator-build-section">
                     <div className="creator-readiness__heading">
                       <h3>{c.readiness}</h3>
                       <span>
-                        {readinessCount}/5 {c.readyCount}
+                        {readinessCount}/6 {c.readyCount}
                       </span>
                     </div>
                     <ul>
@@ -4814,6 +4877,14 @@ export function CompanionCreator({
                         {locale === "zh-CN"
                           ? "共享画布与全局尺寸已就绪"
                           : "Shared canvas and global size ready"}
+                      </li>
+                      <li data-ready={edgeReview.complete}>
+                        {edgeReview.complete ? (
+                          <Check size={14} />
+                        ) : (
+                          <AlertTriangle size={14} />
+                        )}
+                        {c.edgeReviewReady}
                       </li>
                     </ul>
                     <div className="creator-output-summary">

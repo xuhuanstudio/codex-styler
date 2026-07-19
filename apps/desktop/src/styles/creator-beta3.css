@@ -351,6 +351,144 @@
   align-self: start;
 }
 
+.edge-quality-review {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #d97706 26%, var(--border-subtle));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #d97706 5%, var(--surface-base));
+  outline: none;
+}
+
+.edge-quality-review:focus-visible {
+  box-shadow: 0 0 0 2px var(--focus-ring);
+}
+
+.edge-quality-review--complete {
+  border-color: color-mix(in srgb, #16a36a 28%, var(--border-subtle));
+  background: color-mix(in srgb, #16a36a 5%, var(--surface-base));
+}
+
+.edge-quality-review__heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+
+.edge-quality-review__heading > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.edge-quality-review__heading h3,
+.edge-quality-review__heading p {
+  margin: 0;
+}
+
+.edge-quality-review__heading p {
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  line-height: 1.45;
+}
+
+.edge-quality-review__heading > strong {
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  font-variant-numeric: tabular-nums;
+}
+
+.edge-quality-review__icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  color: #d97706;
+  background: color-mix(in srgb, #d97706 12%, transparent);
+}
+
+.edge-quality-review--complete .edge-quality-review__icon {
+  color: #16a36a;
+  background: color-mix(in srgb, #16a36a 12%, transparent);
+}
+
+.edge-quality-review__backdrops {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.edge-quality-review__backdrops button {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xs);
+  color: var(--text-secondary);
+  background: var(--surface-subtle);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-caption);
+  text-align: left;
+  transition:
+    color var(--motion-standard) var(--ease-standard),
+    border-color var(--motion-standard) var(--ease-standard),
+    background var(--motion-standard) var(--ease-standard);
+}
+
+.edge-quality-review__backdrops button:hover,
+.edge-quality-review__backdrops button.is-active {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border-strong));
+  background: var(--surface-hover);
+}
+
+.edge-quality-review__backdrops button:focus-visible,
+.edge-quality-review__repair:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.edge-quality-review__backdrops button > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edge-quality-review__backdrops button > svg {
+  color: #16a36a;
+}
+
+.edge-quality-review__confirm {
+  width: 100%;
+}
+
+.edge-quality-review__repair {
+  display: inline-flex;
+  width: max-content;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-caption);
+}
+
+.edge-quality-review__repair:hover {
+  color: var(--text-primary);
+}
+
 .creator-readiness-action {
   display: grid;
   width: 100%;

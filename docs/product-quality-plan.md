@@ -209,6 +209,11 @@ working control behind another page, revert it.
 - disconnected theme, variant, and companion selection now communicates
   through the selected row and live setup bar instead of redundant Toasts that
   could cover the next action. Save, apply, recovery, and error Toasts remain.
+- final companion output now includes a guided black, white, and theme-surface
+  edge review for color spill, halos, broken transparency, and residual
+  background pixels. Review evidence is stored with a compact output
+  fingerprint and automatically expires after any pixel, crop, scale,
+  inclusion, or alignment change.
 
 ## RC — reliability proof
 

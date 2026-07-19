@@ -4,6 +4,14 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+### Added
+
+- Companion Studio now requires an explicit final edge review on black, white,
+  and theme-colored surfaces before building. Reviews advance between
+  backdrops, remain part of the local draft, and automatically expire whenever
+  source pixels, cleanup, shared crop, global scale, frame inclusion, or
+  alignment changes.
+
 ## [0.2.0-beta.6] - 2026-07-19
 
 ### Added
