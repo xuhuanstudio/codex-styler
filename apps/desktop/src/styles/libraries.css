@@ -251,6 +251,10 @@
     var(--ease-emphasized) both;
 }
 
+.theme-preview-controls__panel[hidden] {
+  display: none;
+}
+
 .theme-preview-controls__panel .ui-select-field__label,
 .theme-preview-controls__comparison > span {
   color: rgb(255 255 255 / 62%);
