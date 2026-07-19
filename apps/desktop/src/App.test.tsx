@@ -1148,6 +1148,9 @@ describe("Codex Styler shell", () => {
     const { container } = render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     const facts = container.querySelector(".theme-facts");
+    expect(
+      container.querySelector(".featured-theme__preview .workspace-preview"),
+    ).toHaveClass("workspace-preview--compact");
     expect(facts).toHaveTextContent("CompositionNative rhythm · Balanced");
     expect(facts).toHaveTextContent("Icon treatmentContained");
     expect(facts).toHaveTextContent("Motion styleFluid");

@@ -331,6 +331,7 @@ export function ThemesView({
                 reduceMotion={reduceMotion}
                 resolveAsset={resolveAsset}
                 presentation={previewPresentation}
+                compact
                 scenario={previewScenario}
                 motionPreviewRevision={motionPreviewRevision}
               />
