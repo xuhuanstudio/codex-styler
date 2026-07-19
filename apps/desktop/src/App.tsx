@@ -119,6 +119,11 @@ import {
   type ThemeAssetMap,
 } from "./lib/theme-files";
 import { assignThemeVariantField } from "./lib/theme-draft";
+import {
+  applyCompanionPlacementMode,
+  resolveCompanionPlacementMode,
+  type SelectableCompanionPlacementMode,
+} from "./lib/companion-placement-modes";
 
 const CompanionCreator = lazy(() =>
   import("./features/companion-creator/CompanionCreator").then((module) => ({
@@ -1193,6 +1198,15 @@ export function App() {
     });
   }
 
+  function commitSelectedCompanionOverrides(next: UserSettings) {
+    if (!selectedCompanion) return;
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    });
+    scheduleLiveCompanionSync(next);
+  }
+
   function updateEntitySize(size: number) {
     if (!selectedCompanion) return;
     const current = settingsRef.current;
@@ -1202,11 +1216,7 @@ export function App() {
         [selectedCompanion.id]: size,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
-    });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function updateEntityAnchor(anchor: { x: number; y: number }) {
@@ -1218,11 +1228,7 @@ export function App() {
         [selectedCompanion.id]: anchor,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
-    });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function updateEntityAttachment(attachment: EntityAttachment | null) {
@@ -1234,11 +1240,43 @@ export function App() {
         [selectedCompanion.id]: attachment,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    commitSelectedCompanionOverrides(next);
+  }
+
+  function setEntityPlacementMode(mode: SelectableCompanionPlacementMode) {
+    if (!selectedCompanion) return;
+    const current = settingsRef.current;
+    const hasAttachmentOverride = Object.prototype.hasOwnProperty.call(
+      current.companionAttachments,
+      selectedCompanion.id,
+    );
+    const currentPlacement = {
+      anchor:
+        current.companionAnchors[selectedCompanion.id] ??
+        selectedCompanion.entity.anchor,
+      attachment: hasAttachmentOverride
+        ? current.companionAttachments[selectedCompanion.id]
+        : (selectedCompanion.entity.attachment ?? null),
+    };
+    if (resolveCompanionPlacementMode(currentPlacement.attachment) === mode) {
+      return;
+    }
+    const placement = applyCompanionPlacementMode(
+      mode,
+      currentPlacement,
+      selectedCompanion.entity.attachment,
+    );
+    const next = updateSettings({
+      companionAnchors: {
+        ...current.companionAnchors,
+        [selectedCompanion.id]: placement.anchor,
+      },
+      companionAttachments: {
+        ...current.companionAttachments,
+        [selectedCompanion.id]: placement.attachment,
+      },
     });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function resetEntityPlacement() {
@@ -1255,11 +1293,7 @@ export function App() {
       companionSizes,
       companionAttachments,
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
-    });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function selectCompanion(companion: CompanionDefinition | null) {
@@ -1950,7 +1984,20 @@ export function App() {
                     selectedCompanion.id,
                   )),
               )}
+              placementMode={
+                selectedCompanion
+                  ? resolveCompanionPlacementMode(
+                      Object.prototype.hasOwnProperty.call(
+                        settings.companionAttachments,
+                        selectedCompanion.id,
+                      )
+                        ? settings.companionAttachments[selectedCompanion.id]
+                        : selectedCompanion.entity.attachment,
+                    )
+                  : "free"
+              }
               onSizeChange={updateEntitySize}
+              onPlacementModeChange={setEntityPlacementMode}
               onResetPlacement={resetEntityPlacement}
               onAnchorChange={updateEntityAnchor}
               onAttachmentChange={updateEntityAttachment}

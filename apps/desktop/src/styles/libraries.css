@@ -672,6 +672,64 @@
   margin: 0;
 }
 
+.companion-placement-modes {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-subtle);
+}
+
+.companion-placement-modes button {
+  display: inline-flex;
+  min-width: 0;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: calc(var(--radius-sm) - 3px);
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-caption);
+  font-weight: 650;
+  white-space: nowrap;
+  transition:
+    color var(--motion-micro) var(--ease-standard),
+    background var(--motion-micro) var(--ease-standard),
+    box-shadow var(--motion-micro) var(--ease-standard);
+}
+
+.companion-placement-modes button:hover {
+  color: var(--text-secondary);
+  background: var(--surface-hover);
+}
+
+.companion-placement-modes button[aria-pressed="true"] {
+  color: var(--text-primary);
+  background: var(--surface-base);
+  box-shadow: var(--shadow-control);
+}
+
+.companion-placement-modes button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.companion-placement-modes > span {
+  grid-column: 1 / -1;
+  padding: 3px 5px 2px;
+  color: var(--text-tertiary);
+  font-size: 10px;
+  text-align: center;
+}
+
 .companion-placement-controls__row {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) auto auto;

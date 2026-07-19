@@ -5,6 +5,7 @@ import {
   Download,
   Film,
   FolderOpen,
+  Magnet,
   MoreHorizontal,
   MousePointer2,
   PencilLine,
@@ -12,6 +13,7 @@ import {
   RotateCcw,
   Trash2,
   Upload,
+  Move,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
@@ -29,6 +31,10 @@ import type {
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { ThemeVariantName } from "../../lib/app-session";
 import { findCompanionSourceProject } from "./companion-project-link";
+import type {
+  CompanionPlacementMode,
+  SelectableCompanionPlacementMode,
+} from "../../lib/companion-placement-modes";
 
 export type CompanionCollection = "builtIn" | "mine";
 
@@ -83,7 +89,9 @@ export interface CompanionsViewProps {
   onDelete: (companion: CompanionDefinition) => void;
   selectedSize: number | null;
   placementCustomized: boolean;
+  placementMode: CompanionPlacementMode;
   onSizeChange: (size: number) => void;
+  onPlacementModeChange: (mode: SelectableCompanionPlacementMode) => void;
   onResetPlacement: () => void;
   onAnchorChange: (anchor: { x: number; y: number }) => void;
   onAttachmentChange: (attachment: EntityAttachment | null) => void;
@@ -116,7 +124,9 @@ export function CompanionsView({
   onDelete,
   selectedSize,
   placementCustomized,
+  placementMode,
   onSizeChange,
+  onPlacementModeChange,
   onResetPlacement,
   onAnchorChange,
   onAttachmentChange,
@@ -401,6 +411,31 @@ export function CompanionsView({
                         ? t("customized")
                         : t("packageDefault")}
                     </small>
+                  </div>
+                  <div
+                    className="companion-placement-modes"
+                    role="group"
+                    aria-label={t("placementMode")}
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={placementMode === "composer"}
+                      onClick={() => onPlacementModeChange("composer")}
+                    >
+                      <Magnet size={12} aria-hidden="true" />
+                      {t("composerEdge")}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={placementMode === "free"}
+                      onClick={() => onPlacementModeChange("free")}
+                    >
+                      <Move size={12} aria-hidden="true" />
+                      {t("freePosition")}
+                    </button>
+                    {placementMode === "custom" && (
+                      <span>{t("customAttachment")}</span>
+                    )}
                   </div>
                   <div className="companion-placement-controls__row">
                     <label className="range-control companion-size-control">

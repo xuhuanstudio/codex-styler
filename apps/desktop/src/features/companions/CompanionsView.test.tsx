@@ -20,6 +20,7 @@ describe("CompanionsView installed companion management", () => {
     const onExport = vi.fn();
     const onDelete = vi.fn();
     const onSizeChange = vi.fn();
+    const onPlacementModeChange = vi.fn();
     const onResetPlacement = vi.fn();
 
     render(
@@ -43,7 +44,9 @@ describe("CompanionsView installed companion management", () => {
         onDelete={onDelete}
         selectedSize={136}
         placementCustomized
+        placementMode="composer"
         onSizeChange={onSizeChange}
+        onPlacementModeChange={onPlacementModeChange}
         onResetPlacement={onResetPlacement}
         onAnchorChange={vi.fn()}
         onAttachmentChange={vi.fn()}
@@ -79,6 +82,15 @@ describe("CompanionsView installed companion management", () => {
       screen.getByRole("button", { name: "Reset size & placement" }),
     );
     expect(onSizeChange).toHaveBeenCalledWith(180);
+    expect(
+      screen.getByRole("button", { name: "Composer edge" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const freePositionButton = screen.getByRole("button", {
+      name: "Free position",
+    });
+    expect(freePositionButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(freePositionButton);
+    expect(onPlacementModeChange).toHaveBeenCalledWith("free");
     expect(onResetPlacement).toHaveBeenCalledOnce();
   });
 });

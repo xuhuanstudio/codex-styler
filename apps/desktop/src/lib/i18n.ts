@@ -251,7 +251,9 @@ const messages = {
     companionSize: "Companion size",
     companionPlacement: "Size & placement",
     companionPlacementDetail:
-      "Drag in the preview. Changes update Codex immediately while connected.",
+      "Choose a stable placement mode or drag in the preview. Changes update Codex immediately while connected.",
+    placementMode: "Placement mode",
+    customAttachment: "Package attachment",
     packageDefault: "Package default",
     customized: "Customized",
     resetCompanionPlacement: "Reset size & placement",
@@ -810,7 +812,9 @@ const messages = {
     companionSize: "伙伴尺寸",
     companionPlacement: "尺寸与位置",
     companionPlacementDetail:
-      "可直接在预览中拖拽；Codex 已连接时会即时同步调整。",
+      "可选择稳定的定位方式，也可直接在预览中拖拽；Codex 已连接时会即时同步调整。",
+    placementMode: "定位方式",
+    customAttachment: "资源包自定义吸附",
     packageDefault: "资源包默认值",
     customized: "已自定义",
     resetCompanionPlacement: "恢复默认尺寸与位置",
