@@ -5,10 +5,14 @@ import {
   importCompanionPackage,
 } from "@codex-styler/theme-core";
 import {
+  assertEncodedFileSize,
+  assertOutputCanvasSize,
   atlasPackLayout,
   compileCompanion,
   decodedPageLimit,
+  encodedFileLimit,
   expandMotionFrames,
+  rasterDimensionLimit,
   rasterExtensionForBytes,
 } from "./compiler";
 import { createCompanionProject } from "./model";
@@ -30,6 +34,22 @@ describe("companion atlas compiler limits", () => {
   it("rejects a canvas that would require more than eight safe pages", () => {
     expect(() => atlasPackLayout(1000, 1000, 100)).toThrow(
       /eight safe atlas pages/,
+    );
+  });
+
+  it("rejects every generated asset above the encoded package limit", () => {
+    expect(() => assertEncodedFileSize(encodedFileLimit)).not.toThrow();
+    expect(() => assertEncodedFileSize(encodedFileLimit + 1)).toThrow(
+      /20 MiB package limit/,
+    );
+  });
+
+  it("rejects shared canvases that exceed the raster dimension limit", () => {
+    expect(() =>
+      assertOutputCanvasSize(rasterDimensionLimit, rasterDimensionLimit),
+    ).not.toThrow();
+    expect(() => assertOutputCanvasSize(rasterDimensionLimit + 1, 512)).toThrow(
+      /8192 pixels/,
     );
   });
 

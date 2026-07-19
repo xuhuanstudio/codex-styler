@@ -10,6 +10,15 @@ if (title && nonEnglish.test(title)) {
   process.exit(1);
 }
 
+// Pull requests are squash-merged, so their English title becomes the public
+// commit subject on main. Branch commits may follow a contributor's local
+// language convention; the push check below still enforces English subjects
+// for every commit that actually lands on main.
+if (title) {
+  console.log("Checked the English pull request title.");
+  process.exit(0);
+}
+
 let base = baseInput;
 if (!base || zeroSha.test(base)) {
   try {

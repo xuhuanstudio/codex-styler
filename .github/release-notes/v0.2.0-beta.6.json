@@ -1,0 +1,39 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.6",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "A clearer first-run and application model now connects themes, companions, runtime state, and recovery, while both creative workspaces gain professional history, validation, and compact-window behavior.",
+      "highlights": [
+        "One persistent configuration dock shows the selected theme, independent companion, runtime state, and safest next action without duplicating Apply controls across pages.",
+        "The setup guide now keeps its steps and actions visible while theme and companion choices scroll inside a compact, keyboard-friendly workspace.",
+        "Theme Editor adds undo and redo, current-versus-saved preview, runtime control coverage, real scene-layer management, and explicit dirty-draft navigation.",
+        "Companion Studio adds automatic source detection, compiled-output readiness, source-project editing, and observable cancellable restoration for large drafts."
+      ],
+      "fixes": [
+        "Fixed compact dialogs and creator workspaces clipping navigation or primary actions instead of scrolling only their working content.",
+        "Fixed reset actions becoming indistinguishable icon-only controls at narrow widths.",
+        "Fixed large companion drafts appearing frozen while several full-size cleanup buffers were processed at once.",
+        "Fixed partially decoded or cleaned draft frames retaining temporary object URLs after cancellation or failure.",
+        "Fixed theme drafts being easy to leave without a clear save, discard, or continue-editing decision."
+      ]
+    },
+    "zh-CN": {
+      "summary": "更清晰的首次使用与应用模型现在统一呈现主题、独立伙伴、运行状态和恢复操作；两个创作工作区也补齐了专业的历史、校验与紧凑窗口体验。",
+      "highlights": [
+        "统一的当前搭配栏会持续显示主题、独立伙伴、运行状态和最安全的下一步，不再在多个页面重复出现应用按钮。",
+        "设置引导在紧凑窗口中固定步骤与操作，只让主题和伙伴选择区域滚动，并保持完整键盘操作。",
+        "主题编辑器新增撤销重做、当前与已保存版本对比、运行时映射说明、真实场景图层管理和未保存离开确认。",
+        "伙伴工作室新增自动素材识别、编译输出检查、源工程编辑，以及面向大型草稿的可观察、可取消恢复流程。"
+      ],
+      "fixes": [
+        "修复紧凑窗口中的引导弹窗和创作工作区裁掉步骤或主要操作，而不是仅滚动中间内容的问题。",
+        "修复窄窗口下两个重置操作退化成难以区分的纯图标按钮。",
+        "修复大型伙伴草稿同时处理多个完整像素缓冲区时看似卡死的问题。",
+        "修复草稿恢复取消或失败后，部分解码和清理帧残留临时对象 URL 的问题。",
+        "修复主题草稿离开时缺少明确保存、放弃或继续编辑决策的问题。"
+      ]
+    }
+  }
+}

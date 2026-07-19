@@ -8,12 +8,36 @@ import {
   type CompanionPose,
 } from "@codex-styler/theme-core";
 import { calibrateDirections, normalizeAngle } from "./calibration";
+import { companionPackageId, companionSlug } from "./companion-id";
 import type { ExtractedFrame } from "./media";
 import type { CompanionCreatorProject, FrameBounds } from "./model";
 import { validateMotionRanges } from "./motions";
 
 export const decodedPageLimit = 48 * 1024 * 1024;
-const encodedFileLimit = 20 * 1024 * 1024;
+export const encodedFileLimit = 20 * 1024 * 1024;
+export const atlasPageLimit = 8;
+export const rasterDimensionLimit = 8192;
+
+export function assertEncodedFileSize(size: number): void {
+  if (size > encodedFileLimit) {
+    throw new Error(
+      "A generated companion asset exceeds the 20 MiB package limit",
+    );
+  }
+}
+
+export function assertOutputCanvasSize(width: number, height: number): void {
+  if (
+    width < 1 ||
+    height < 1 ||
+    width > rasterDimensionLimit ||
+    height > rasterDimensionLimit
+  ) {
+    throw new Error(
+      `The shared canvas must be between 1 and ${rasterDimensionLimit} pixels on each side`,
+    );
+  }
+}
 
 function canvasBlob(
   canvas: HTMLCanvasElement,
@@ -81,21 +105,12 @@ async function encodedCanvasAsset(
   canvas: HTMLCanvasElement,
 ): Promise<EncodedCanvasAsset> {
   const encoded = await bytes(await canvasBlob(canvas));
+  assertEncodedFileSize(encoded.byteLength);
   const extension = rasterExtensionForBytes(encoded);
   if (!extension) {
     throw new Error("The locally encoded companion image has an unknown type");
   }
   return { bytes: encoded, extension };
-}
-
-function slug(value: string): string {
-  const cleaned = value
-    .normalize("NFKD")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, "-")
-    .replace(/^-+|-+$/gu, "")
-    .slice(0, 32);
-  return cleaned.length >= 2 ? cleaned : "companion";
 }
 
 function nearestPackedFrame(
@@ -117,10 +132,17 @@ export function atlasPackLayout(
   frameHeight: number,
   count: number,
 ) {
+  assertOutputCanvasSize(frameWidth, frameHeight);
   const cellBytes = frameWidth * frameHeight * 4;
   const byMemory = Math.max(1, Math.floor(decodedPageLimit / cellBytes));
-  const maxColumns = Math.max(1, Math.min(16, Math.floor(8192 / frameWidth)));
-  const maxRows = Math.max(1, Math.min(16, Math.floor(8192 / frameHeight)));
+  const maxColumns = Math.max(
+    1,
+    Math.min(16, Math.floor(rasterDimensionLimit / frameWidth)),
+  );
+  const maxRows = Math.max(
+    1,
+    Math.min(16, Math.floor(rasterDimensionLimit / frameHeight)),
+  );
   const pageCapacity = Math.max(
     1,
     Math.min(256, byMemory, maxColumns * maxRows),
@@ -135,7 +157,7 @@ export function atlasPackLayout(
   );
   const framesPerPage = Math.max(1, columns * rows);
   const pages = Math.ceil(count / framesPerPage);
-  if (pages > 8) {
+  if (pages > atlasPageLimit) {
     throw new Error(
       "The shared canvas is too large for eight safe atlas pages. Reduce empty canvas area or exclude frames.",
     );
@@ -208,11 +230,12 @@ export async function compileCompanion(
   if (activeLogicalFrames.length > 512) {
     throw new Error("A companion can contain at most 512 logical frames");
   }
+  const width = Math.ceil(crop.width);
+  const height = Math.ceil(crop.height);
+  assertOutputCanvasSize(width, height);
 
-  const id = project.id.startsWith("local.")
-    ? project.id
-    : `local.${slug(project.name)}-${project.id.slice(-8).toLowerCase()}`;
-  const entityId = slug(project.name);
+  const id = companionPackageId(project);
+  const entityId = companionSlug(project.name);
   const files = new Map<string, Uint8Array>();
   const portrait = await portraitAsset(
     frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!,
@@ -225,8 +248,8 @@ export async function compileCompanion(
     const frame = frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!;
     const bitmap = await createImageBitmap(frame.blob);
     const canvas = document.createElement("canvas");
-    canvas.width = Math.ceil(crop.width);
-    canvas.height = Math.ceil(crop.height);
+    canvas.width = width;
+    canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas 2D is unavailable");
     context.drawImage(
@@ -247,7 +270,7 @@ export async function compileCompanion(
     const definition: CompanionPackageDefinition = {
       format: COMPANION_FORMAT,
       id,
-      version: "0.2.0-beta.5",
+      version: "0.2.0-beta.6",
       metadata: {
         name: project.name,
         description: project.description.trim(),
@@ -290,8 +313,6 @@ export async function compileCompanion(
     return { companion: companionFromPackage(definition), files };
   }
 
-  const width = Math.ceil(crop.width);
-  const height = Math.ceil(crop.height);
   const layout = atlasPackLayout(width, height, activeLogicalFrames.length);
   const packedIndexes = new Map<number, number>();
   activeLogicalFrames.forEach((frame, index) => {
@@ -330,9 +351,6 @@ export async function compileCompanion(
       bitmap.close();
     }
     const encoded = await encodedCanvasAsset(canvas);
-    if (encoded.bytes.byteLength > encodedFileLimit) {
-      throw new Error("An atlas page exceeds the 20 MiB package limit");
-    }
     const path = `assets/atlas-${page + 1}.${encoded.extension}`;
     pagePaths.push(path);
     files.set(path, encoded.bytes);
@@ -419,7 +437,7 @@ export async function compileCompanion(
         .filter((poseId): poseId is string => Boolean(poseId));
       return [
         {
-          id: slug(motion.name) + `-${motion.id.slice(-4)}`,
+          id: companionSlug(motion.name) + `-${motion.id.slice(-4)}`,
           poseIds: [...new Set(allowed)],
           frames: clipFrames,
           minimumDelayMs: motion.minimumDelayMs,
@@ -432,7 +450,7 @@ export async function compileCompanion(
   const definition: CompanionPackageDefinition = {
     format: COMPANION_FORMAT,
     id,
-    version: "0.2.0-beta.5",
+    version: "0.2.0-beta.6",
     metadata: {
       name: project.name,
       description: project.description.trim(),

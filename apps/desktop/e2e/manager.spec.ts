@@ -109,7 +109,77 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await expect(
     page.getByRole("separator", { name: "Scene layers" }),
   ).toBeHidden();
+  await expect(
+    page.getByRole("region", { name: "Live effect mapped" }),
+  ).toContainText("5 preview views");
+  const saveDraft = page.getByRole("button", { name: "Save draft" });
+  await expect(saveDraft).toBeDisabled();
+  await expect(saveDraft).toHaveAttribute("data-dirty", "false");
   await expect(page).toHaveScreenshot("theme-editor-en-dark-960x680.png");
+
+  await page.getByRole("button", { name: "Surfaces" }).click();
+  await expect(
+    page.getByRole("button", { name: "Appearance" }),
+  ).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("region", { name: "Enhanced mode effect" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Preview on Task & composer" })
+    .click();
+  await expect(page.locator(".workspace-preview")).toHaveAttribute(
+    "data-preview-scenario",
+    "task",
+  );
+  await expect(page.locator('[data-theme-control^="surfaces."]')).toHaveCount(
+    6,
+  );
+  const savedPreview = page.getByRole("button", { name: "Saved" });
+  await expect(savedPreview).toBeDisabled();
+  await page
+    .getByRole("combobox", { name: "Workspace layout" })
+    .selectOption("immersive");
+  await expect(saveDraft).toBeEnabled();
+  await expect(saveDraft).toHaveAttribute("data-dirty", "true");
+  await expect(savedPreview).toBeEnabled();
+  const undoTheme = page.getByRole("button", { name: "Undo theme change" });
+  const redoTheme = page.getByRole("button", { name: "Redo theme change" });
+  await expect(undoTheme).toBeEnabled();
+  await expect(redoTheme).toBeDisabled();
+  await undoTheme.click();
+  await expect(
+    page.getByRole("combobox", { name: "Workspace layout" }),
+  ).toHaveValue("native");
+  await expect(redoTheme).toBeEnabled();
+  await redoTheme.click();
+  await expect(
+    page.getByRole("combobox", { name: "Workspace layout" }),
+  ).toHaveValue("immersive");
+  await savedPreview.click();
+  await expect(page.locator(".canvas-stage")).toHaveAttribute(
+    "data-preview-version",
+    "saved",
+  );
+  await expect(page.locator(".inspector-content")).toHaveAttribute("inert");
+  await expect(page.getByText("Saved preview", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Return" }).click();
+  await expect(page.locator(".canvas-stage")).toHaveAttribute(
+    "data-preview-version",
+    "current",
+  );
+  await expect(page.locator(".inspector-content")).not.toHaveAttribute("inert");
+
+  await page.getByRole("button", { name: "Back to themes" }).click();
+  const unsavedDialog = page.getByRole("dialog", {
+    name: "Save this theme before leaving?",
+  });
+  await expect(unsavedDialog).toBeVisible();
+  await unsavedDialog.getByRole("button", { name: "Keep editing" }).click();
+  await expect(page.locator(".editor-page")).toBeVisible();
+
+  await page.getByRole("button", { name: "Back to themes" }).click();
+  await page.getByRole("button", { name: "Save and leave" }).click();
+  await expect(page.locator(".theme-library-workspace")).toBeVisible();
 });
 
 test("scroll surfaces use product chrome instead of platform defaults", async ({
@@ -191,7 +261,7 @@ test("keyboard flow starts, applies, changes a companion, and restores", async (
 }) => {
   await openManager(page, "en", "dark", { width: 1320, height: 840 });
 
-  const start = page.getByRole("button", { name: "Start and apply" });
+  const start = page.getByRole("button", { name: "Start Codex & apply" });
   await start.focus();
   await page.keyboard.press("Enter");
   await expect(
@@ -210,7 +280,7 @@ test("keyboard flow starts, applies, changes a companion, and restores", async (
   await restore.focus();
   await page.keyboard.press("Enter");
   await expect(
-    page.getByText("Pending", { exact: true }).first(),
+    page.getByText("Ready to start", { exact: true }).first(),
   ).toBeVisible();
 });
 
@@ -388,7 +458,20 @@ test("keyboard companion creator completes a static-image project", async ({
   await page.getByRole("button", { name: "Motions" }).press("Enter");
   await expect(page).toHaveScreenshot("creator-motions-en-dark.png");
   await page.getByRole("button", { name: "Test & Save" }).press("Enter");
+  await expect(
+    page.getByText("Compiled output", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("1 optimized image", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText("1 / 512", { exact: true })).toBeVisible();
   await expect(page).toHaveScreenshot("creator-test-en-dark.png");
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expect(page).toHaveScreenshot("creator-test-en-dark-960x680.png");
+  await expect(
+    page.getByText("Compiled output", { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 1320, height: 840 });
   const companionPlacement = page.getByRole("button", {
     name: "Drag companion position",
   });
@@ -412,18 +495,23 @@ test("keyboard companion creator completes a static-image project", async ({
     .poll(async () => Number(await horizontalPosition.inputValue()))
     .toBeLessThan(horizontalBefore);
 
-  const buildCompanion = page.getByRole("button", {
-    name: /Build and install companion/,
+  const reviewSetup = page.getByRole("button", {
+    name: /Review remaining setup/,
   });
   const companionName = page.getByLabel("Companion name");
   await companionName.fill("");
-  await expect(buildCompanion).toBeDisabled();
+  await expect(reviewSetup).toBeEnabled();
+  await reviewSetup.press("Enter");
+  await expect(companionName).toBeFocused();
   await companionName.fill("Keyboard Friend");
   await page
     .getByLabel("Description")
     .fill("A keyboard-tested local companion.");
   await page.getByLabel("Author").fill("Test creator");
   await page.getByLabel("Asset license").selectOption("CC0-1.0");
+  const buildCompanion = page.getByRole("button", {
+    name: /Build and install companion/,
+  });
   await expect(buildCompanion).toBeEnabled();
   await buildCompanion.press("Enter");
   await expect(

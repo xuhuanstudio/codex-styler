@@ -18,11 +18,9 @@ import {
   PanelRightOpen,
   PanelLeftClose,
   PanelLeftOpen,
-  Pause,
-  Play,
   Plus,
   RefreshCw,
-  RotateCcw,
+  Save,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -59,10 +57,10 @@ import {
 } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { BrandMark } from "./components/BrandMark";
+import { ConfigurationDock } from "./components/ConfigurationDock";
 import { Onboarding } from "./components/Onboarding";
 import { PreviewWorkspace } from "./components/PreviewWorkspace";
 import { SelectField } from "./components/ui/SelectField";
-import { StatusBadge } from "./components/ui/StatusBadge";
 import type { CompanionCreatorProject } from "./features/companion-creator/model";
 import {
   deleteCompanionProject,
@@ -147,6 +145,11 @@ import {
   createInitialAppSession,
   type ThemeVariantName,
 } from "./lib/app-session";
+import {
+  classifyRuntimeFailure,
+  configurationPresentation,
+  runtimeFailureMessageKey,
+} from "./lib/configuration-presentation";
 import { SettingsView } from "./features/settings/SettingsView";
 import { HomeView } from "./features/home/HomeView";
 import { ThemesView, type ThemeCollection } from "./features/themes/ThemesView";
@@ -155,6 +158,10 @@ import {
   type CompanionCollection,
 } from "./features/companions/CompanionsView";
 import { ThemeEditorView } from "./features/theme-editor/ThemeEditorView";
+import {
+  themeDraftsEqual,
+  useThemeDraftHistory,
+} from "./features/theme-editor/use-theme-draft-history";
 
 type View =
   "home" | "themes" | "companions" | "settings" | "editor" | "companion-editor";
@@ -166,9 +173,6 @@ type ApplySuccessMessage =
   | "themeApplied"
   | "companionApplied"
   | "companionPositionApplied";
-type ConfigurationState =
-  "pending" | "applying" | "applied" | "paused" | "fallback" | "error";
-
 const initialRuntime: RuntimeStatus = {
   state: "disconnected",
   connected: false,
@@ -181,9 +185,8 @@ const initialRuntime: RuntimeStatus = {
 };
 
 function isRuntimeConnectionFailure(message: string): boolean {
-  return /debugging socket|connection refused|socket closed|not connected|connection is no longer available|probe timed out/i.test(
-    message,
-  );
+  const failure = classifyRuntimeFailure(message);
+  return failure === "connection" || failure === "timeout";
 }
 
 function initialCompanionForTheme(
@@ -243,9 +246,17 @@ export function App() {
       dispatchSession({ type: "runtime/replace", runtime: next });
     }
   };
-  const [draftTheme, setDraftTheme] = useState<ThemeDefinition>(() =>
-    structuredClone(initialTheme),
-  );
+  const {
+    theme: draftTheme,
+    commit: commitThemeDraft,
+    reset: resetThemeDraft,
+    undo: undoThemeDraft,
+    redo: redoThemeDraft,
+    breakGroup: breakThemeHistoryGroup,
+    canUndo: canUndoThemeDraft,
+    canRedo: canRedoThemeDraft,
+  } = useThemeDraftHistory(initialTheme);
+  const draftThemeRef = useRef(draftTheme);
   const [detection, setDetection] = useState<CodexDetection | null>(null);
   const [themeCollection, setThemeCollection] =
     useState<ThemeCollection>("builtIn");
@@ -264,9 +275,13 @@ export function App() {
   const [activeCompanionProject, setActiveCompanionProject] =
     useState<CompanionCreatorProject | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lastAppliedTheme, setLastAppliedTheme] = useState<{
+    theme: ThemeDefinition;
+    variant: ThemeVariantName;
+  } | null>(null);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.5");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.6");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -284,6 +299,9 @@ export function App() {
   );
   const [pendingCompanionDelete, setPendingCompanionDelete] =
     useState<CompanionDefinition | null>(null);
+  const [pendingCompanionProjectDelete, setPendingCompanionProjectDelete] =
+    useState<CompanionCreatorProject | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<View | null>(null);
   const [pendingApplication, setPendingApplication] = useState<{
     theme: ThemeDefinition;
     companion: CompanionDefinition | null;
@@ -293,7 +311,13 @@ export function App() {
     successMessage: ApplySuccessMessage;
   } | null>(null);
   const [restartError, setRestartError] = useState<string | null>(null);
+  const [settingsFocusRequest, setSettingsFocusRequest] = useState<{
+    target: "codex" | "diagnostics";
+    revision: number;
+  } | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
+  const appMainRef = useRef<HTMLDivElement>(null);
+  const pendingNavigationTriggerRef = useRef<HTMLElement | null>(null);
   const companionImportRef = useRef<HTMLInputElement>(null);
   const backgroundImportRef = useRef<HTMLInputElement>(null);
   const [backgroundImportMode, setBackgroundImportMode] = useState<
@@ -308,6 +332,35 @@ export function App() {
 
   const locale = resolveLocale(settings.locale);
   const t = (key: MessageKey) => translate(locale, key);
+
+  useEffect(() => {
+    const element = appMainRef.current;
+    if (!element) return;
+    if (typeof element.scrollTo === "function") {
+      element.scrollTo({ top: 0, behavior: "auto" });
+    } else {
+      element.scrollTop = 0;
+    }
+  }, [view]);
+
+  useEffect(() => {
+    if (!pendingNavigation) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || busy) return;
+      event.preventDefault();
+      cancelPendingNavigation();
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [busy, pendingNavigation]);
+
+  useEffect(() => {
+    if (!pendingNavigation || busy || session.draft.themeDirty) return;
+    const nextView = pendingNavigation;
+    pendingNavigationTriggerRef.current = null;
+    setPendingNavigation(null);
+    setView(nextView);
+  }, [busy, pendingNavigation, session.draft.themeDirty]);
   const themePersistenceMessage = (error: unknown) => {
     const detail = error instanceof Error ? error.message : String(error);
     if (
@@ -322,26 +375,8 @@ export function App() {
     }
     return t("themeSaveFailed");
   };
-  const runtimeFailureMessage = (detail: string) => {
-    if (
-      /Microsoft Store installation|application identity|activate the Microsoft Store|AppsFolder|AppUserModelId/i.test(
-        detail,
-      )
-    ) {
-      return t("windowsStoreLaunchFailed");
-    }
-    if (/access is denied|拒绝访问|os error 5\b/i.test(detail)) {
-      return t("windowsLaunchPermissionFailed");
-    }
-    if (
-      /debugging socket|connection refused|os error 61\b|websocket.*(?:closed|connect)|target closed/i.test(
-        detail,
-      )
-    ) {
-      return t("runtimeConnectionLost");
-    }
-    return detail;
-  };
+  const runtimeFailureMessage = (detail: string) =>
+    t(runtimeFailureMessageKey(detail));
   const allCompanions = [...builtinCompanions, ...localCompanions];
   const companionForTheme = (
     theme: ThemeDefinition,
@@ -382,30 +417,17 @@ export function App() {
     (runtime.state === "applied" ||
       runtime.state === "fallback" ||
       runtime.state === "applying");
-  const configurationState: ConfigurationState =
-    runtime.state === "error"
-      ? "error"
-      : runtime.state === "fallback"
-        ? "fallback"
-        : runtime.state === "paused"
-          ? "paused"
-          : runtime.state === "applying" || runtime.state === "launching"
-            ? "applying"
-            : runtime.state === "applied"
-              ? "applied"
-              : "pending";
-  const configurationStateKey: MessageKey =
-    configurationState === "applying"
-      ? "statusApplying"
-      : configurationState === "applied"
-        ? "statusApplied"
-        : configurationState === "paused"
-          ? "statusPaused"
-          : configurationState === "fallback"
-            ? "statusFallback"
-            : configurationState === "error"
-              ? "statusError"
-              : "statusPending";
+  const isDraftApplied =
+    isLive &&
+    !session.draft.themeDirty &&
+    lastAppliedTheme !== null &&
+    lastAppliedTheme.variant === variant &&
+    themeDraftsEqual(draftTheme, lastAppliedTheme.theme);
+  const configuration = configurationPresentation({
+    runtime,
+    detection,
+    runtimeStrategy: settings.runtimeStrategy,
+  });
   const displayedTheme = isLive ? appliedTheme : selectedTheme;
   const companionOverridesFor = (
     companion: CompanionDefinition | null,
@@ -476,6 +498,20 @@ export function App() {
   useEffect(() => {
     saveWorkspaceUiPreferences(uiPreferences);
   }, [uiPreferences]);
+
+  useEffect(() => {
+    if (
+      !runtime.connected ||
+      (runtime.state !== "applied" && runtime.state !== "fallback") ||
+      lastAppliedTheme !== null
+    ) {
+      return;
+    }
+    setLastAppliedTheme({
+      theme: structuredClone(appliedTheme),
+      variant: settings.themeVariant,
+    });
+  }, [appliedTheme, lastAppliedTheme, runtime, settings.themeVariant]);
 
   useEffect(() => {
     selectCompanionInSession(
@@ -587,9 +623,17 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    setDraftTheme(structuredClone(selectedTheme));
-    dispatchSession({ type: "draft/theme-dirty", dirty: false });
-  }, [selectedTheme]);
+    draftThemeRef.current = draftTheme;
+    dispatchSession({
+      type: "draft/theme-dirty",
+      dirty: !themeDraftsEqual(draftTheme, selectedTheme),
+    });
+  }, [draftTheme, selectedTheme]);
+
+  useEffect(() => {
+    if (themeDraftsEqual(draftThemeRef.current, selectedTheme)) return;
+    resetThemeDraft(selectedTheme);
+  }, [resetThemeDraft, selectedTheme]);
 
   useEffect(() => {
     if (!toast) return;
@@ -750,6 +794,10 @@ export function App() {
       );
       if (revision !== applyRevisionRef.current) return;
       setRuntime(next);
+      setLastAppliedTheme({
+        theme: structuredClone(theme),
+        variant: variantSnapshot,
+      });
       if (!preserveSelection) setSelectedTheme(theme);
       updateSettings({ appliedThemeId: theme.id });
       syncDetection(await detectCodex(settingsSnapshot.codexInstallPath));
@@ -870,21 +918,38 @@ export function App() {
   }
 
   async function handlePause() {
+    if (busy) return;
+    const revision = ++applyRevisionRef.current;
+    setBusy(true);
     try {
       setRuntime(await pauseTheme());
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      await recoverRuntimeFailure(detail, applyRevisionRef.current);
+      await recoverRuntimeFailure(detail, revision);
       setToast(`${t("applyFailed")}: ${runtimeFailureMessage(detail)}`);
+    } finally {
+      if (revision === applyRevisionRef.current) setBusy(false);
     }
   }
 
   async function handleRestore() {
-    dispatchSession({
-      type: "runtime/reset",
-      runtime: await restoreOfficial(),
-    });
-    setToast(t("restore"));
+    if (busy) return;
+    const revision = ++applyRevisionRef.current;
+    setBusy(true);
+    try {
+      const restored = await restoreOfficial();
+      if (revision !== applyRevisionRef.current) return;
+      dispatchSession({ type: "runtime/reset", runtime: restored });
+      setLastAppliedTheme(null);
+      setToast(t("restore"));
+    } catch (error) {
+      if (revision !== applyRevisionRef.current) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      await recoverRuntimeFailure(detail, revision);
+      setToast(`${t("restoreFailed")}: ${runtimeFailureMessage(detail)}`);
+    } finally {
+      if (revision === applyRevisionRef.current) setBusy(false);
+    }
   }
 
   async function handleCheckForUpdates(manual = true) {
@@ -1039,8 +1104,6 @@ export function App() {
           variant: settingsRef.current.themeVariant,
         },
       );
-    } else {
-      setToast(t("themePending"));
     }
   }
 
@@ -1059,8 +1122,6 @@ export function App() {
           variant: nextVariant,
         },
       );
-    } else {
-      setToast(t("themePending"));
     }
   }
 
@@ -1068,23 +1129,24 @@ export function App() {
     section: "background" | "appearance" | "motion",
     key: string,
     value: number | string,
+    historyGroup?: string,
   ) {
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
-    setDraftTheme((current) => {
-      const next = structuredClone(current);
-      const target = next.variants[variant][section] as unknown as Record<
-        string,
-        number | string | object
-      >;
-      target[key] = value;
-      return next;
-    });
+    commitThemeDraft(
+      (next) => {
+        const target = next.variants[variant][section] as unknown as Record<
+          string,
+          number | string | object
+        >;
+        target[key] = value;
+        return next;
+      },
+      historyGroup ?? `${variant}.${section}.${key}`,
+    );
   }
 
   function addSceneLayer(type: "image" | "gradient" | "vignette") {
-    setDraftTheme((current) => {
-      if (current.scene.layers.length >= 8) return current;
-      const next = structuredClone(current);
+    commitThemeDraft((next) => {
+      if (next.scene.layers.length >= 8) return next;
       const suffix = `${Date.now().toString(36)}-${next.scene.layers.length + 1}`;
       const image = next.variants[variant].background.image;
       next.scene.layers.push({
@@ -1097,37 +1159,34 @@ export function App() {
       });
       return next;
     });
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
   }
 
   function updateSceneLayer(
     layerId: string,
     patch: Partial<ThemeDefinition["scene"]["layers"][number]>,
   ) {
-    setDraftTheme((current) => {
-      const next = structuredClone(current);
-      const layer = next.scene.layers.find((item) => item.id === layerId);
-      if (!layer) return current;
-      Object.assign(layer, patch);
-      return next;
-    });
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+    commitThemeDraft(
+      (next) => {
+        const layer = next.scene.layers.find((item) => item.id === layerId);
+        if (!layer) return next;
+        Object.assign(layer, patch);
+        return next;
+      },
+      `scene.${layerId}.${Object.keys(patch).sort().join("-")}`,
+    );
   }
 
   function removeSceneLayer(layerId: string) {
-    setDraftTheme((current) => ({
-      ...structuredClone(current),
-      scene: {
-        ...structuredClone(current.scene),
-        layers: current.scene.layers.filter((item) => item.id !== layerId),
-      },
-    }));
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
+    commitThemeDraft((next) => {
+      next.scene.layers = next.scene.layers.filter(
+        (item) => item.id !== layerId,
+      );
+      return next;
+    });
   }
 
   function setRecommendedCompanion(companionId: string | null) {
-    setDraftTheme((current) => {
-      const next = structuredClone(current);
+    commitThemeDraft((next) => {
       if (companionId) {
         next.metadata.recommendedCompanionId = companionId;
       } else {
@@ -1135,7 +1194,6 @@ export function App() {
       }
       return next;
     });
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
   }
 
   function updateEntitySize(size: number) {
@@ -1203,8 +1261,6 @@ export function App() {
         next,
         "companionApplied",
       );
-    } else {
-      setToast(t("companionPending"));
     }
   }
 
@@ -1227,16 +1283,76 @@ export function App() {
   }
 
   function resetDraft() {
-    setDraftTheme(structuredClone(selectedTheme));
-    dispatchSession({ type: "draft/theme-dirty", dirty: false });
+    commitThemeDraft(() => structuredClone(selectedTheme));
     setToast(t("resetTheme"));
+  }
+
+  function handleUndoThemeDraft() {
+    undoThemeDraft();
+    setToast(t("themeChangeUndone"));
+  }
+
+  function handleRedoThemeDraft() {
+    redoThemeDraft();
+    setToast(t("themeChangeRedone"));
+  }
+
+  function navigateTo(nextView: View) {
+    if (
+      view === "editor" &&
+      nextView !== "editor" &&
+      session.draft.themeDirty
+    ) {
+      pendingNavigationTriggerRef.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      setPendingNavigation(nextView);
+      return;
+    }
+    if (nextView === "settings") setSettingsFocusRequest(null);
+    setView(nextView);
+  }
+
+  function openSettingsTarget(target: "codex" | "diagnostics") {
+    setToast(null);
+    setSettingsFocusRequest((current) => ({
+      target,
+      revision: (current?.revision ?? 0) + 1,
+    }));
+    setView("settings");
+  }
+
+  function cancelPendingNavigation() {
+    const trigger = pendingNavigationTriggerRef.current;
+    pendingNavigationTriggerRef.current = null;
+    setPendingNavigation(null);
+    window.setTimeout(() => trigger?.focus(), 0);
+  }
+
+  async function saveAndNavigate() {
+    if (!pendingNavigation) return;
+    const nextView = pendingNavigation;
+    if (!(await saveDraftTheme())) return;
+    pendingNavigationTriggerRef.current = null;
+    setPendingNavigation(null);
+    setView(nextView);
+  }
+
+  function discardAndNavigate() {
+    if (!pendingNavigation) return;
+    const nextView = pendingNavigation;
+    resetThemeDraft(selectedTheme);
+    pendingNavigationTriggerRef.current = null;
+    setPendingNavigation(null);
+    setView(nextView);
   }
 
   function openLocalThemeEditor(theme: ThemeDefinition) {
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setSelectedTheme(theme);
-    setDraftTheme(structuredClone(theme));
+    resetThemeDraft(theme);
     setView("editor");
   }
 
@@ -1276,7 +1392,7 @@ export function App() {
       setLocalThemes(next);
       saveLocalThemes(next);
       setSelectedTheme(duplicate);
-      setDraftTheme(duplicate);
+      resetThemeDraft(duplicate);
       setToast(t("savedCopy"));
       setThemeCollection("mine");
       setView("editor");
@@ -1367,12 +1483,16 @@ export function App() {
     setToast(t("companionSaved"));
   }
 
-  async function handleDeleteCompanionProject(projectId: string) {
+  async function handleDeleteCompanionProject() {
+    if (!pendingCompanionProjectDelete) return;
+    const projectId = pendingCompanionProjectDelete.id;
     try {
       await deleteCompanionProject(projectId);
       setCompanionProjects((current) =>
         current.filter((project) => project.id !== projectId),
       );
+      setPendingCompanionProjectDelete(null);
+      setToast(t("draftDeleted"));
     } catch (error) {
       console.error(error);
       setToast(t("companionProjectDeleteFailed"));
@@ -1450,7 +1570,7 @@ export function App() {
         setLocalThemes(next);
         saveLocalThemes(next);
         setSelectedTheme(structuredClone(replacement));
-        setDraftTheme(structuredClone(replacement));
+        resetThemeDraft(replacement);
         setAdaptiveSchemes(generated.schemes);
         setActiveAdaptiveScheme(generated.selectedSchemeId);
         setToast(t("themeImageUpdated"));
@@ -1471,7 +1591,7 @@ export function App() {
       setLocalThemes(next);
       saveLocalThemes(next);
       setSelectedTheme(generated.theme);
-      setDraftTheme(structuredClone(generated.theme));
+      resetThemeDraft(generated.theme);
       setAdaptiveSchemes(generated.schemes);
       setActiveAdaptiveScheme(generated.selectedSchemeId);
       setThemeCollection("mine");
@@ -1488,11 +1608,10 @@ export function App() {
 
   function selectAdaptiveScheme(scheme: AdaptiveScheme) {
     setActiveAdaptiveScheme(scheme.id);
-    dispatchSession({ type: "draft/theme-dirty", dirty: true });
-    setDraftTheme((current) => ({
-      ...structuredClone(current),
-      variants: structuredClone(scheme.variants),
-    }));
+    commitThemeDraft((next) => {
+      next.variants = structuredClone(scheme.variants);
+      return next;
+    });
   }
 
   async function handleExport() {
@@ -1514,7 +1633,7 @@ export function App() {
     setLocalThemes(next);
     saveLocalThemes(next);
     setSelectedTheme(theme);
-    setDraftTheme(structuredClone(theme));
+    resetThemeDraft(theme);
     setAdaptiveSchemes([]);
     setActiveAdaptiveScheme(null);
     setThemeCollection("mine");
@@ -1524,8 +1643,9 @@ export function App() {
   }
 
   async function saveDraftTheme() {
+    if (busy) return false;
     setBusy(true);
-    const revision = applyRevisionRef.current;
+    const revision = ++applyRevisionRef.current;
     dispatchSession({ type: "operation/start", revision, phase: "saving" });
     try {
       const assetMap = draftTheme.assets.length
@@ -1543,7 +1663,7 @@ export function App() {
       saveLocalThemes(next);
       setSelectedTheme(structuredClone(draftTheme));
       setToast(t("themeSaved"));
-      dispatchSession({ type: "draft/theme-dirty", dirty: false });
+      breakThemeHistoryGroup();
       dispatchSession({ type: "operation/complete", revision });
       return true;
     } catch (error) {
@@ -1561,7 +1681,8 @@ export function App() {
   }
 
   async function saveAndApplyDraft() {
-    if (await saveDraftTheme()) requestApply(draftTheme);
+    if (session.draft.themeDirty && !(await saveDraftTheme())) return;
+    requestApply(draftTheme);
   }
 
   function changeThemeCollection(collection: ThemeCollection) {
@@ -1610,7 +1731,21 @@ export function App() {
   const focusWorkspace =
     uiPreferences.focusMode &&
     (view === "editor" || view === "companion-editor");
-
+  const showConfigurationDock =
+    view !== "editor" && view !== "companion-editor";
+  const selectedThemeCopy =
+    selectedTheme.locales[locale] ?? selectedTheme.locales.en;
+  const selectedCompanionCopy = selectedCompanion
+    ? (selectedCompanion.locales[locale] ?? selectedCompanion.locales.en)
+    : null;
+  const onboardingRecommendedCompanion =
+    (selectedTheme.metadata.recommendedCompanionId
+      ? allCompanions.find(
+          (item) => item.id === selectedTheme.metadata.recommendedCompanionId,
+        )
+      : null) ??
+    embeddedCompanionForTheme(selectedTheme) ??
+    defaultCompanionForTheme(selectedTheme.id);
   return (
     <div
       className={"app" + (focusWorkspace ? " professional-focus" : "")}
@@ -1635,7 +1770,7 @@ export function App() {
                   ? "app-nav__item app-nav__item--active"
                   : "app-nav__item"
               }
-              onClick={() => setView(item.id)}
+              onClick={() => navigateTo(item.id)}
             >
               {item.icon}
               <span>{t(item.label)}</span>
@@ -1645,70 +1780,16 @@ export function App() {
 
         <div className="app-sidebar__spacer" />
 
-        <div className="connection-card">
-          <div className="connection-card__top">
-            <span
-              className={
-                "connection-indicator" +
-                (runtime.connected ? " connection-indicator--online" : "")
-              }
-            />
-            <strong>{t(configurationStateKey)}</strong>
-            <StatusBadge state={configurationState}>
-              {runtime.connected
-                ? t("connected")
-                : needsManualRestart
-                  ? t("codexRunning")
-                  : t("disconnected")}
-            </StatusBadge>
-          </div>
-          <span>
-            {runtime.connected
-              ? t("trustedRuntime")
-              : needsManualRestart
-                ? t("quitToContinue")
-                : detection?.installed === false
-                  ? t("disconnected")
-                  : t("unknownCompatibility")}
-          </span>
-          <div className="connection-card__actions">
-            {runtime.state === "applied" || runtime.state === "fallback" ? (
-              <button onClick={handlePause}>
-                <Pause size={13} />
-                {t("pause")}
-              </button>
-            ) : needsManualRestart ? (
-              <button onClick={() => requestApply()} disabled={busy}>
-                <RefreshCw size={13} />
-                {busy ? t("applying") : t("restartAndApply")}
-              </button>
-            ) : (
-              <button onClick={() => requestApply()} disabled={busy}>
-                <Play size={13} />
-                {busy
-                  ? t("applying")
-                  : runtime.connected
-                    ? t("applyChanges")
-                    : t("startAndApply")}
-              </button>
-            )}
-            <button
-              className="icon-button"
-              onClick={handleRestore}
-              title={t("restore")}
-            >
-              <RotateCcw size={14} />
-            </button>
-          </div>
-        </div>
-
         <div className="app-version">
           <ShieldCheck size={13} />
           <span>{t("version")}</span>
         </div>
       </aside>
 
-      <main className="app-main">
+      <main
+        className="app-main"
+        data-has-configuration-dock={showConfigurationDock ? "true" : "false"}
+      >
         <header className="app-topbar">
           <div
             className="window-drag-region"
@@ -1716,13 +1797,9 @@ export function App() {
             onMouseDown={startWindowDrag}
             aria-hidden="true"
           />
-          <div className="topbar-status">
+          <div className="topbar-status" data-state={configuration.state}>
             <span className="topbar-status__dot" />
-            {runtime.connected && runtime.compatibility === "supported"
-              ? t("compatible")
-              : runtime.state === "applied" || runtime.state === "fallback"
-                ? t("compatibilityMode")
-                : t("unknownCompatibility")}
+            {t(configuration.topbarKey)}
           </div>
           <div className="preview-variant-control">
             <span title={t("codexAppearanceDescription")}>
@@ -1754,171 +1831,212 @@ export function App() {
           </div>
         </header>
 
-        {view === "home" && (
-          <HomeView
-            locale={locale}
-            theme={composeTheme(displayedTheme)}
-            sourceTheme={displayedTheme}
-            companion={companionForTheme(displayedTheme)}
-            runtime={runtime}
-            runtimeStrategy={settings.runtimeStrategy}
-            variant={variant}
-            reduceMotion={settings.reduceMotion}
-            t={t}
-            onEdit={() => openThemeEditor(displayedTheme)}
-            onBrowse={() => setView("themes")}
-            onCreateFromImage={() => {
-              setBackgroundImportMode("create");
-              setNewThemeStep(null);
-              backgroundImportRef.current?.click();
-            }}
-            onCompanions={() => setView("companions")}
-            resolveAsset={resolveAsset}
-          />
-        )}
-
-        {view === "themes" && (
-          <ThemesView
-            locale={locale}
-            selectedTheme={selectedTheme}
-            previewTheme={composeTheme(selectedTheme)}
-            localThemes={localThemes}
-            collection={themeCollection}
-            variant={variant}
-            reduceMotion={settings.reduceMotion}
-            t={t}
-            onSelect={chooseTheme}
-            onEdit={openThemeEditor}
-            onDelete={setPendingDelete}
-            onCollectionChange={changeThemeCollection}
-            onNew={() => setNewThemeStep("choose")}
-            onImport={() => importRef.current?.click()}
-            resolveAsset={resolveAsset}
-            liveThemeId={isLive ? settings.appliedThemeId : null}
-            isLive={isLive}
-            busy={busy}
-          />
-        )}
-
-        {view === "companions" && (
-          <CompanionsView
-            locale={locale}
-            selected={selectedCompanion}
-            theme={composeTheme(selectedTheme)}
-            localCompanions={localCompanions}
-            projects={companionProjects}
-            collection={companionCollection}
-            variant={variant}
-            reduceMotion={settings.reduceMotion}
-            t={t}
-            onSelect={selectCompanion}
-            onCollectionChange={setCompanionCollection}
-            onCreate={() => {
-              setActiveCompanionProject(null);
-              setView("companion-editor");
-            }}
-            onEditProject={(project) => {
-              setActiveCompanionProject(project);
-              setView("companion-editor");
-            }}
-            onDeleteProject={(projectId) =>
-              void handleDeleteCompanionProject(projectId)
-            }
-            onImport={() => companionImportRef.current?.click()}
-            onExport={(companion) => void handleExportCompanion(companion)}
-            onDelete={setPendingCompanionDelete}
-            onAnchorChange={updateEntityAnchor}
-            onAttachmentChange={updateEntityAttachment}
-            resolveAsset={resolveAsset}
-            resolveCompanionAsset={(companion, path) =>
-              companionAssetMaps[companion.id]?.[path] ??
-              themeAssetUrl(selectedTheme, path)
-            }
-            isLive={isLive}
-            busy={busy}
-          />
-        )}
-
-        {view === "companion-editor" && (
-          <Suspense
-            fallback={
-              <main className="page companion-creator">
-                <section className="empty-state" aria-live="polite">
-                  <PawPrint aria-hidden="true" />
-                  <h2>{t("loadingCompanionStudio")}</h2>
-                </section>
-              </main>
-            }
-          >
-            <CompanionCreator
+        <div ref={appMainRef} className="app-main__viewport">
+          {view === "home" && (
+            <HomeView
               locale={locale}
-              initialProject={activeCompanionProject}
-              onBack={() => {
-                void listCompanionProjects()
-                  .then(setCompanionProjects)
-                  .finally(() => setView("companions"));
+              theme={composeTheme(displayedTheme)}
+              sourceTheme={displayedTheme}
+              companion={companionForTheme(displayedTheme)}
+              runtime={runtime}
+              runtimeStrategy={settings.runtimeStrategy}
+              variant={variant}
+              reduceMotion={settings.reduceMotion}
+              t={t}
+              onEdit={() => openThemeEditor(displayedTheme)}
+              onBrowse={() => setView("themes")}
+              onCreateFromImage={() => {
+                setBackgroundImportMode("create");
+                setNewThemeStep(null);
+                backgroundImportRef.current?.click();
               }}
-              onSaved={handleSavedCompanion}
+              onCompanions={() => setView("companions")}
+              resolveAsset={resolveAsset}
             />
-          </Suspense>
-        )}
+          )}
 
-        {view === "editor" && (
-          <ThemeEditorView
-            theme={composeTheme(draftTheme)}
-            variant={variant}
-            locale={locale}
-            reduceMotion={settings.reduceMotion}
-            t={t}
-            onUpdateVariant={updateVariant}
-            onAddSceneLayer={addSceneLayer}
-            onUpdateSceneLayer={updateSceneLayer}
-            onRemoveSceneLayer={removeSceneLayer}
-            companions={allCompanions}
-            recommendedCompanionId={
-              draftTheme.metadata.recommendedCompanionId ?? null
-            }
-            onSetRecommendedCompanion={setRecommendedCompanion}
-            onBack={() => {
-              setThemeCollection("mine");
-              setView("themes");
-            }}
-            onReset={resetDraft}
-            onSave={() => void saveDraftTheme()}
-            onApply={() => void saveAndApplyDraft()}
-            onExport={handleExport}
-            onImportBackground={() => {
-              setBackgroundImportMode("replace");
-              backgroundImportRef.current?.click();
-            }}
-            adaptiveSchemes={adaptiveSchemes}
-            activeAdaptiveScheme={activeAdaptiveScheme}
-            onSelectAdaptiveScheme={selectAdaptiveScheme}
-            resolveAsset={resolveAsset}
-            busy={busy}
-            dirty={session.draft.themeDirty}
-            uiPreferences={uiPreferences}
-            onUiPreferencesChange={(patch) =>
-              setUiPreferences((current) => ({ ...current, ...patch }))
-            }
-          />
-        )}
+          {view === "themes" && (
+            <ThemesView
+              locale={locale}
+              selectedTheme={selectedTheme}
+              previewTheme={composeTheme(selectedTheme)}
+              localThemes={localThemes}
+              collection={themeCollection}
+              variant={variant}
+              reduceMotion={settings.reduceMotion}
+              t={t}
+              onSelect={chooseTheme}
+              onEdit={openThemeEditor}
+              onDelete={setPendingDelete}
+              onCollectionChange={changeThemeCollection}
+              onNew={() => setNewThemeStep("choose")}
+              onImport={() => importRef.current?.click()}
+              resolveAsset={resolveAsset}
+              liveThemeId={isLive ? settings.appliedThemeId : null}
+              busy={busy}
+            />
+          )}
 
-        {view === "settings" && (
-          <SettingsView
-            settings={settings}
-            detection={detection}
-            currentVersion={currentVersion}
-            updateStatus={updateStatus}
+          {view === "companions" && (
+            <CompanionsView
+              locale={locale}
+              selected={selectedCompanion}
+              theme={composeTheme(selectedTheme)}
+              localCompanions={localCompanions}
+              projects={companionProjects}
+              collection={companionCollection}
+              variant={variant}
+              reduceMotion={settings.reduceMotion}
+              t={t}
+              onSelect={selectCompanion}
+              onCollectionChange={setCompanionCollection}
+              onCreate={() => {
+                setActiveCompanionProject(null);
+                setView("companion-editor");
+              }}
+              onEditProject={(project) => {
+                setActiveCompanionProject(project);
+                setView("companion-editor");
+              }}
+              onDeleteProject={setPendingCompanionProjectDelete}
+              onImport={() => companionImportRef.current?.click()}
+              onExport={(companion) => void handleExportCompanion(companion)}
+              onDelete={setPendingCompanionDelete}
+              onAnchorChange={updateEntityAnchor}
+              onAttachmentChange={updateEntityAttachment}
+              resolveAsset={resolveAsset}
+              resolveCompanionAsset={(companion, path) =>
+                companionAssetMaps[companion.id]?.[path] ??
+                themeAssetUrl(selectedTheme, path)
+              }
+              isLive={isLive}
+              busy={busy}
+            />
+          )}
+
+          {view === "companion-editor" && (
+            <Suspense
+              fallback={
+                <main className="page companion-creator">
+                  <section className="empty-state" aria-live="polite">
+                    <PawPrint aria-hidden="true" />
+                    <h2>{t("loadingCompanionStudio")}</h2>
+                  </section>
+                </main>
+              }
+            >
+              <CompanionCreator
+                locale={locale}
+                initialProject={activeCompanionProject}
+                onBack={() => {
+                  void listCompanionProjects()
+                    .then(setCompanionProjects)
+                    .finally(() => setView("companions"));
+                }}
+                onSaved={handleSavedCompanion}
+              />
+            </Suspense>
+          )}
+
+          {view === "editor" && (
+            <ThemeEditorView
+              theme={composeTheme(draftTheme)}
+              savedTheme={composeTheme(selectedTheme)}
+              variant={variant}
+              locale={locale}
+              reduceMotion={settings.reduceMotion}
+              t={t}
+              onUpdateVariant={updateVariant}
+              onAddSceneLayer={addSceneLayer}
+              onUpdateSceneLayer={updateSceneLayer}
+              onRemoveSceneLayer={removeSceneLayer}
+              companions={allCompanions}
+              recommendedCompanionId={
+                draftTheme.metadata.recommendedCompanionId ?? null
+              }
+              onSetRecommendedCompanion={setRecommendedCompanion}
+              onBack={() => {
+                setThemeCollection("mine");
+                navigateTo("themes");
+              }}
+              onReset={resetDraft}
+              onUndo={handleUndoThemeDraft}
+              onRedo={handleRedoThemeDraft}
+              onSave={() => void saveDraftTheme()}
+              onApply={() => void saveAndApplyDraft()}
+              onExport={handleExport}
+              onImportBackground={() => {
+                setBackgroundImportMode("replace");
+                backgroundImportRef.current?.click();
+              }}
+              adaptiveSchemes={adaptiveSchemes}
+              activeAdaptiveScheme={activeAdaptiveScheme}
+              onSelectAdaptiveScheme={selectAdaptiveScheme}
+              resolveAsset={resolveAsset}
+              busy={busy}
+              dirty={session.draft.themeDirty}
+              operationPhase={session.operation.phase}
+              operationError={
+                session.operation.phase === "error"
+                  ? runtime.state === "error" && runtime.message
+                    ? runtimeFailureMessage(runtime.message)
+                    : t("themeSaveFailed")
+                  : null
+              }
+              applied={isDraftApplied}
+              canUndo={canUndoThemeDraft}
+              canRedo={canRedoThemeDraft}
+              uiPreferences={uiPreferences}
+              onUiPreferencesChange={(patch) =>
+                setUiPreferences((current) => ({ ...current, ...patch }))
+              }
+            />
+          )}
+
+          {view === "settings" && (
+            <SettingsView
+              settings={settings}
+              detection={detection}
+              currentVersion={currentVersion}
+              updateStatus={updateStatus}
+              t={t}
+              onChange={handleSettingsChange}
+              installPathBusy={installPathBusy}
+              onChooseCodexInstall={handleChooseCodexInstall}
+              onUseAutomaticCodexInstall={handleUseAutomaticCodexInstall}
+              onCheckForUpdates={() => void handleCheckForUpdates(true)}
+              diagnosticsBusy={diagnosticsBusy}
+              onRunDiagnostics={() => void handleRunDiagnostics()}
+              onOpenOnboarding={() => setShowOnboarding(true)}
+              focusRequest={settingsFocusRequest}
+            />
+          )}
+        </div>
+
+        {showConfigurationDock && (
+          <ConfigurationDock
+            themeName={selectedThemeCopy.name}
+            companionName={selectedCompanionCopy?.name ?? t("noCompanion")}
+            statusLabel={t(configuration.statusKey)}
+            statusDetail={t(configuration.detailKey)}
+            actionLabel={t(configuration.actionLabelKey)}
+            state={configuration.state}
+            action={configuration.action}
+            busy={configuration.state === "applying"}
+            disabled={busy}
             t={t}
-            onChange={handleSettingsChange}
-            installPathBusy={installPathBusy}
-            onChooseCodexInstall={handleChooseCodexInstall}
-            onUseAutomaticCodexInstall={handleUseAutomaticCodexInstall}
-            onCheckForUpdates={() => void handleCheckForUpdates(true)}
-            diagnosticsBusy={diagnosticsBusy}
-            onRunDiagnostics={() => void handleRunDiagnostics()}
-            onOpenOnboarding={() => setShowOnboarding(true)}
+            onAction={() => {
+              if (configuration.action === "pause") {
+                void handlePause();
+              } else if (configuration.action === "settings") {
+                openSettingsTarget("codex");
+              } else if (configuration.action === "diagnostics") {
+                openSettingsTarget("diagnostics");
+              } else {
+                requestApply();
+              }
+            }}
+            onRestore={() => void handleRestore()}
           />
         )}
       </main>
@@ -1953,13 +2071,33 @@ export function App() {
 
       {showOnboarding && (
         <Onboarding
+          isFirstRun={!settings.onboardingComplete}
           locale={locale}
+          detection={detection}
           selectedTheme={selectedTheme}
+          previewTheme={composeTheme(selectedTheme)}
+          selectedCompanion={selectedCompanion}
+          recommendedCompanion={onboardingRecommendedCompanion}
+          variant={variant}
+          reduceMotion={settings.reduceMotion}
+          requiresRestart={needsManualRestart}
           onSelectTheme={setSelectedTheme}
-          onComplete={() => {
-            updateSettings({ onboardingComplete: true });
+          onSelectCompanion={selectCompanion}
+          onSelectVariant={chooseVariant}
+          onApply={() => {
+            const next = updateSettings({ onboardingComplete: true });
+            setShowOnboarding(false);
+            requestApply(
+              selectedTheme,
+              companionForTheme(selectedTheme, next),
+              next,
+            );
+          }}
+          onOpenSettings={() => {
+            setView("settings");
             setShowOnboarding(false);
           }}
+          resolveAsset={resolveAsset}
           onClose={
             settings.onboardingComplete
               ? () => setShowOnboarding(false)
@@ -2024,6 +2162,52 @@ export function App() {
         </div>
       )}
 
+      {pendingNavigation && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog confirm-dialog--unsaved"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unsaved-theme-title"
+            aria-describedby="unsaved-theme-description"
+          >
+            <span className="confirm-dialog__icon confirm-dialog__icon--draft">
+              <Save size={18} />
+            </span>
+            <h2 id="unsaved-theme-title">{t("unsavedThemeTitle")}</h2>
+            <p id="unsaved-theme-description">{t("unsavedThemeBody")}</p>
+            <strong>
+              {draftTheme.locales[locale]?.name ?? draftTheme.metadata.name}
+            </strong>
+            <div className="button-row button-row--unsaved">
+              <button
+                className="secondary-button"
+                onClick={cancelPendingNavigation}
+                disabled={busy}
+                autoFocus
+              >
+                {t("keepEditing")}
+              </button>
+              <button
+                className="danger-button danger-button--quiet"
+                onClick={discardAndNavigate}
+                disabled={busy}
+              >
+                {t("discardChanges")}
+              </button>
+              <button
+                className="primary-button"
+                onClick={() => void saveAndNavigate()}
+                disabled={busy}
+              >
+                <Save size={14} />
+                {busy ? t("saving") : t("saveAndLeave")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
       {pendingCompanionDelete && (
         <div className="confirm-backdrop" role="presentation">
           <section
@@ -2054,6 +2238,41 @@ export function App() {
               >
                 <Trash2 size={14} />
                 {t("deleteCompanion")}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {pendingCompanionProjectDelete && (
+        <div className="confirm-backdrop" role="presentation">
+          <section
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-companion-project-title"
+          >
+            <span className="confirm-dialog__icon">
+              <Trash2 size={18} />
+            </span>
+            <h2 id="delete-companion-project-title">
+              {t("deleteDraftTitle")}
+            </h2>
+            <p>{t("deleteDraftBody")}</p>
+            <strong>{pendingCompanionProjectDelete.name}</strong>
+            <div className="button-row">
+              <button
+                className="secondary-button"
+                onClick={() => setPendingCompanionProjectDelete(null)}
+              >
+                {t("cancel")}
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => void handleDeleteCompanionProject()}
+              >
+                <Trash2 size={14} />
+                {t("deleteDraft")}
               </button>
             </div>
           </section>

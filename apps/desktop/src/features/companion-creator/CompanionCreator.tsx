@@ -81,6 +81,10 @@ import {
   type LogicalFrame,
 } from "./model";
 import {
+  companionOutputLimits,
+  summarizeCompanionOutput,
+} from "./output-summary";
+import {
   diagnoseMotionRange,
   motionPreviewFrames,
   motionRangeSignature,
@@ -93,6 +97,11 @@ import {
   saveCompanionProject,
 } from "./project-files";
 import { filesFromDroppedPaths } from "./native-drop";
+import {
+  isCompanionRestoreCancelled,
+  restoreFramesSequentially,
+  throwIfRestoreCancelled,
+} from "./restore-flow";
 import { AtlasGridPreview, SourceMediaPreview } from "./SourcePreview";
 import { CalibrationHealth, CalibrationSummary } from "./CalibrationStatus";
 import { ImportStep } from "./ImportStep";
@@ -114,6 +123,20 @@ const stepOrder: CreatorStep[] = [
   "motions",
   "test",
 ];
+
+type DraftRestoreStage = "sources" | "frames" | "cleanup";
+
+type DraftRestoreState =
+  | {
+      status: "running";
+      stage: DraftRestoreStage;
+      completed: number;
+      total: number;
+      progress: number;
+      cancelling: boolean;
+    }
+  | { status: "cancelled" }
+  | { status: "error"; message: string };
 
 const copy = {
   en: {
@@ -202,6 +225,31 @@ const copy = {
     building: "Building companion…",
     description: "Description",
     readiness: "Package readiness",
+    compiledOutput: "Compiled output",
+    outputCanvas: "Output canvas",
+    logicalFrames: "Logical frames",
+    directionCoverage: "Direction coverage",
+    idleMotions: "Idle motions",
+    decodedPage: "Largest decoded page",
+    staticImageAsset: "1 optimized image",
+    atlasPage: "atlas page",
+    atlasPages: "atlas pages",
+    pose: "pose",
+    poses: "poses",
+    clip: "clip",
+    clips: "clips",
+    excludedFrames: "excluded",
+    packageLimitsReady: "Compiled assets fit package limits",
+    packageLimits:
+      "Limits: 512 frames · 8192 px per side · 8 atlas pages · 48 MiB decoded per page · 20 MiB encoded per asset",
+    outputIssue: {
+      "missing-crop": "Set a shared crop before compiling.",
+      "missing-frames": "Include at least one logical frame before compiling.",
+      "frame-limit": "Exclude frames until the project contains at most 512.",
+      "canvas-limit": "Reduce the shared crop so neither side exceeds 8192 px.",
+      "atlas-limit":
+        "Reduce empty canvas area or exclude frames to fit within eight atlas pages.",
+    },
     metadataReady: "Name, description, author and license are complete",
     framesReady: "Included frames are ready",
     directionsReady: "Direction behavior is ready",
@@ -214,6 +262,12 @@ const copy = {
     previewBackdrop: "Preview background",
     optionalSkipped: "Optional step skipped",
     fixMetadata: "Complete the highlighted companion details before building.",
+    reviewRemaining: "Review remaining setup",
+    reviewMetadata: "Complete companion details",
+    reviewFrames: "Restore an included frame",
+    reviewDirections: "Complete direction calibration",
+    reviewOutput: "Fix compiled output",
+    reviewIssue: "Open the step that needs attention",
     dragCompanion: "Drag companion position",
     previewHeight: "Composer height (preview)",
     companionSize: "Companion size",
@@ -228,6 +282,20 @@ const copy = {
     resetAll: "Reset project",
     noFrames: "Generate frames before continuing.",
     processing: "Processing locally…",
+    restoringDraft: "Restoring local draft",
+    restoreStageSources: "Reading source media",
+    restoreStageFrames: "Restoring working frames",
+    restoreStageCleanup: "Rebuilding background cleanup",
+    restoreProgress: "completed",
+    stopRestore: "Stop loading",
+    stoppingRestore: "Stopping after the current frame…",
+    restoreCancelled: "Draft loading was stopped",
+    restoreCancelledDetail:
+      "The draft and source media are still safe. Retry loading or return to the companion library.",
+    restoreFailed: "This draft could not be restored",
+    restoreFailedDetail:
+      "Nothing was deleted. Retry once; if it fails again, return to the library and keep the draft for diagnostics.",
+    retryRestore: "Retry loading",
     frame: "Frame",
     excluded: "Excluded",
     include: "Include",
@@ -330,6 +398,30 @@ const copy = {
     building: "正在构建伙伴…",
     description: "伙伴描述",
     readiness: "伙伴包就绪状态",
+    compiledOutput: "编译输出",
+    outputCanvas: "输出画布",
+    logicalFrames: "逻辑帧",
+    directionCoverage: "方向覆盖",
+    idleMotions: "空闲动作",
+    decodedPage: "最大解码页面",
+    staticImageAsset: "1 张优化图片",
+    atlasPage: "页图集",
+    atlasPages: "页图集",
+    pose: "个姿态",
+    poses: "个姿态",
+    clip: "个片段",
+    clips: "个片段",
+    excludedFrames: "帧已排除",
+    packageLimitsReady: "编译资源符合伙伴包限制",
+    packageLimits:
+      "限制：512 帧 · 单边 8192 px · 8 页图集 · 每页解码 48 MiB · 单个编码资源 20 MiB",
+    outputIssue: {
+      "missing-crop": "请先设置共享裁剪区域。",
+      "missing-frames": "请至少保留一个逻辑帧。",
+      "frame-limit": "请排除部分帧，使工程不超过 512 帧。",
+      "canvas-limit": "请缩小共享裁剪区域，确保任一边不超过 8192 px。",
+      "atlas-limit": "请减少空白画布区域或排除部分帧，使图集不超过 8 页。",
+    },
     metadataReady: "名称、描述、作者和许可证已填写",
     framesReady: "有效帧已准备完成",
     directionsReady: "方向行为已准备完成",
@@ -342,6 +434,12 @@ const copy = {
     previewBackdrop: "预览背景",
     optionalSkipped: "已跳过可选步骤",
     fixMetadata: "请先补全高亮显示的伙伴信息，再进行构建。",
+    reviewRemaining: "检查未完成设置",
+    reviewMetadata: "补全伙伴信息",
+    reviewFrames: "恢复至少一个有效帧",
+    reviewDirections: "完成方向校准",
+    reviewOutput: "修复编译输出",
+    reviewIssue: "打开需要处理的步骤",
     dragCompanion: "拖动伙伴位置",
     previewHeight: "输入框高度（仅预览）",
     companionSize: "伙伴尺寸",
@@ -356,6 +454,20 @@ const copy = {
     resetAll: "重置整个工程",
     noFrames: "请先生成帧再继续。",
     processing: "正在本地处理…",
+    restoringDraft: "正在恢复本地草稿",
+    restoreStageSources: "读取源素材",
+    restoreStageFrames: "恢复工作帧",
+    restoreStageCleanup: "重建背景处理",
+    restoreProgress: "已完成",
+    stopRestore: "停止加载",
+    stoppingRestore: "正在完成当前帧后停止…",
+    restoreCancelled: "已停止加载草稿",
+    restoreCancelledDetail:
+      "草稿和源素材仍安全保留。你可以重新加载，或返回伙伴库稍后继续。",
+    restoreFailed: "无法恢复这个草稿",
+    restoreFailedDetail:
+      "没有删除任何内容。请先重试一次；如果仍然失败，可返回伙伴库并保留草稿用于诊断。",
+    retryRestore: "重新加载",
     frame: "帧",
     excluded: "已排除",
     include: "包含",
@@ -509,6 +621,10 @@ async function extractProjectFrames(
 
 async function restoreCachedFrames(
   project: CompanionCreatorProject,
+  options?: {
+    signal?: AbortSignal;
+    onProgress?: (completed: number, total: number) => void;
+  },
 ): Promise<ExtractedFrame[] | null> {
   if (
     project.frames.length === 0 ||
@@ -524,27 +640,38 @@ async function restoreCachedFrames(
 
   const restored = new Array<ExtractedFrame>(project.frames.length);
   let cursor = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(4, project.frames.length) }, async () => {
-      while (cursor < project.frames.length) {
-        const index = cursor;
-        cursor += 1;
-        const logical = project.frames[index]!;
-        const blob = blobs[index]!;
-        const bitmap = await createImageBitmap(blob);
-        restored[index] = {
-          id: logical.id,
-          sourceIndex: logical.sourceIndex,
-          sourceTimeMs: logical.sourceTimeMs,
-          blob,
-          url: URL.createObjectURL(blob),
-          width: bitmap.width,
-          height: bitmap.height,
-        };
-        bitmap.close();
-      }
-    }),
-  );
+  let completed = 0;
+  try {
+    await Promise.all(
+      Array.from({ length: Math.min(2, project.frames.length) }, async () => {
+        while (cursor < project.frames.length) {
+          if (options?.signal) throwIfRestoreCancelled(options.signal);
+          const index = cursor;
+          cursor += 1;
+          const logical = project.frames[index]!;
+          const blob = blobs[index]!;
+          const bitmap = await createImageBitmap(blob);
+          restored[index] = {
+            id: logical.id,
+            sourceIndex: logical.sourceIndex,
+            sourceTimeMs: logical.sourceTimeMs,
+            blob,
+            url: URL.createObjectURL(blob),
+            width: bitmap.width,
+            height: bitmap.height,
+          };
+          bitmap.close();
+          completed += 1;
+          options?.onProgress?.(completed, project.frames.length);
+        }
+      }),
+    );
+  } catch (reason) {
+    for (const frame of restored) {
+      if (frame) URL.revokeObjectURL(frame.url);
+    }
+    throw reason;
+  }
   return restored;
 }
 
@@ -590,6 +717,9 @@ export function CompanionCreator({
   ) => Promise<void> | void;
 }) {
   const c = copy[locale];
+  const requiresDraftRestore = Boolean(
+    initialProject?.source?.files.some((file) => file.storedPath),
+  );
   const [project, setProject] = useState<CompanionCreatorProject>(() =>
     initialProject
       ? normalizeCompanionProject(initialProject)
@@ -614,6 +744,20 @@ export function CompanionCreator({
   const [exiting, setExiting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const [restoreState, setRestoreState] = useState<DraftRestoreState | null>(
+    () =>
+      requiresDraftRestore
+        ? {
+            status: "running",
+            stage: "sources",
+            completed: 0,
+            total: initialProject?.source?.files.length ?? 1,
+            progress: 0,
+            cancelling: false,
+          }
+        : null,
+  );
   const [motionStart, setMotionStart] = useState(0);
   const [motionEnd, setMotionEnd] = useState(0);
   const [motionPreviewing, setMotionPreviewing] = useState(false);
@@ -686,7 +830,7 @@ export function CompanionCreator({
   const framesRef = useRef(frames);
   const sourceFramesRef = useRef(sourceFrames);
   const cleanupPreviewRef = useRef<ExtractedFrame | undefined>(undefined);
-  const restoredProjectRef = useRef(false);
+  const restoreAbortRef = useRef<AbortController | null>(null);
   const activeStepRef = useRef(project.step);
 
   const updateProject = (
@@ -765,7 +909,7 @@ export function CompanionCreator({
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       creatorRootRef.current
-        ?.closest<HTMLElement>(".app-main")
+        ?.closest<HTMLElement>(".app-main__viewport")
         ?.scrollTo({ top: 0, behavior: "auto" });
     });
     return () => window.cancelAnimationFrame(frame);
@@ -827,49 +971,88 @@ export function CompanionCreator({
   }, [sourceFrames]);
 
   useEffect(() => {
-    if (
-      restoredProjectRef.current ||
-      !initialProject?.source?.files.some((file) => file.storedPath)
-    ) {
-      return;
-    }
-    restoredProjectRef.current = true;
+    if (!initialProject?.source?.files.some((file) => file.storedPath)) return;
     let active = true;
+    const controller = new AbortController();
+    restoreAbortRef.current = controller;
+    let sourceOutput: ExtractedFrame[] = [];
+    let output: ExtractedFrame[] = [];
+    const generatedOutput: ExtractedFrame[] = [];
+    let committed = false;
+    const setRunningRestore = (
+      stage: DraftRestoreStage,
+      completed: number,
+      total: number,
+    ) => {
+      if (!active || controller.signal.aborted) return;
+      const safeTotal = Math.max(1, total);
+      setRestoreState({
+        status: "running",
+        stage,
+        completed,
+        total: safeTotal,
+        progress: Math.min(1, Math.max(0, completed / safeTotal)),
+        cancelling: false,
+      });
+    };
     void (async () => {
       setBusy(true);
+      setError(null);
       try {
-        const restored = await Promise.all(
-          initialProject.source!.files.map(async (descriptor) => {
-            if (!descriptor.storedPath) return null;
-            const blob = await loadCompanionProjectSource(
-              initialProject.id,
-              descriptor.storedPath,
+        const descriptors = initialProject.source!.files;
+        const restored: File[] = [];
+        setRunningRestore("sources", 0, descriptors.length);
+        for (const [index, descriptor] of descriptors.entries()) {
+          throwIfRestoreCancelled(controller.signal);
+          if (!descriptor.storedPath) {
+            throw new Error(
+              "One or more source files are missing from this draft",
             );
-            return blob
-              ? new File([blob], descriptor.name, {
-                  type: descriptor.type,
-                  lastModified: descriptor.lastModified,
-                })
-              : null;
-          }),
-        );
-        const files = restored.filter((file): file is File => file !== null);
-        if (files.length !== initialProject.source!.files.length) {
-          throw new Error(
-            "One or more source files are missing from this draft",
+          }
+          const blob = await loadCompanionProjectSource(
+            initialProject.id,
+            descriptor.storedPath,
           );
+          throwIfRestoreCancelled(controller.signal);
+          if (!blob) {
+            throw new Error(
+              "One or more source files are missing from this draft",
+            );
+          }
+          restored.push(
+            new File([blob], descriptor.name, {
+              type: descriptor.type,
+              lastModified: descriptor.lastModified,
+            }),
+          );
+          setRunningRestore("sources", index + 1, descriptors.length);
         }
-        let sourceOutput = await restoreCachedFrames(initialProject);
-        if (!sourceOutput) {
+        const files = restored;
+        setRunningRestore("frames", 0, initialProject.frames.length || 1);
+        const cached = await restoreCachedFrames(initialProject, {
+          signal: controller.signal,
+          onProgress: (completed, total) =>
+            setRunningRestore("frames", completed, total),
+        });
+        if (cached) {
+          sourceOutput = cached;
+        } else {
           sourceOutput = await extractProjectFrames(
             initialProject,
             files,
-            setProgress,
+            (value) =>
+              setRunningRestore(
+                "frames",
+                Math.round(value * Math.max(1, initialProject.frames.length)),
+                Math.max(1, initialProject.frames.length),
+              ),
           );
+          throwIfRestoreCancelled(controller.signal);
           const storedPaths = await cacheCompanionProjectFrames(
             initialProject.id,
             sourceOutput,
           );
+          throwIfRestoreCancelled(controller.signal);
           setProject((current) => {
             const next = structuredClone(current);
             next.frames.forEach((frame, index) => {
@@ -879,19 +1062,33 @@ export function CompanionCreator({
             return next;
           });
         }
-        let output = sourceOutput;
+        output = sourceOutput;
         if (
           initialProject.cleanup.mode !== "preserve-alpha" ||
           initialProject.cleanup.cornerMasks.length > 0 ||
           initialProject.cleanup.strokes.length > 0
         ) {
-          output = await Promise.all(
-            output.map((frame) => cleanFrame(frame, initialProject.cleanup)),
+          setRunningRestore("cleanup", 0, sourceOutput.length);
+          output = await restoreFramesSequentially(
+            sourceOutput,
+            async (frame) => {
+              const cleaned = await cleanFrame(frame, initialProject.cleanup);
+              generatedOutput.push(cleaned);
+              return cleaned;
+            },
+            {
+              signal: controller.signal,
+              onProgress: (completed, total) =>
+                setRunningRestore("cleanup", completed, total),
+            },
           );
         }
+        throwIfRestoreCancelled(controller.signal);
         if (!active) {
           for (const url of new Set(
-            [...sourceOutput, ...output].map((frame) => frame.url),
+            [...sourceOutput, ...output, ...generatedOutput].map(
+              (frame) => frame.url,
+            ),
           )) {
             URL.revokeObjectURL(url);
           }
@@ -913,18 +1110,43 @@ export function CompanionCreator({
         for (const frame of sourceOutput) {
           if (!retainedUrls.has(frame.url)) URL.revokeObjectURL(frame.url);
         }
+        committed = true;
+        setRestoreState(null);
       } catch (reason) {
         if (active) {
-          setError(reason instanceof Error ? reason.message : String(reason));
+          setRestoreState(
+            isCompanionRestoreCancelled(reason)
+              ? { status: "cancelled" }
+              : {
+                  status: "error",
+                  message:
+                    reason instanceof Error ? reason.message : String(reason),
+                },
+          );
         }
       } finally {
-        if (active) setBusy(false);
+        if (!committed) {
+          for (const url of new Set(
+            [...sourceOutput, ...output, ...generatedOutput].map(
+              (frame) => frame.url,
+            ),
+          )) {
+            URL.revokeObjectURL(url);
+          }
+        }
+        if (active) {
+          setBusy(false);
+          if (restoreAbortRef.current === controller) {
+            restoreAbortRef.current = null;
+          }
+        }
       }
     })();
     return () => {
       active = false;
+      controller.abort();
     };
-  }, [initialProject]);
+  }, [initialProject, restoreAttempt]);
 
   useEffect(
     () => () => {
@@ -1022,6 +1244,10 @@ export function CompanionCreator({
     () => calibrateDirections(project.frames, project.directionAnchors),
     [project.frames, project.directionAnchors],
   );
+  const outputSummary = useMemo(
+    () => summarizeCompanionOutput(project, calibration),
+    [calibration, project],
+  );
   const currentDirectionAnchor = project.directionAnchors.find(
     (anchor) => anchor.frameIndex === currentFrame,
   );
@@ -1084,10 +1310,10 @@ export function CompanionCreator({
     replaceSourceFrames([]);
   };
 
-  const applySourceKind = (kind: CompanionImportKind) => {
+  const applySourceKind = (kind: CompanionImportKind | null) => {
     setProject((current) => {
       const next = structuredClone(current);
-      next.source = sourceDescriptor(kind, []);
+      next.source = kind ? sourceDescriptor(kind, []) : null;
       resetCompanionProjectDerivedState(next);
       next.updatedAt = new Date().toISOString();
       return next;
@@ -1107,6 +1333,17 @@ export function CompanionCreator({
       return;
     }
     applySourceKind(kind);
+  };
+
+  const useAutomaticSourceDetection = () => {
+    if (
+      !project.source ||
+      project.source.files.length > 0 ||
+      frames.length > 0
+    ) {
+      return;
+    }
+    applySourceKind(null);
   };
 
   const replaceFrames = (nextFrames: ExtractedFrame[]) => {
@@ -1705,7 +1942,13 @@ export function CompanionCreator({
     Number(metadataValid) +
     Number(includedFrameCount > 0) +
     Number(directionSetupValid) +
+    Number(outputSummary.withinLimits) +
     1;
+  const buildReady =
+    metadataValid &&
+    includedFrameCount > 0 &&
+    directionSetupValid &&
+    outputSummary.withinLimits;
   const stepHasChanges =
     projectStateSignature(project) !==
     projectStateSignature(stepBaseline.current);
@@ -1796,6 +2039,64 @@ export function CompanionCreator({
     setStep(target);
   };
 
+  const focusFirstInvalidMetadata = () => {
+    const fieldId =
+      project.name.trim().length === 0 || project.name.trim().length > 64
+        ? "companion-name"
+        : project.description.trim().length === 0 ||
+            project.description.trim().length > 240
+          ? "companion-description"
+          : project.author.trim().length === 0 ||
+              project.author.trim().length > 80
+            ? "companion-author"
+            : "companion-license";
+    setError(null);
+    window.requestAnimationFrame(() => {
+      const field = document.getElementById(fieldId);
+      const reduceMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      field?.scrollIntoView({
+        block: "center",
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+      field?.focus({ preventScroll: true });
+    });
+  };
+
+  const resolveFirstReadinessIssue = () => {
+    if (!metadataValid) {
+      focusFirstInvalidMetadata();
+      return;
+    }
+    if (includedFrameCount === 0) {
+      void navigateToStep("cleanup");
+      return;
+    }
+    if (!directionSetupValid) {
+      void navigateToStep("calibrate");
+      return;
+    }
+    if (!outputSummary.withinLimits) {
+      const target: CreatorStep =
+        outputSummary.issue === "frame-limit" ? "extract" : "align";
+      void navigateToStep(target);
+    }
+  };
+
+  const readinessAction = !metadataValid
+    ? { title: c.reviewMetadata, detail: c.fixMetadata }
+    : includedFrameCount === 0
+      ? { title: c.reviewFrames, detail: c.outputIssue["missing-frames"] }
+      : !directionSetupValid
+        ? { title: c.reviewDirections, detail: c.reviewIssue }
+        : !outputSummary.withinLimits && outputSummary.issue
+          ? {
+              title: c.reviewOutput,
+              detail: c.outputIssue[outputSummary.issue],
+            }
+          : null;
+
   const resetCurrentStep = () => {
     const baseline = structuredClone(stepBaseline.current);
     setPast([]);
@@ -1879,6 +2180,36 @@ export function CompanionCreator({
           ? c.confirmRemove
           : c.confirmChange;
 
+  const cancelDraftRestore = () => {
+    setRestoreState((current) =>
+      current?.status === "running"
+        ? { ...current, cancelling: true }
+        : current,
+    );
+    restoreAbortRef.current?.abort();
+  };
+
+  const retryDraftRestore = () => {
+    setRestoreState({
+      status: "running",
+      stage: "sources",
+      completed: 0,
+      total: initialProject?.source?.files.length ?? 1,
+      progress: 0,
+      cancelling: false,
+    });
+    setRestoreAttempt((value) => value + 1);
+  };
+
+  const restoreStageLabel =
+    restoreState?.status === "running"
+      ? restoreState.stage === "sources"
+        ? c.restoreStageSources
+        : restoreState.stage === "frames"
+          ? c.restoreStageFrames
+          : c.restoreStageCleanup
+      : null;
+
   return (
     <div ref={creatorRootRef} className="companion-creator page">
       <header className="creator-header">
@@ -1916,16 +2247,20 @@ export function CompanionCreator({
           <button
             className="button button--ghost"
             onClick={resetCurrentStep}
-            disabled={!stepHasChanges || busy || exiting}
+            disabled={
+              !stepHasChanges || busy || exiting || Boolean(restoreState)
+            }
             title={c.resetStep}
             aria-label={c.resetStep}
           >
-            <RotateCcw size={15} /> <span>{c.resetStep}</span>
+            <Eraser size={15} /> <span>{c.resetStep}</span>
           </button>
           <button
             className="button button--danger-ghost"
             onClick={() => setConfirmAction({ kind: "reset-project" })}
-            disabled={!projectHasContent || busy || exiting}
+            disabled={
+              !projectHasContent || busy || exiting || Boolean(restoreState)
+            }
             title={c.resetAll}
             aria-label={c.resetAll}
           >
@@ -1948,7 +2283,7 @@ export function CompanionCreator({
                     : "creator-step"
             }
             onClick={() => void navigateToStep(step)}
-            disabled={!canOpenStep(step)}
+            disabled={Boolean(restoreState) || !canOpenStep(step)}
             aria-current={project.step === step ? "step" : undefined}
             title={
               step === "motions" && motionStepSkipped
@@ -1970,19 +2305,101 @@ export function CompanionCreator({
         ))}
       </nav>
 
-      {error && (
+      {error && !restoreState && (
         <div className="creator-error" role="alert">
           {error}
         </div>
       )}
-      {busy && (
+      {restoreState && (
+        <section
+          className={`creator-restore-card creator-restore-card--${restoreState.status}`}
+          aria-live="polite"
+          aria-busy={restoreState.status === "running"}
+        >
+          <span className="creator-restore-card__icon">
+            {restoreState.status === "running" ? (
+              <LoaderCircle className="spin" size={20} />
+            ) : restoreState.status === "cancelled" ? (
+              <Pause size={20} />
+            ) : (
+              <AlertTriangle size={20} />
+            )}
+          </span>
+          <div className="creator-restore-card__body">
+            <span className="page-kicker">{c.restoringDraft}</span>
+            <strong>
+              {restoreState.status === "running"
+                ? restoreState.cancelling
+                  ? c.stoppingRestore
+                  : restoreStageLabel
+                : restoreState.status === "cancelled"
+                  ? c.restoreCancelled
+                  : c.restoreFailed}
+            </strong>
+            {restoreState.status === "running" ? (
+              <>
+                <div className="creator-restore-card__progress-copy">
+                  <span>
+                    {restoreState.completed}/{restoreState.total}{" "}
+                    {c.restoreProgress}
+                  </span>
+                  <output>{Math.round(restoreState.progress * 100)}%</output>
+                </div>
+                <span
+                  className="creator-restore-card__progress"
+                  aria-hidden="true"
+                >
+                  <span style={{ width: `${restoreState.progress * 100}%` }} />
+                </span>
+              </>
+            ) : (
+              <p>
+                {restoreState.status === "cancelled"
+                  ? c.restoreCancelledDetail
+                  : c.restoreFailedDetail}
+              </p>
+            )}
+            {restoreState.status === "error" && (
+              <code>{restoreState.message}</code>
+            )}
+          </div>
+          <div className="creator-restore-card__actions">
+            {restoreState.status === "running" ? (
+              <button
+                className="button button--ghost"
+                onClick={cancelDraftRestore}
+                disabled={restoreState.cancelling}
+              >
+                <Pause size={15} />
+                {restoreState.cancelling ? c.stoppingRestore : c.stopRestore}
+              </button>
+            ) : (
+              <>
+                <button
+                  className="button button--ghost"
+                  onClick={() => void leaveCreator()}
+                >
+                  <ArrowLeft size={15} /> {c.back}
+                </button>
+                <button
+                  className="button button--primary"
+                  onClick={retryDraftRestore}
+                >
+                  <RotateCcw size={15} /> {c.retryRestore}
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
+      {busy && !restoreState && (
         <div className="creator-progress" aria-live="polite">
           <LoaderCircle className="spin" size={16} /> {c.processing}
           <span style={{ width: `${Math.round(progress * 100)}%` }} />
         </div>
       )}
 
-      <div className="creator-workbench">
+      <div className="creator-workbench" hidden={Boolean(restoreState)}>
         <main className="creator-stage">
           {project.step === "import" && (
             <ImportStep
@@ -1993,6 +2410,7 @@ export function CompanionCreator({
               dropzoneRef={dropzoneRef}
               inputRef={inputRef}
               chooseKind={chooseKind}
+              onUseAutomaticDetection={useAutomaticSourceDetection}
               onDragEnter={onDragEnter}
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
@@ -4243,7 +4661,7 @@ export function CompanionCreator({
                     <div className="creator-readiness__heading">
                       <h3>{c.readiness}</h3>
                       <span>
-                        {readinessCount}/4 {c.readyCount}
+                        {readinessCount}/5 {c.readyCount}
                       </span>
                     </div>
                     <ul>
@@ -4273,33 +4691,99 @@ export function CompanionCreator({
                           ? c.staticDirectionReady
                           : c.directionsReady}
                       </li>
+                      <li data-ready={outputSummary.withinLimits}>
+                        {outputSummary.withinLimits ? (
+                          <Check size={14} />
+                        ) : (
+                          <AlertTriangle size={14} />
+                        )}
+                        {c.packageLimitsReady}
+                      </li>
                       <li data-ready="true">
                         <Check size={14} />
                         {c.placementReady}
                       </li>
                     </ul>
-                    {!metadataValid ? (
-                      <p className="creator-field-error" role="alert">
-                        {c.fixMetadata}
-                      </p>
+                    <div className="creator-output-summary">
+                      <div className="creator-output-summary__heading">
+                        <strong>{c.compiledOutput}</strong>
+                        <span>
+                          {outputSummary.assetKind === "image"
+                            ? c.staticImageAsset
+                            : outputSummary.assetKind === "atlas"
+                              ? `${outputSummary.atlasPages} ${
+                                  outputSummary.atlasPages === 1
+                                    ? c.atlasPage
+                                    : c.atlasPages
+                                }`
+                              : "—"}
+                        </span>
+                      </div>
+                      <dl>
+                        <div>
+                          <dt>{c.outputCanvas}</dt>
+                          <dd>
+                            {outputSummary.canvas
+                              ? `${outputSummary.canvas.width} × ${outputSummary.canvas.height} px`
+                              : "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{c.logicalFrames}</dt>
+                          <dd>
+                            {outputSummary.includedFrames} /{" "}
+                            {companionOutputLimits.frames}
+                            {outputSummary.excludedFrames > 0
+                              ? ` · ${outputSummary.excludedFrames} ${c.excludedFrames}`
+                              : ""}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{c.directionCoverage}</dt>
+                          <dd>
+                            {Math.round(outputSummary.directionCoverage * 100)}%
+                            {` · ${outputSummary.directionPoses} ${
+                              outputSummary.directionPoses === 1
+                                ? c.pose
+                                : c.poses
+                            }`}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>{c.idleMotions}</dt>
+                          <dd>
+                            {outputSummary.idleClips}{" "}
+                            {outputSummary.idleClips === 1 ? c.clip : c.clips}
+                          </dd>
+                        </div>
+                        {outputSummary.assetKind === "atlas" ? (
+                          <div>
+                            <dt>{c.decodedPage}</dt>
+                            <dd>
+                              {formatFileSize(outputSummary.decodedPageBytes)} /{" "}
+                              {formatFileSize(
+                                companionOutputLimits.decodedPageBytes,
+                              )}
+                            </dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                      <p>{c.packageLimits}</p>
+                    </div>
+                    {readinessAction ? (
+                      <button
+                        type="button"
+                        className="creator-readiness-action"
+                        onClick={resolveFirstReadinessIssue}
+                      >
+                        <AlertTriangle size={15} />
+                        <span>
+                          <strong>{readinessAction.title}</strong>
+                          <small>{readinessAction.detail}</small>
+                        </span>
+                        <ChevronRight size={15} />
+                      </button>
                     ) : null}
-                    <button
-                      className="button button--primary creator-inspector-action"
-                      onClick={save}
-                      disabled={
-                        busy ||
-                        !metadataValid ||
-                        includedFrameCount === 0 ||
-                        !directionSetupValid
-                      }
-                    >
-                      {busy ? (
-                        <LoaderCircle className="spin" size={17} />
-                      ) : (
-                        <Save size={17} />
-                      )}
-                      {busy ? c.building : c.save}
-                    </button>
                   </section>
                   <section>
                     <h3>
@@ -4309,6 +4793,7 @@ export function CompanionCreator({
                       <label className="creator-field">
                         <span>{c.name}</span>
                         <input
+                          id="companion-name"
                           value={project.name}
                           maxLength={64}
                           aria-invalid={
@@ -4326,6 +4811,7 @@ export function CompanionCreator({
                       <label className="creator-field">
                         <span>{c.description}</span>
                         <textarea
+                          id="companion-description"
                           value={project.description}
                           maxLength={240}
                           aria-invalid={
@@ -4344,6 +4830,7 @@ export function CompanionCreator({
                       <label className="creator-field">
                         <span>{c.author}</span>
                         <input
+                          id="companion-author"
                           value={project.author}
                           maxLength={80}
                           aria-invalid={
@@ -4362,6 +4849,7 @@ export function CompanionCreator({
                         <span>{c.license}</span>
                         <span className="creator-select-control">
                           <select
+                            id="companion-license"
                             value={project.license}
                             aria-invalid={project.license.trim().length === 0}
                             aria-describedby="companion-license-hint"
@@ -4597,7 +5085,7 @@ export function CompanionCreator({
           )}
       </div>
 
-      <footer className="creator-footer">
+      <footer className="creator-footer" hidden={Boolean(restoreState)}>
         <button
           className="button button--ghost"
           disabled={stepIndex === 0}
@@ -4620,7 +5108,22 @@ export function CompanionCreator({
                 ? c.autosaveFailed
                 : `${locale === "zh-CN" ? "已自动保存" : "Autosaved"} ${lastSavedAt.toLocaleTimeString(locale)}`}
         </span>
-        {project.step !== "test" && (
+        {project.step === "test" ? (
+          <button
+            className="button button--primary creator-footer__build"
+            onClick={buildReady ? save : resolveFirstReadinessIssue}
+            disabled={busy}
+          >
+            {busy ? (
+              <LoaderCircle className="spin" size={17} />
+            ) : buildReady ? (
+              <Save size={17} />
+            ) : (
+              <AlertTriangle size={17} />
+            )}
+            {busy ? c.building : buildReady ? c.save : c.reviewRemaining}
+          </button>
+        ) : (
           <button
             className="button button--primary"
             disabled={!canContinue}

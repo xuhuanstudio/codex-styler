@@ -57,29 +57,12 @@ export function HomeView({
           <h1>{t("homeTitle")}</h1>
           <p>{t("homeDescription")}</p>
         </div>
-        <div className="home-heading__status">
-          <span className={setupIsLive ? "is-live" : ""} />
-          <div>
-            <small>{t("codexAppearance")}</small>
-            <strong>
-              {runtime.state === "fallback"
-                ? t("statusFallback")
-                : setupIsLive
-                  ? t("themeActive")
-                  : runtime.state === "error"
-                    ? t("statusError")
-                    : runtime.state === "paused"
-                      ? t("statusPaused")
-                      : t("ready")}
-            </strong>
-          </div>
-        </div>
       </section>
 
       <section className="home-current">
         <div className="home-current__preview">
           <span className="home-current__label">
-            {setupIsLive ? t("liveSetup") : t("selectedSetup")}
+            {setupIsLive ? t("liveSetup") : t("previewOnly")}
           </span>
           <PreviewWorkspace
             theme={theme}
@@ -91,7 +74,7 @@ export function HomeView({
         </div>
         <div className="home-current__content">
           <span className="home-current__eyebrow">
-            {setupIsLive ? t("liveInCodex") : t("readyToApply")}
+            {setupIsLive ? t("liveInCodex") : t("selectedSetup")}
           </span>
           <h2>{copy.name}</h2>
           <p>{copy.description}</p>
@@ -114,17 +97,6 @@ export function HomeView({
               {t("editTheme")}
               <ChevronRight size={15} />
             </button>
-          </div>
-          <div
-            className={
-              "configuration-state" +
-              (setupIsLive ? " configuration-state--live" : "")
-            }
-          >
-            <span />
-            {setupIsLive
-              ? t("changesApplyInstantly")
-              : t("changesReadyToApply")}
           </div>
         </div>
       </section>

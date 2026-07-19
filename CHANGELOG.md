@@ -4,6 +4,29 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.6] - 2026-07-19
+
+### Added
+
+- A persistent configuration dock and three-step first-use journey that present the selected theme, independent companion, runtime state, and one context-aware application action.
+- Theme Editor undo/redo, current-versus-saved preview, control-to-runtime coverage, real scene-layer selection, and explicit unsaved-draft navigation.
+- Companion source-project editing, compiled-output readiness, automatic source detection, and cancellable stage-by-stage draft restoration.
+- Regression coverage for configuration presentation, companion project linking, compiler output, draft history, editor mappings, compact onboarding, and bounded restore.
+
+### Changed
+
+- Compact theme and companion libraries now use explicit list-to-detail navigation while preserving keyboard selection and resource actions.
+- Setup, theme creation, and Companion Studio keep their navigation and primary actions stable while only the working content scrolls.
+- Companion draft cleanup is restored sequentially to bound peak decoded-image memory; partially created resources are revoked on cancellation or failure.
+- Cross-platform controls, scrollbars, responsive typography, Home proportions, Settings density, and all creator stages share the same product chrome and updated screenshot baselines.
+
+### Fixed
+
+- Reset current step and reset entire project remain visibly labelled and use distinct icons at compact widths.
+- Large existing companion drafts no longer present an unobservable frozen workspace during source, frame, or cleanup restoration.
+- Theme drafts cannot be left without an explicit save, discard, or continue-editing decision.
+- Compact setup and creation dialogs no longer clip their footer actions or rely on whole-dialog scrolling.
+
 ## [0.2.0-beta.5] - 2026-07-18
 
 ### Added

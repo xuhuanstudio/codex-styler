@@ -3,11 +3,17 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor,
 } from "@testing-library/react";
 import { builtinThemes } from "@codex-styler/theme-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
+import { createCompanionProject } from "./features/companion-creator/model";
+import {
+  deleteCompanionProject,
+  listCompanionProjects,
+} from "./features/companion-creator/project-files";
 import {
   applyConfiguration,
   checkForUpdates,
@@ -16,7 +22,9 @@ import {
   downloadAndInstallUpdate,
   getRuntimeStatus,
   launchCodex,
+  pauseTheme,
   quitCodex,
+  restoreOfficial,
   restartApp,
   updateCompanionConfiguration,
   validateCodexInstallPath,
@@ -78,7 +86,9 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     updateCompanionConfiguration: vi.fn(),
     chooseCodexInstallPath: vi.fn(),
     launchCodex: vi.fn(),
+    pauseTheme: vi.fn(),
     quitCodex: vi.fn(),
+    restoreOfficial: vi.fn(),
     checkForUpdates: vi.fn().mockResolvedValue({
       currentVersion: "0.2.0-beta.2",
       update: null,
@@ -88,6 +98,11 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     validateCodexInstallPath: vi.fn(),
   };
 });
+
+vi.mock("./features/companion-creator/project-files", () => ({
+  listCompanionProjects: vi.fn().mockResolvedValue([]),
+  deleteCompanionProject: vi.fn().mockResolvedValue(undefined),
+}));
 
 describe("Codex Styler shell", () => {
   afterEach(() => {
@@ -122,6 +137,13 @@ describe("Codex Styler shell", () => {
       version: "26.707.72221",
       platform: "macos",
     });
+    vi.mocked(pauseTheme).mockReset();
+    vi.mocked(pauseTheme).mockResolvedValue({
+      ...appliedRuntime,
+      state: "paused",
+    });
+    vi.mocked(restoreOfficial).mockReset();
+    vi.mocked(restoreOfficial).mockResolvedValue(disconnectedRuntime);
     vi.mocked(chooseCodexInstallPath).mockReset();
     vi.mocked(chooseCodexInstallPath).mockResolvedValue(null);
     vi.mocked(validateCodexInstallPath).mockReset();
@@ -133,6 +155,10 @@ describe("Codex Styler shell", () => {
     });
     vi.mocked(downloadAndInstallUpdate).mockReset();
     vi.mocked(restartApp).mockReset();
+    vi.mocked(listCompanionProjects).mockReset();
+    vi.mocked(listCompanionProjects).mockResolvedValue([]);
+    vi.mocked(deleteCompanionProject).mockReset();
+    vi.mocked(deleteCompanionProject).mockResolvedValue(undefined);
     localStorage.clear();
     localStorage.setItem(
       "codex-styler.settings.v1",
@@ -157,20 +183,210 @@ describe("Codex Styler shell", () => {
     expect(
       screen.queryByRole("button", { name: "Create" }),
     ).not.toBeInTheDocument();
+    expect(screen.getAllByText("Verified when applied").length).toBeGreaterThan(
+      0,
+    );
     expect(
-      screen.getAllByText("Compatibility not verified").length,
-    ).toBeGreaterThan(0);
+      screen.queryByText(
+        "Use the setup bar below when you are ready to apply.",
+      ),
+    ).not.toBeInTheDocument();
+    const decorativePreview = document.querySelector(".workspace-preview");
+    expect(decorativePreview).toHaveAttribute("aria-hidden", "true");
+    expect(decorativePreview).toHaveAttribute("inert");
+    const main = document.querySelector(".app-main");
+    const viewport = document.querySelector(".app-main__viewport");
+    const configurationDock = document.querySelector(".configuration-dock");
+    expect(main).toHaveAttribute("data-has-configuration-dock", "true");
+    expect(viewport?.parentElement).toBe(main);
+    expect(configurationDock?.parentElement).toBe(main);
+    expect(configurationDock?.previousElementSibling).toBe(viewport);
+  });
+
+  it("uses the persistent setup bar instead of redundant selection toasts", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview: Gilded Grandeur" }),
+    );
+    expect(screen.queryByText("Theme selected")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Current setup" })).getByText(
+        "Gilded Grandeur",
+      ),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    fireEvent.click(screen.getByRole("button", { name: /Moss/ }));
+    expect(screen.queryByText("Companion selected")).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("region", { name: "Current setup" })).getByText(
+        "Moss",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("routes a missing Codex installation to location settings", async () => {
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: false,
+      running: false,
+      path: null,
+      version: null,
+      platform: "windows",
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Codex not found")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Review Codex location" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Settings" }),
+    ).toBeInTheDocument();
+  });
+
+  it("finishes first-run setup by applying the reviewed configuration", async () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        skippedUpdateVersion: null,
+        lastUpdateCheckAt: null,
+        onboardingComplete: false,
+      }),
+    );
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    });
+
+    render(<App />);
+    const safetyDialog = await screen.findByRole("dialog", {
+      name: "A reversible connection, not an app modification.",
+    });
+    await screen.findByText("Codex Desktop detected");
+    fireEvent.click(
+      within(safetyDialog).getByRole("button", { name: "Continue" }),
+    );
+
+    const styleDialog = screen.getByRole("dialog", {
+      name: "Start with a complete visual direction.",
+    });
+    fireEvent.click(
+      within(styleDialog).getByRole("button", { name: "Continue" }),
+    );
+
+    const reviewDialog = screen.getByRole("dialog", {
+      name: "Your first setup is ready.",
+    });
+    fireEvent.click(
+      within(reviewDialog).getByRole("button", { name: "Start and apply" }),
+    );
+
+    await waitFor(() => expect(applyConfiguration).toHaveBeenCalledTimes(1));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}")
+        .onboardingComplete,
+    ).toBe(true);
+  });
+
+  it("preserves the current companion when the setup guide is revisited", async () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        ...JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}"),
+        companionMode: "custom",
+        companionId: "token-thief",
+      }),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Review setup guide" }));
+
+    const safetyDialog = await screen.findByRole("dialog", {
+      name: "A reversible connection, not an app modification.",
+    });
+    await screen.findByText("Codex Desktop detected");
+    fireEvent.click(
+      within(safetyDialog).getByRole("button", { name: "Continue" }),
+    );
+
+    const styleDialog = screen.getByRole("dialog", {
+      name: "Start with a complete visual direction.",
+    });
+    const currentCompanion = within(styleDialog).getByRole("button", {
+      name: /Token ThiefCurrent selection/,
+    });
+    expect(currentCompanion).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(
+      within(styleDialog).getByRole("button", { name: "Continue" }),
+    );
+
+    const reviewDialog = screen.getByRole("dialog", {
+      name: "Review your selected setup.",
+    });
+    expect(within(reviewDialog).getByText("Token Thief")).toBeVisible();
+  });
+
+  it("waits for installation detection before advancing first-run setup", async () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        skippedUpdateVersion: null,
+        lastUpdateCheckAt: null,
+        onboardingComplete: false,
+      }),
+    );
+    const detection = deferred<Awaited<ReturnType<typeof detectCodex>>>();
+    vi.mocked(detectCodex).mockReturnValue(detection.promise);
+
+    render(<App />);
+    const dialog = await screen.findByRole("dialog", {
+      name: "A reversible connection, not an app modification.",
+    });
+    const continueButton = within(dialog).getByRole("button", {
+      name: "Continue",
+    });
+    expect(continueButton).toBeDisabled();
+    expect(
+      within(dialog).getByText("Looking for Codex Desktop…"),
+    ).toBeVisible();
+
+    detection.resolve({
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    });
+
+    await waitFor(() => expect(continueButton).toBeEnabled());
   });
 
   it("asks before quitting an existing Codex session", async () => {
     render(<App />);
+    expect(await screen.findByText("Restart required")).toBeInTheDocument();
     expect(
-      await screen.findByText("Codex is already running"),
+      screen.getByRole("button", { name: "Restart Codex & apply" }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Restart and apply" }),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restart Codex & apply" }),
+    );
     expect(
       screen.getByRole("dialog", {
         name: "Restart Codex to apply this theme?",
@@ -197,7 +413,7 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Apply draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply theme" }));
 
     expect(
       await screen.findByRole("dialog", {
@@ -205,6 +421,74 @@ describe("Codex Styler shell", () => {
       }),
     ).toBeInTheDocument();
     expect(applyConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("uses honest theme editor apply labels and keeps the live result visible", async () => {
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    });
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "connected",
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply theme" }));
+    const applied = await screen.findByRole("button", {
+      name: "Applied to Codex",
+    });
+    expect(applied).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Workspace layout" }),
+      { target: { value: "immersive" } },
+    );
+    expect(
+      await screen.findByRole("button", { name: "Save & apply" }),
+    ).toBeEnabled();
+  });
+
+  it("keeps theme apply failures visible inside focus mode", async () => {
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    });
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "connected",
+    });
+    vi.mocked(applyConfiguration).mockRejectedValueOnce(
+      new Error("Could not open the Codex debugging socket: connection refused"),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply theme" }));
+
+    const failure = await screen.findByRole("alert");
+    expect(
+      within(failure).getByText("This theme needs attention"),
+    ).toBeVisible();
+    expect(
+      within(failure).getByText(/temporary Codex connection was lost/i),
+    ).toBeVisible();
+    expect(
+      within(failure).getByRole("button", { name: "Retry apply" }),
+    ).toBeEnabled();
   });
 
   it("uses a language dropdown with system language first", () => {
@@ -294,7 +578,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.5")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.6")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -554,10 +838,10 @@ describe("Codex Styler shell", () => {
     fireEvent(window, new Event("focus"));
 
     expect(
-      await screen.findByRole("button", { name: "Restart and apply" }),
+      await screen.findByRole("button", { name: "Restart Codex & apply" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Connected")).not.toBeInTheDocument();
-    expect(screen.getByText("Codex is already running")).toBeInTheDocument();
+    expect(screen.getByText("Restart required")).toBeInTheDocument();
   });
 
   it("recovers from a refused debugging socket with the restart flow", async () => {
@@ -591,10 +875,12 @@ describe("Codex Styler shell", () => {
     );
 
     expect(
-      await screen.findByRole("button", { name: "Restart and apply" }),
+      await screen.findByRole("button", { name: "Restart Codex & apply" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Connected")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restart Codex & apply" }),
+    );
     expect(
       screen.getByRole("dialog", {
         name: "Restart Codex to apply this theme?",
@@ -650,10 +936,10 @@ describe("Codex Styler shell", () => {
         platform: "macos",
       });
     render(<App />);
-    expect(
-      await screen.findByText("Codex is already running"),
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Restart and apply" }));
+    expect(await screen.findByText("Restart required")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Restart Codex & apply" }),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Quit Codex and continue" }),
     );
@@ -693,7 +979,9 @@ describe("Codex Styler shell", () => {
     );
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "启动并应用" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "启动 Codex 并应用" }),
+    );
 
     expect(
       await screen.findByText(/Windows 无法启动 Microsoft Store 版 Codex/),
@@ -701,6 +989,94 @@ describe("Codex Styler shell", () => {
     expect(
       screen.queryByText(/could not be resolved to an application identity/),
     ).not.toBeInTheDocument();
+
+    const locationAction = screen.getByRole("button", {
+      name: "检查 Codex 位置",
+    });
+    fireEvent.click(locationAction);
+    const locationSection = await screen.findByText("Codex 应用位置");
+    await waitFor(() =>
+      expect(locationSection.closest("section")).toHaveFocus(),
+    );
+  });
+
+  it("routes an unknown runtime failure to focused local diagnostics", async () => {
+    vi.mocked(detectCodex).mockResolvedValue({
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    });
+    vi.mocked(launchCodex).mockRejectedValue(
+      new Error("Codex could not be launched: unexpected desktop failure"),
+    );
+
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Start Codex & apply" }),
+    );
+    expect(
+      await screen.findByText(/Open Diagnostics & compatibility/),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Open diagnostics" }));
+    const diagnosticsHeading = await screen.findByRole("heading", {
+      name: "Diagnostics & compatibility",
+    });
+    await waitFor(() =>
+      expect(diagnosticsHeading.closest("section")).toHaveFocus(),
+    );
+  });
+
+  it("rechecks the process after a target timeout and offers one restart", async () => {
+    const stoppedDetection = {
+      installed: true,
+      running: false,
+      path: "/Applications/ChatGPT.app",
+      version: "26.707.72221",
+      platform: "macos",
+    };
+    vi.mocked(detectCodex)
+      .mockResolvedValueOnce(stoppedDetection)
+      .mockResolvedValueOnce(stoppedDetection)
+      .mockResolvedValue({ ...stoppedDetection, running: true });
+    vi.mocked(launchCodex).mockRejectedValue(
+      new Error(
+        "Codex did not expose a trusted page target before the connection timeout",
+      ),
+    );
+
+    render(<App />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Start Codex & apply" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Restart Codex & apply" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Restart required")).toBeInTheDocument();
+  });
+
+  it("keeps a failed restore recoverable and prevents duplicate restore calls", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue(appliedRuntime);
+    vi.mocked(restoreOfficial).mockRejectedValue(
+      new Error("runtime restore failed unexpectedly"),
+    );
+
+    render(<App />);
+    expect(await screen.findByText("Connected")).toBeInTheDocument();
+    const restore = screen.getByRole("button", { name: "Restore official" });
+    fireEvent.click(restore);
+    fireEvent.click(restore);
+
+    expect(restoreOfficial).toHaveBeenCalledOnce();
+    expect(
+      await screen.findByText(/Could not restore the official interface/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Open diagnostics" }),
+    ).toBeInTheDocument();
   });
 
   it("ships the gilded and circus themes with their signature companions", () => {
@@ -714,6 +1090,13 @@ describe("Codex Styler shell", () => {
       screen.getByRole("button", { name: "Preview: Merry Big Top" }),
     );
     expect(screen.getByLabelText("Token Thief")).toBeInTheDocument();
+  });
+
+  it("reports theme capabilities independently from the selected companion", () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    const facts = container.querySelector(".theme-facts");
+    expect(facts).toHaveTextContent("Interactive—");
   });
 
   it("keeps companions independent and exposes draggable placement", () => {
@@ -765,7 +1148,9 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
     expect(screen.getByText("Contrast protected")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    expect(screen.getByRole("menuitem", { name: "Reset" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menuitem", { name: "Revert to saved" }),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
@@ -788,12 +1173,260 @@ describe("Codex Styler shell", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("menuitem", { name: "Gradient layer" }));
     expect(
-      screen.getByRole("button", { name: /gradient-/i }),
+      screen.getByRole("button", { name: "Gradient layer 2" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Motion" }));
     expect(
       screen.getByRole("button", { name: /Expressive/ }),
     ).toBeInTheDocument();
+  });
+
+  it("explains which Codex views each theme section affects", () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+
+    expect(
+      screen.getByRole("region", { name: "Live effect mapped" }),
+    ).toHaveTextContent("5 preview views");
+    expect(
+      container.querySelector('[data-theme-control="background.brightness"]'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    expect(
+      screen.getByRole("region", { name: "Enhanced mode effect" }),
+    ).toHaveTextContent("Panels, controls, icons, and layout update together");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Preview on Task & composer" }),
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-preview-scenario",
+      "task",
+    );
+    expect(
+      container.querySelector('[data-theme-control="surfaces.layout"]'),
+    ).toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Recommended pairing" }),
+    );
+    expect(
+      screen.getByRole("region", { name: "Recommendation only" }),
+    ).toHaveTextContent("without replacing the current companion");
+    expect(
+      screen.queryByRole("button", { name: /Preview on/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("uses a reversible list-to-detail flow for compact theme properties", () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+
+    const appearance = screen.getByRole("button", { name: "Appearance" });
+    const editorLayout = container.querySelector(".editor-layout");
+    expect(appearance).toHaveAttribute("aria-expanded", "false");
+    expect(editorLayout).not.toHaveClass("editor-layout--inspector-open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    expect(appearance).toHaveAttribute("aria-expanded", "true");
+    expect(editorLayout).toHaveClass("editor-layout--inspector-open");
+
+    fireEvent.click(screen.getByRole("button", { name: "Close inspector" }));
+    expect(appearance).toHaveAttribute("aria-expanded", "false");
+    expect(editorLayout).not.toHaveClass("editor-layout--inspector-open");
+    expect(appearance).toHaveFocus();
+  });
+
+  it("compares the current theme edit with the saved version without changing the draft", async () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+
+    const savedPreview = screen.getByRole("button", { name: "Saved" });
+    expect(savedPreview).toBeDisabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Workspace layout" }),
+      { target: { value: "immersive" } },
+    );
+    expect(savedPreview).toBeEnabled();
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "immersive",
+    );
+
+    fireEvent.click(savedPreview);
+    expect(container.querySelector(".canvas-stage")).toHaveAttribute(
+      "data-preview-version",
+      "saved",
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "native",
+    );
+    expect(screen.getByText("Saved preview")).toBeInTheDocument();
+    expect(container.querySelector(".inspector")).toHaveClass(
+      "inspector--preview-saved",
+    );
+    expect(container.querySelector(".inspector-content")).toHaveAttribute(
+      "inert",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Return" }));
+    await waitFor(() =>
+      expect(container.querySelector(".canvas-stage")).toHaveAttribute(
+        "data-preview-version",
+        "current",
+      ),
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "immersive",
+    );
+    expect(container.querySelector(".inspector-content")).not.toHaveAttribute(
+      "inert",
+    );
+
+    fireEvent.click(savedPreview);
+    fireEvent.click(screen.getByRole("button", { name: "Background" }));
+    expect(container.querySelector(".canvas-stage")).toHaveAttribute(
+      "data-preview-version",
+      "current",
+    );
+  });
+
+  it("undoes and redoes theme edits from buttons and keyboard shortcuts", async () => {
+    const { container } = render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+
+    const layout = screen.getByRole("combobox", { name: "Workspace layout" });
+    const undo = screen.getByRole("button", { name: "Undo theme change" });
+    const redo = screen.getByRole("button", { name: "Redo theme change" });
+    const saveDraft = screen.getByRole("button", { name: "Save draft" });
+    expect(undo).toBeDisabled();
+    expect(redo).toBeDisabled();
+    expect(saveDraft).toBeDisabled();
+    expect(saveDraft).toHaveAttribute("data-dirty", "false");
+
+    fireEvent.change(layout, { target: { value: "immersive" } });
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "immersive",
+    );
+    expect(undo).toBeEnabled();
+    expect(saveDraft).toBeEnabled();
+    expect(saveDraft).toHaveAttribute("data-dirty", "true");
+
+    fireEvent.click(undo);
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "native",
+    );
+    expect(screen.getByText("Theme change undone")).toBeInTheDocument();
+    expect(redo).toBeEnabled();
+
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true, shiftKey: true });
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "immersive",
+    );
+
+    fireEvent.click(saveDraft);
+    await waitFor(() =>
+      expect(screen.getByText("All changes saved")).toBeInTheDocument(),
+    );
+    expect(saveDraft).toBeDisabled();
+    expect(saveDraft).toHaveAttribute("data-dirty", "false");
+    expect(undo).toBeEnabled();
+
+    fireEvent.keyDown(window, { key: "z", metaKey: true });
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-layout",
+      "native",
+    );
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect(saveDraft).toBeEnabled();
+    expect(saveDraft).toHaveAttribute("data-dirty", "true");
+  });
+
+  it("protects unsaved theme edits when leaving the editor", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Workspace layout" }),
+      { target: { value: "immersive" } },
+    );
+
+    const homeNavigation = screen.getByRole("button", { name: "Home" });
+    homeNavigation.focus();
+    fireEvent.click(homeNavigation);
+    expect(
+      screen.getByRole("dialog", { name: "Save this theme before leaving?" }),
+    ).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Save this theme before leaving?",
+      }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Untitled Theme" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(homeNavigation).toHaveFocus());
+
+    fireEvent.click(homeNavigation);
+    fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
+    expect(
+      screen.getByRole("heading", { name: "Untitled Theme" }),
+    ).toBeInTheDocument();
+    await waitFor(() => expect(homeNavigation).toHaveFocus());
+
+    fireEvent.click(homeNavigation);
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(
+      screen.getByRole("heading", {
+        name: "Your Codex, composed in one place.",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("saves an edited theme before completing navigation", async () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("button", { name: "New theme" }));
+    fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Workspace layout" }),
+      { target: { value: "immersive" } },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save and leave" }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("heading", { name: "Settings" }),
+      ).toBeInTheDocument(),
+    );
+    expect(
+      screen.queryByRole("dialog", {
+        name: "Save this theme before leaving?",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("resizes editor panels with the keyboard and keeps recommendations independent", async () => {
@@ -869,5 +1502,57 @@ describe("Codex Styler shell", () => {
     await waitFor(() =>
       expect(screen.queryByText("Theme to delete")).not.toBeInTheDocument(),
     );
+  });
+
+  it("explains creator draft progress and confirms destructive deletion", async () => {
+    const project = createCompanionProject("local-draft-to-delete");
+    project.name = "Orbit fox";
+    project.step = "cleanup";
+    project.updatedAt = "2026-07-19T02:30:00.000Z";
+    project.frames = [
+      {
+        id: "frame-1",
+        sourceIndex: 0,
+        excluded: false,
+        visualDelta: 0,
+        baselineOffset: { x: 0, y: 0 },
+      },
+    ];
+    vi.mocked(listCompanionProjects).mockResolvedValue([project]);
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    fireEvent.click(screen.getByRole("tab", { name: /My Companions/ }));
+
+    expect(
+      await screen.findByRole("button", {
+        name: /Continue draft: Orbit fox, Background cleanup, 3\/7/,
+      }),
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete draft: Orbit fox" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Delete this creator draft?" }),
+    ).toHaveTextContent("An installed companion with the same name will not be deleted.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(deleteCompanionProject).not.toHaveBeenCalled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Delete draft: Orbit fox" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Delete draft" }));
+
+    await waitFor(() =>
+      expect(deleteCompanionProject).toHaveBeenCalledWith(
+        "local-draft-to-delete",
+      ),
+    );
+    expect(
+      screen.queryByRole("button", {
+        name: /Continue draft: Orbit fox/,
+      }),
+    ).not.toBeInTheDocument();
   });
 });

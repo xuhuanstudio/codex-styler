@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   Check,
   ChevronRight,
   Download,
@@ -6,11 +7,13 @@ import {
   FolderOpen,
   MoreHorizontal,
   MousePointer2,
+  PencilLine,
   Plus,
   Trash2,
   Upload,
   X,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   builtinCompanions,
   type CompanionDefinition,
@@ -18,11 +21,46 @@ import {
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import { PreviewWorkspace } from "../../components/PreviewWorkspace";
-import type { CompanionCreatorProject } from "../companion-creator/model";
+import type {
+  CompanionCreatorProject,
+  CreatorStep,
+} from "../companion-creator/model";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { ThemeVariantName } from "../../lib/app-session";
+import { findCompanionSourceProject } from "./companion-project-link";
 
 export type CompanionCollection = "builtIn" | "mine";
+
+const creatorSteps: CreatorStep[] = [
+  "import",
+  "extract",
+  "cleanup",
+  "align",
+  "calibrate",
+  "motions",
+  "test",
+];
+
+const creatorStepLabels: Record<Locale, Record<CreatorStep, string>> = {
+  en: {
+    import: "Import",
+    extract: "Extract / slice",
+    cleanup: "Background cleanup",
+    align: "Alignment",
+    calibrate: "Direction calibration",
+    motions: "Idle motions",
+    test: "Test & save",
+  },
+  "zh-CN": {
+    import: "导入",
+    extract: "抽帧 / 切割",
+    cleanup: "背景处理",
+    align: "对齐",
+    calibrate: "方向校准",
+    motions: "小动作",
+    test: "测试与保存",
+  },
+};
 
 export interface CompanionsViewProps {
   locale: Locale;
@@ -38,7 +76,7 @@ export interface CompanionsViewProps {
   onCollectionChange: (collection: CompanionCollection) => void;
   onCreate: () => void;
   onEditProject: (project: CompanionCreatorProject) => void;
-  onDeleteProject: (projectId: string) => void;
+  onDeleteProject: (project: CompanionCreatorProject) => void;
   onImport: () => void;
   onExport: (companion: CompanionDefinition) => void;
   onDelete: (companion: CompanionDefinition) => void;
@@ -78,6 +116,24 @@ export function CompanionsView({
   isLive,
   busy,
 }: CompanionsViewProps) {
+  const [compactDetailOpen, setCompactDetailOpen] = useState(false);
+  const [showAllProjects, setShowAllProjects] = useState(false);
+  const layoutRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!compactDetailOpen) return;
+    const element = layoutRef.current?.closest<HTMLElement>(
+      ".app-main__viewport",
+    );
+    if (!element) return;
+    if (typeof element.scrollTo === "function") {
+      element.scrollTo({
+        top: 0,
+        behavior: reduceMotion ? "auto" : "smooth",
+      });
+    } else {
+      element.scrollTop = 0;
+    }
+  }, [compactDetailOpen, reduceMotion]);
   const companions =
     collection === "builtIn" ? builtinCompanions : localCompanions;
   const selectedCopy = selected
@@ -87,6 +143,19 @@ export function CompanionsView({
         description: selected.description,
       })
     : null;
+  const selectedIsLocal = Boolean(
+    selected && localCompanions.some((item) => item.id === selected.id),
+  );
+  const selectedSourceProject = selectedIsLocal
+    ? findCompanionSourceProject(selected, projects)
+    : null;
+  const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
+  const dateFormatter = new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <div className="page companions-page">
@@ -120,7 +189,10 @@ export function CompanionsView({
             role="tab"
             aria-selected={collection === "builtIn"}
             className={collection === "builtIn" ? "is-active" : ""}
-            onClick={() => onCollectionChange("builtIn")}
+            onClick={() => {
+              setCompactDetailOpen(false);
+              onCollectionChange("builtIn");
+            }}
           >
             {t("builtInCompanions")}
             <small>{builtinCompanions.length}</small>
@@ -129,24 +201,14 @@ export function CompanionsView({
             role="tab"
             aria-selected={collection === "mine"}
             className={collection === "mine" ? "is-active" : ""}
-            onClick={() => onCollectionChange("mine")}
+            onClick={() => {
+              setCompactDetailOpen(false);
+              onCollectionChange("mine");
+            }}
           >
             {t("myCompanions")}
             <small>{localCompanions.length}</small>
           </button>
-        </div>
-        <div
-          className={
-            "configuration-state" + (isLive ? " configuration-state--live" : "")
-          }
-          aria-live="polite"
-        >
-          <span />
-          {busy
-            ? t("applying")
-            : isLive
-              ? t("changesApplyInstantly")
-              : t("changesReadyToApply")}
         </div>
       </div>
 
@@ -156,38 +218,90 @@ export function CompanionsView({
             <div>
               <span className="page-kicker">AUTOSAVED CREATOR PROJECTS</span>
               <strong>{t("companionDrafts")}</strong>
+              <p>{t("companionDraftsDetail")}</p>
             </div>
-            <small>{projects.length}</small>
+            <div className="companion-projects__heading-actions">
+              <small>{projects.length}</small>
+              {projects.length > 3 && (
+                <button
+                  className="text-button"
+                  onClick={() => setShowAllProjects((current) => !current)}
+                >
+                  {showAllProjects ? t("showRecentDrafts") : t("showAllDrafts")}
+                </button>
+              )}
+            </div>
           </div>
           <div className="companion-projects__list">
-            {projects.map((project) => (
-              <div key={project.id} className="companion-project-card">
-                <button onClick={() => onEditProject(project)}>
-                  <span>
-                    <Film size={15} />
-                  </span>
-                  <strong>{project.name}</strong>
-                  <small>
-                    {project.source?.files.length ?? 0} {t("sourceFiles")} ·{" "}
-                    {project.frames.length} {t("frames")}
-                  </small>
-                  <ChevronRight size={14} />
-                </button>
-                <button
-                  className="icon-button"
-                  onClick={() => onDeleteProject(project.id)}
-                  aria-label={`${t("deleteDraft")}: ${project.name}`}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-            ))}
+            {visibleProjects.map((project) => {
+              const stepIndex = Math.max(0, creatorSteps.indexOf(project.step));
+              const stepLabel = creatorStepLabels[locale][project.step];
+              const stepProgress =
+                ((stepIndex + 1) / creatorSteps.length) * 100;
+              const sourceCount = project.source?.files.length ?? 0;
+              const frameCount = project.frames.length;
+              const lastEdited = Number.isNaN(Date.parse(project.updatedAt))
+                ? null
+                : dateFormatter.format(new Date(project.updatedAt));
+              return (
+                <div key={project.id} className="companion-project-card">
+                  <button
+                    onClick={() => onEditProject(project)}
+                    aria-label={`${t("continueDraft")}: ${project.name}, ${stepLabel}, ${stepIndex + 1}/${creatorSteps.length}`}
+                  >
+                    <span className="companion-project-card__icon">
+                      <Film size={15} />
+                    </span>
+                    <span className="companion-project-card__body">
+                      <span className="companion-project-card__title-row">
+                        <strong>{project.name}</strong>
+                        <small>{stepLabel}</small>
+                      </span>
+                      <span className="companion-project-card__meta">
+                        {sourceCount}{" "}
+                        {t(sourceCount === 1 ? "sourceFile" : "sourceFiles")} ·{" "}
+                        {frameCount} {t(frameCount === 1 ? "frame" : "frames")}
+                        {lastEdited ? ` · ${lastEdited}` : ""}
+                      </span>
+                      <span
+                        className="companion-project-card__progress"
+                        aria-hidden="true"
+                      >
+                        <span style={{ width: `${stepProgress}%` }} />
+                      </span>
+                    </span>
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    onClick={() => onDeleteProject(project)}
+                    aria-label={`${t("deleteDraft")}: ${project.name}`}
+                    title={t("deleteDraft")}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
 
-      <div className="companions-layout">
+      <div
+        ref={layoutRef}
+        className={
+          "companions-layout" +
+          (compactDetailOpen ? " companions-layout--detail" : "")
+        }
+      >
         <section className="companion-preview-panel">
+          <button
+            className="compact-detail-back"
+            onClick={() => setCompactDetailOpen(false)}
+          >
+            <ArrowLeft size={14} />
+            {t("backToCompanions")}
+          </button>
           <PreviewWorkspace
             theme={theme}
             variant={variant}
@@ -209,9 +323,54 @@ export function CompanionsView({
               <strong>{selectedCopy?.name ?? t("noCompanion")}</strong>
               <p>{selectedCopy?.description ?? t("companionIndependence")}</p>
             </div>
-            <div className="companion-detail-summary__badges">
-              {selected && <span>{t("interactive")}</span>}
-              <span>{isLive ? t("statusApplied") : t("statusPending")}</span>
+            <div className="companion-detail-summary__side">
+              <div className="companion-detail-summary__badges">
+                {selected && (
+                  <span>
+                    {selectedIsLocal
+                      ? t("installedLocally")
+                      : t("builtInCompanion")}
+                  </span>
+                )}
+                <span>
+                  {busy
+                    ? t("statusApplying")
+                    : isLive
+                      ? t("statusApplied")
+                      : t("statusPending")}
+                </span>
+              </div>
+              {selected && selectedIsLocal && (
+                <div
+                  className="companion-detail-summary__actions"
+                  role="group"
+                  aria-label={t("installedCompanionActions")}
+                >
+                  {selectedSourceProject && (
+                    <button
+                      className="secondary-button"
+                      onClick={() => onEditProject(selectedSourceProject)}
+                    >
+                      <PencilLine size={13} />
+                      {t("editSourceProject")}
+                    </button>
+                  )}
+                  <button
+                    className="secondary-button"
+                    onClick={() => onExport(selected)}
+                  >
+                    <Download size={13} />
+                    {t("exportCompanion")}
+                  </button>
+                  <button
+                    className="danger-button danger-button--quiet"
+                    onClick={() => onDelete(selected)}
+                  >
+                    <Trash2 size={13} />
+                    {t("deleteCompanion")}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </section>
@@ -222,7 +381,10 @@ export function CompanionsView({
               "companion-option" +
               (!selected ? " companion-option--active" : "")
             }
-            onClick={() => onSelect(null)}
+            onClick={() => {
+              onSelect(null);
+              setCompactDetailOpen(true);
+            }}
             aria-pressed={!selected}
           >
             <span className="companion-option__visual companion-option__visual--empty">
@@ -253,6 +415,10 @@ export function CompanionsView({
                 description: item.description,
               };
             const active = selected?.id === item.id;
+            const sourceProject =
+              collection === "mine"
+                ? findCompanionSourceProject(item, projects)
+                : null;
             const renderer = item.entity.renderer;
             const previewSize = 64;
             const hasDedicatedPortrait = Boolean(item.metadata.preview);
@@ -314,7 +480,10 @@ export function CompanionsView({
                     "companion-option" +
                     (active ? " companion-option--active" : "")
                   }
-                  onClick={() => onSelect(item)}
+                  onClick={() => {
+                    onSelect(item);
+                    setCompactDetailOpen(true);
+                  }}
                   aria-pressed={active}
                 >
                   <span className="companion-option__visual companion-option__visual--sprite">
@@ -353,6 +522,15 @@ export function CompanionsView({
                       <MoreHorizontal size={14} />
                     </summary>
                     <div role="menu">
+                      {sourceProject && (
+                        <button
+                          role="menuitem"
+                          onClick={() => onEditProject(sourceProject)}
+                        >
+                          <PencilLine size={14} />
+                          {t("editSourceProject")}
+                        </button>
+                      )}
                       <button role="menuitem" onClick={() => onExport(item)}>
                         <Download size={14} />
                         {t("exportCompanion")}
