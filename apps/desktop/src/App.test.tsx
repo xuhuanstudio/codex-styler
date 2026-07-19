@@ -1297,9 +1297,26 @@ describe("Codex Styler shell", () => {
     expect(
       container.querySelector('[data-theme-control="surfaces.focus-opacity"]'),
     ).toBeInTheDocument();
-    expect(
-      container.querySelector('[data-theme-control="surfaces.color-harmony"]'),
-    ).toHaveTextContent("Automatic component harmony");
+    const harmony = container.querySelector(
+      '[data-theme-control="surfaces.color-harmony"]',
+    );
+    expect(harmony).toHaveTextContent("Automatic");
+    expect(harmony).toHaveTextContent("Tonal harmony");
+    expect(harmony).toHaveTextContent("Clear hierarchy");
+    const preview = container.querySelector(
+      ".workspace-preview",
+    ) as HTMLElement;
+    const automaticBorder = preview.style.getPropertyValue(
+      "--preview-border-strong",
+    );
+    const clearHierarchy = screen.getByRole("button", {
+      name: /Clear hierarchy/,
+    });
+    fireEvent.click(clearHierarchy);
+    expect(clearHierarchy).toHaveAttribute("aria-pressed", "true");
+    expect(preview.style.getPropertyValue("--preview-border-strong")).not.toBe(
+      automaticBorder,
+    );
 
     const frostedMaterial = screen.getByRole("button", { name: "Frosted" });
     fireEvent.click(frostedMaterial);

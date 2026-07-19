@@ -390,13 +390,21 @@ const messages = {
       "Selection, focus rings, caret, links, and scrollbars remain readable while following the theme accent.",
     surfaceColor: "Surface color",
     borderColor: "Border color",
-    automaticColorHarmony: "Automatic component harmony",
-    automaticColorHarmonyDetail:
-      "Panels, controls, code blocks, and states follow the base theme colors.",
+    colorHarmony: "Component color harmony",
+    colorHarmonyDescription:
+      "Choose how strongly panels and controls separate while preserving readable text.",
+    harmonyAutomatic: "Automatic",
+    harmonyAutomaticDetail:
+      "Follows the theme detail treatment and adapts as base colors change.",
+    harmonyTonal: "Tonal harmony",
+    harmonyTonalDetail:
+      "Keeps panels and controls close to the surface color for a quieter workspace.",
+    harmonyContrast: "Clear hierarchy",
+    harmonyContrastDetail:
+      "Adds stronger surface separation for dense panels, code, and controls.",
     authoredColorHarmony: "Designed component palette",
     authoredColorHarmonyDetail:
       "This theme includes individually tuned component colors.",
-    matchBaseColors: "Match base colors",
     focusSurfaceOpacity: "Focused panel opacity",
     surfaceBlur: "Glass blur",
     layoutTreatment: "Workspace layout",
@@ -944,12 +952,17 @@ const messages = {
       "文字选择、焦点环、输入光标、链接与滚动条会保持清晰，并跟随主题强调色。",
     surfaceColor: "表面颜色",
     borderColor: "边框颜色",
-    automaticColorHarmony: "组件色彩自动协调",
-    automaticColorHarmonyDetail:
-      "面板、控件、代码块与状态颜色会跟随主题基础色同步变化。",
+    colorHarmony: "组件色彩协调",
+    colorHarmonyDescription:
+      "选择面板与控件的层次强度，同时持续保护文字可读性。",
+    harmonyAutomatic: "自动协调",
+    harmonyAutomaticDetail: "跟随主题细节风格，并随基础颜色自动调整。",
+    harmonyTonal: "柔和同色",
+    harmonyTonalDetail: "让面板与控件接近表面色，形成安静统一的工作区。",
+    harmonyContrast: "清晰层次",
+    harmonyContrastDetail: "强化密集面板、代码区域和控件之间的层级区分。",
     authoredColorHarmony: "主题精调组件色板",
     authoredColorHarmonyDetail: "该主题包含逐项设计的组件颜色。",
-    matchBaseColors: "同步基础颜色",
     focusSurfaceOpacity: "聚焦面板不透明度",
     surfaceBlur: "玻璃模糊",
     layoutTreatment: "工作区布局",

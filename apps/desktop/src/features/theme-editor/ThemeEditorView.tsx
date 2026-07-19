@@ -47,7 +47,9 @@ import type {
 } from "../../lib/adaptive-theme";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { WorkspaceUiPreferences } from "../../lib/storage";
+import type { ThemeColorHarmonyId } from "../../lib/theme-color-harmony";
 import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
+import { ColorHarmonyPicker } from "./ColorHarmonyPicker";
 import {
   themeEditorSectionCoverage,
   type ThemeEditorControlId,
@@ -145,6 +147,7 @@ export function ThemeEditorView({
   reduceMotion,
   t,
   onUpdateVariant,
+  onSetColorHarmony,
   onAddSceneLayer,
   onUpdateSceneLayer,
   onRemoveSceneLayer,
@@ -183,6 +186,7 @@ export function ThemeEditorView({
     value: number | string,
     historyGroup?: string,
   ) => void;
+  onSetColorHarmony: (recipe: ThemeColorHarmonyId) => void;
   onAddSceneLayer: (type: SceneLayer["type"]) => void;
   onUpdateSceneLayer: (layerId: string, patch: Partial<SceneLayer>) => void;
   onRemoveSceneLayer: (layerId: string) => void;
@@ -1195,6 +1199,15 @@ export function ThemeEditorView({
                     );
                   })}
                 </div>
+                <div className="inspector-subsection-heading">
+                  <strong>{t("colorHarmony")}</strong>
+                  <span>{t("colorHarmonyDescription")}</span>
+                </div>
+                <ColorHarmonyPicker
+                  variant={visual}
+                  t={t}
+                  onChange={onSetColorHarmony}
+                />
                 <p className="inspector-mode-note">
                   {t("semanticControlsHint")}
                 </p>
@@ -1291,45 +1304,6 @@ export function ThemeEditorView({
                         onUpdateVariant("appearance", "border", value)
                       }
                     />
-                    <div
-                      className="semantic-harmony-status"
-                      data-theme-control="surfaces.color-harmony"
-                      data-authored={
-                        visual.appearance.palette ? "true" : "false"
-                      }
-                    >
-                      <Sparkles size={14} />
-                      <span>
-                        <strong>
-                          {t(
-                            visual.appearance.palette
-                              ? "authoredColorHarmony"
-                              : "automaticColorHarmony",
-                          )}
-                        </strong>
-                        <small>
-                          {t(
-                            visual.appearance.palette
-                              ? "authoredColorHarmonyDetail"
-                              : "automaticColorHarmonyDetail",
-                          )}
-                        </small>
-                      </span>
-                      {visual.appearance.palette && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            onUpdateVariant(
-                              "appearance",
-                              "accent",
-                              visual.appearance.accent,
-                            )
-                          }
-                        >
-                          {t("matchBaseColors")}
-                        </button>
-                      )}
-                    </div>
                     <RangeControl
                       controlId="surfaces.opacity"
                       label={t("surfaceOpacity")}

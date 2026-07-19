@@ -120,6 +120,10 @@ import {
 } from "./lib/theme-files";
 import { assignThemeVariantField } from "./lib/theme-draft";
 import {
+  assignThemeColorHarmony,
+  type ThemeColorHarmonyId,
+} from "./lib/theme-color-harmony";
+import {
   applyCompanionPlacementMode,
   resolveCompanionPlacementMode,
   type SelectableCompanionPlacementMode,
@@ -1146,6 +1150,13 @@ export function App() {
     );
   }
 
+  function setThemeColorHarmony(recipe: ThemeColorHarmonyId) {
+    commitThemeDraft((next) => {
+      assignThemeColorHarmony(next, variant, recipe);
+      return next;
+    }, `${variant}.appearance.color-harmony`);
+  }
+
   function addSceneLayer(type: "image" | "gradient" | "vignette") {
     commitThemeDraft((next) => {
       if (next.scene.layers.length >= 8) return next;
@@ -2044,6 +2055,7 @@ export function App() {
               reduceMotion={settings.reduceMotion}
               t={t}
               onUpdateVariant={updateVariant}
+              onSetColorHarmony={setThemeColorHarmony}
               onAddSceneLayer={addSceneLayer}
               onUpdateSceneLayer={updateSceneLayer}
               onRemoveSceneLayer={removeSceneLayer}

@@ -3,6 +3,7 @@ import { nativeRefined, type SceneEntity } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
 import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
+import { assignThemeColorHarmony } from "./lib/theme-color-harmony";
 import { resolveThemePreviewPalette } from "./lib/theme-preview-palette";
 import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
 
@@ -166,6 +167,30 @@ describe("injected compatibility runtime", () => {
           contrastSystem,
         ),
       ).toEqual(previewPalette);
+    },
+  );
+
+  it.each(["tonal", "contrast"] as const)(
+    "keeps the %s color harmony identical in preview and runtime",
+    (recipe) => {
+      const theme = structuredClone(nativeRefined);
+      assignThemeColorHarmony(theme, "dark", recipe);
+      const visual = theme.variants.dark;
+      const contrastSystem = resolveThemeContrast(theme, "dark");
+
+      expect(
+        runtimeInternals().semanticPalette(
+          visual.appearance,
+          visual.background,
+          contrastSystem,
+        ),
+      ).toEqual(
+        resolveThemePreviewPalette(
+          visual.appearance,
+          visual.background.color,
+          contrastSystem,
+        ),
+      );
     },
   );
 
