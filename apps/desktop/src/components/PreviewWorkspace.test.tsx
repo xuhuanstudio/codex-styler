@@ -225,6 +225,12 @@ describe("PreviewWorkspace task views", () => {
     expect(preview?.style.getPropertyValue("--preview-border-strong")).toBe(
       palette.borderStrong,
     );
+    expect(preview?.style.getPropertyValue("--preview-icon")).toBe(
+      palette.icon,
+    );
+    expect(preview?.style.getPropertyValue("--preview-icon-emphasis")).toBe(
+      palette.iconEmphasis,
+    );
   });
 
   it("runs a controlled motion preview and preserves each scene layer scale", () => {

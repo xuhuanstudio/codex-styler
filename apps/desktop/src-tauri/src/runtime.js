@@ -832,6 +832,14 @@
     const textPrimary = contrastSystem.textPrimary;
     const textSecondary = contrastSystem.textSecondary;
     const textTertiary = contrastSystem.textTertiary;
+    const preferredIconColor = (emphasis = false) => {
+      const style = appearance.iconStyle || "native";
+      const base = emphasis ? textPrimary : textSecondary;
+      if (style === "native") return base;
+      const accentAmount =
+        style === "themed" ? (emphasis ? 0.72 : 0.58) : emphasis ? 0.5 : 0.36;
+      return mix(base, appearance.accent, accentAmount);
+    };
     const readableSurface = (surface, minimum = 4.5) =>
       contrast(textPrimary, surface) >= minimum &&
       contrast(textSecondary, surface) >= minimum &&
@@ -930,6 +938,12 @@
       boundaryBackgrounds,
       custom.borderStrong ? 3 : 2.5,
     );
+    const icon = readable(preferredIconColor(), boundaryBackgrounds, 3);
+    const iconEmphasis = readable(
+      preferredIconColor(true),
+      boundaryBackgrounds,
+      3,
+    );
     return {
       canvas,
       surface: appearance.surface,
@@ -942,6 +956,8 @@
       textPrimary,
       textSecondary,
       textTertiary,
+      icon,
+      iconEmphasis,
       accent: appearance.accent,
       onAccent,
       border,
@@ -987,6 +1003,8 @@
     --codex-styler-text-primary: ${palette.textPrimary};
     --codex-styler-text-secondary: ${palette.textSecondary};
     --codex-styler-text-tertiary: ${palette.textTertiary};
+    --codex-styler-icon: ${palette.icon};
+    --codex-styler-icon-emphasis: ${palette.iconEmphasis};
     --codex-styler-accent: ${palette.accent};
     --codex-styler-on-accent: ${palette.onAccent};
     --codex-styler-border: ${palette.border};
@@ -1029,8 +1047,8 @@
     --color-text-button-primary: var(--codex-styler-on-accent);
     --color-text-button-secondary: var(--codex-styler-text-primary);
     --color-text-button-tertiary: var(--codex-styler-text-secondary);
-    --color-icon-primary: var(--codex-styler-text-primary);
-    --color-icon-secondary: var(--codex-styler-text-secondary);
+    --color-icon-primary: var(--codex-styler-icon-emphasis);
+    --color-icon-secondary: var(--codex-styler-icon);
     --color-icon-tertiary: var(--codex-styler-text-tertiary);
     --color-border: var(--codex-styler-border);
     --color-border-light: var(--codex-styler-border-subtle);
@@ -1625,14 +1643,20 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
-          color: color-mix(in srgb, ${appearance.accent} 74%, ${protectedText}) !important;
+          overflow: visible;
+          border-radius: max(3px, calc(${appearance.radius}px * 0.28));
+          color: var(--codex-styler-icon) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 10%, transparent);
           filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 20%, transparent));
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
-          color: color-mix(in srgb, ${appearance.accent} 86%, ${protectedText}) !important;
+          overflow: visible;
+          border-radius: 999px;
+          color: var(--codex-styler-icon-emphasis) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 13%, transparent), 0 0 12px color-mix(in srgb, ${appearance.accent} 18%, transparent);
           filter: drop-shadow(0 3px 7px color-mix(in srgb, ${appearance.accent} 30%, transparent));
         }
 

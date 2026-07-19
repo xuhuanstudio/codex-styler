@@ -10,6 +10,7 @@ import {
 const labelKeys: Record<ThemeVisualQualityCheckId, MessageKey> = {
   "primary-text": "visualPrimaryText",
   "secondary-text": "visualSecondaryText",
+  icons: "visualIcons",
   "accent-content": "visualAccentContent",
   boundaries: "visualBoundaries",
 };

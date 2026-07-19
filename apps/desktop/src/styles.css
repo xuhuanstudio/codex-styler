@@ -1427,7 +1427,11 @@ button:disabled {
     .workspace-dialog-layer > div
   )
   svg {
-  color: color-mix(in srgb, var(--preview-accent) 74%, var(--preview-text));
+  overflow: visible;
+  border-radius: max(3px, calc(var(--preview-radius) * 0.28));
+  color: var(--preview-icon);
+  box-shadow: 0 0 0 3px
+    color-mix(in srgb, var(--preview-accent) 10%, transparent);
   filter: drop-shadow(
     0 2px 4px color-mix(in srgb, var(--preview-accent) 20%, transparent)
   );
@@ -1466,7 +1470,12 @@ button:disabled {
     .workspace-dialog-layer > div
   )
   svg {
-  color: color-mix(in srgb, var(--preview-accent) 86%, var(--preview-text));
+  overflow: visible;
+  border-radius: 999px;
+  color: var(--preview-icon-emphasis);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--preview-accent) 13%, transparent),
+    0 0 12px color-mix(in srgb, var(--preview-accent) 18%, transparent);
   filter: drop-shadow(
     0 3px 6px color-mix(in srgb, var(--preview-accent) 30%, transparent)
   );

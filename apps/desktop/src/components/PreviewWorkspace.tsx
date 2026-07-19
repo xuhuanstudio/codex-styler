@@ -500,6 +500,12 @@ export function PreviewWorkspace({
       "--preview-tertiary": officialPreview
         ? officialPalette.muted
         : semanticPalette.textTertiary,
+      "--preview-icon": officialPreview
+        ? officialPalette.muted
+        : semanticPalette.icon,
+      "--preview-icon-emphasis": officialPreview
+        ? officialPalette.text
+        : semanticPalette.iconEmphasis,
       "--preview-border": officialPreview
         ? officialPalette.border
         : semanticPalette.border,

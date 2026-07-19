@@ -502,6 +502,12 @@ describe("injected compatibility runtime", () => {
       'data-codex-styler-icons="themed"] body > [data-codex-styler-overlay-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
     );
     expect(stylesheet?.textContent).toContain(
+      "color: var(--codex-styler-icon) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "color: var(--codex-styler-icon-emphasis) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
       ':not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand])',
     );
     expect(stylesheet?.textContent).toContain(
@@ -529,6 +535,7 @@ describe("injected compatibility runtime", () => {
     expect(iconTreatments).not.toMatch(
       /(?:^|\n)\s*(?:width|height|padding|background|stroke-width)\s*:/,
     );
+    expect(iconTreatments).toContain("box-shadow: 0 0 0 3px");
     const decorationTreatments = stylesheet?.textContent
       ?.split("/* Decoration depth is intentionally geometry-safe")[1]
       ?.split(
@@ -697,6 +704,11 @@ describe("injected compatibility runtime", () => {
     );
     expect(stylesheet?.textContent).toContain(
       "--codex-styler-success: #52C982",
+    );
+    expect(stylesheet?.textContent).toContain("--codex-styler-icon:");
+    expect(stylesheet?.textContent).toContain("--codex-styler-icon-emphasis:");
+    expect(stylesheet?.textContent).toContain(
+      "--color-icon-primary: var(--codex-styler-icon-emphasis)",
     );
   });
 

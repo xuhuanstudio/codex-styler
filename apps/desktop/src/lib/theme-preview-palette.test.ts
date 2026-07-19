@@ -113,6 +113,36 @@ describe("theme preview semantic palette", () => {
     ).toBeGreaterThanOrEqual(2.99);
   });
 
+  it("keeps themed icons legible without snapping every icon to plain text", () => {
+    const themed = appearance("expressive");
+    themed.iconStyle = "themed";
+    themed.accent = "#36506F";
+    const palette = resolveThemePreviewPalette(
+      themed,
+      "#101217",
+      contrastSystem,
+    );
+    const surfaces = [
+      palette.surface,
+      palette.surfaceRaised,
+      palette.surfaceOverlay,
+      palette.control,
+      palette.controlHover,
+      palette.controlActive,
+    ];
+
+    expect(palette.icon).not.toBe(contrastSystem.textSecondary);
+    expect(palette.iconEmphasis).not.toBe(contrastSystem.textPrimary);
+    expect(
+      Math.min(...surfaces.map((item) => contrastRatio(palette.icon, item))),
+    ).toBeGreaterThanOrEqual(2.99);
+    expect(
+      Math.min(
+        ...surfaces.map((item) => contrastRatio(palette.iconEmphasis, item)),
+      ),
+    ).toBeGreaterThanOrEqual(2.99);
+  });
+
   it("keeps functional and diff colors readable on focused surfaces", () => {
     const palette = resolveThemePreviewPalette(
       appearance("expressive"),
@@ -156,6 +186,22 @@ describe("theme preview semantic palette", () => {
         ] as const;
         authoredSurfaces.forEach(([label, resolved, expected]) => {
           expect(resolved, `${theme.id} ${variant} ${label}`).toBe(expected);
+        });
+        [palette.icon, palette.iconEmphasis].forEach((color) => {
+          expect(
+            Math.min(
+              ...[
+                palette.surface,
+                palette.surfaceRaised,
+                palette.surfaceOverlay,
+                palette.surfaceSunken,
+                palette.control,
+                palette.controlHover,
+                palette.controlActive,
+              ].map((background) => contrastRatio(color, background)),
+            ),
+            `${theme.id} ${variant} icon color`,
+          ).toBeGreaterThanOrEqual(2.99);
         });
         [
           palette.success,

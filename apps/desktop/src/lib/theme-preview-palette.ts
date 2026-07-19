@@ -14,6 +14,8 @@ export interface ThemePreviewPalette {
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  icon: string;
+  iconEmphasis: string;
   accent: string;
   onAccent: string;
   border: string;
@@ -52,6 +54,22 @@ const profileStrength = {
     controlActive: 0.28,
   },
 } as const;
+
+export function preferredThemeIconColor(
+  appearance: ThemeAppearance,
+  contrastSystem: ThemeContrastSystem,
+  emphasis = false,
+): string {
+  const style = appearance.iconStyle ?? "native";
+  const base = emphasis
+    ? contrastSystem.textPrimary
+    : contrastSystem.textSecondary;
+  if (style === "native") return base;
+
+  const accentAmount =
+    style === "themed" ? (emphasis ? 0.72 : 0.58) : emphasis ? 0.5 : 0.36;
+  return mixColors(base, appearance.accent, accentAmount);
+}
 
 export function resolveThemePreviewPalette(
   appearance: ThemeAppearance,
@@ -147,6 +165,16 @@ export function resolveThemePreviewPalette(
     boundaryBackgrounds,
     custom.borderStrong ? 3 : 2.5,
   );
+  const icon = adaptiveReadableColor(
+    preferredThemeIconColor(appearance, contrastSystem),
+    boundaryBackgrounds,
+    3,
+  );
+  const iconEmphasis = adaptiveReadableColor(
+    preferredThemeIconColor(appearance, contrastSystem, true),
+    boundaryBackgrounds,
+    3,
+  );
 
   return {
     canvas,
@@ -160,6 +188,8 @@ export function resolveThemePreviewPalette(
     textPrimary: contrastSystem.textPrimary,
     textSecondary: contrastSystem.textSecondary,
     textTertiary: contrastSystem.textTertiary,
+    icon,
+    iconEmphasis,
     accent: appearance.accent,
     onAccent: adaptiveReadableColor(
       custom.onAccent ?? appearance.surface,

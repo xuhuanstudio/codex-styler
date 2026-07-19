@@ -4,10 +4,13 @@ import type {
 } from "@codex-styler/theme-core";
 import { minimumContrast } from "./contrast";
 import { resolveThemeContrast } from "./theme-contrast";
-import { resolveThemePreviewPalette } from "./theme-preview-palette";
+import {
+  preferredThemeIconColor,
+  resolveThemePreviewPalette,
+} from "./theme-preview-palette";
 
 export type ThemeVisualQualityCheckId =
-  "primary-text" | "secondary-text" | "accent-content" | "boundaries";
+  "primary-text" | "secondary-text" | "icons" | "accent-content" | "boundaries";
 
 export interface ThemeVisualQualityCheck {
   id: ThemeVisualQualityCheckId;
@@ -74,6 +77,18 @@ export function resolveThemeVisualQuality(
       ratio: minimumContrast(palette.textSecondary, semanticSurfaces),
       minimum: 4.5,
       protected: palette.textSecondary !== visual.appearance.mutedText,
+    },
+    {
+      id: "icons",
+      ratio: Math.min(
+        minimumContrast(palette.icon, boundarySurfaces),
+        minimumContrast(palette.iconEmphasis, boundarySurfaces),
+      ),
+      minimum: 3,
+      protected:
+        palette.icon !== preferredThemeIconColor(visual.appearance, contrast) ||
+        palette.iconEmphasis !==
+          preferredThemeIconColor(visual.appearance, contrast, true),
     },
     {
       id: "accent-content",

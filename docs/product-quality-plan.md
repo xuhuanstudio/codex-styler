@@ -228,6 +228,10 @@ working control behind another page, revert it.
   visual safety result derived from the exact preview/runtime palette. It shows
   primary and secondary text, accent-control, boundary, and image-surface guard
   evidence without mutating the authored theme data.
+- contained and themed icon treatments now use dedicated surface-aware icon
+  roles instead of raw accent/text mixing. Their non-layout visual plates keep
+  the original SVG size, padding, and stroke geometry intact, while preview,
+  injected Codex tokens, and visual-safety evidence share the same result.
 
 ## RC — reliability proof
 
