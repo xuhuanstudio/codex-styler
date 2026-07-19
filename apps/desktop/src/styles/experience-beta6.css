@@ -209,7 +209,6 @@
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
 }
 
 .onboarding--guided .modal-close {
@@ -685,7 +684,7 @@
     display: flex;
     max-height: none;
     flex-direction: column;
-    justify-content: center;
+    justify-content: flex-start;
     grid-row: 2;
     grid-column: 2;
     overflow-y: auto;

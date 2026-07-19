@@ -118,6 +118,7 @@ import {
   persistGeneratedTheme,
   type ThemeAssetMap,
 } from "./lib/theme-files";
+import { assignThemeVariantField } from "./lib/theme-draft";
 
 const CompanionCreator = lazy(() =>
   import("./features/companion-creator/CompanionCreator").then((module) => ({
@@ -1133,11 +1134,7 @@ export function App() {
   ) {
     commitThemeDraft(
       (next) => {
-        const target = next.variants[variant][section] as unknown as Record<
-          string,
-          number | string | object
-        >;
-        target[key] = value;
+        assignThemeVariantField(next, variant, section, key, value);
         return next;
       },
       historyGroup ?? `${variant}.${section}.${key}`,
@@ -1687,8 +1684,6 @@ export function App() {
 
   function changeThemeCollection(collection: ThemeCollection) {
     setThemeCollection(collection);
-    const first = collection === "builtIn" ? builtinThemes[0] : localThemes[0];
-    if (first) chooseTheme(first);
   }
 
   async function handleDeleteTheme() {
@@ -1831,7 +1826,16 @@ export function App() {
           </div>
         </header>
 
-        <div ref={appMainRef} className="app-main__viewport">
+        <div
+          ref={appMainRef}
+          className="app-main__viewport"
+          data-view={view}
+          data-scroll-surface={
+            view === "editor" || view === "companion-editor"
+              ? undefined
+              : "page"
+          }
+        >
           {view === "home" && (
             <HomeView
               locale={locale}
@@ -1859,7 +1863,7 @@ export function App() {
             <ThemesView
               locale={locale}
               selectedTheme={selectedTheme}
-              previewTheme={composeTheme(selectedTheme)}
+              previewThemeFor={(theme) => composeTheme(theme)}
               localThemes={localThemes}
               collection={themeCollection}
               variant={variant}
@@ -1881,7 +1885,9 @@ export function App() {
             <CompanionsView
               locale={locale}
               selected={selectedCompanion}
-              theme={composeTheme(selectedTheme)}
+              previewThemeFor={(companion) =>
+                composeTheme(selectedTheme, companion)
+              }
               localCompanions={localCompanions}
               projects={companionProjects}
               collection={companionCollection}
@@ -2255,9 +2261,7 @@ export function App() {
             <span className="confirm-dialog__icon">
               <Trash2 size={18} />
             </span>
-            <h2 id="delete-companion-project-title">
-              {t("deleteDraftTitle")}
-            </h2>
+            <h2 id="delete-companion-project-title">{t("deleteDraftTitle")}</h2>
             <p>{t("deleteDraftBody")}</p>
             <strong>{pendingCompanionProjectDelete.name}</strong>
             <div className="button-row">
@@ -2332,6 +2336,7 @@ export function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="diagnostics-title"
+            data-scroll-surface="panel"
           >
             <header>
               <span className="confirm-dialog__icon">
@@ -2361,7 +2366,9 @@ export function App() {
             </div>
             <details>
               <summary>{t("previewDiagnosticText")}</summary>
-              <pre>{diagnosticsSummary(diagnosticsReport)}</pre>
+              <pre data-scroll-surface="canvas">
+                {diagnosticsSummary(diagnosticsReport)}
+              </pre>
             </details>
             <div className="button-row">
               <button
@@ -2403,7 +2410,7 @@ export function App() {
             </div>
             <p>{t("updateAvailableBody")}</p>
             {availableUpdate.releaseNotes ? (
-              <div className="update-dialog__notes">
+              <div className="update-dialog__notes" data-scroll-surface="panel">
                 <strong>{t("releaseNotes")}</strong>
                 <p className="update-dialog__summary">
                   {availableUpdate.releaseNotes.summary}
@@ -2430,7 +2437,7 @@ export function App() {
                 )}
               </div>
             ) : availableUpdate.notes ? (
-              <div className="update-dialog__notes">
+              <div className="update-dialog__notes" data-scroll-surface="panel">
                 <strong>{t("releaseNotes")}</strong>
                 <p>{availableUpdate.notes}</p>
               </div>
@@ -2565,7 +2572,7 @@ function NewThemeDialog({
         </header>
 
         {step === "choose" ? (
-          <div className="new-theme-options">
+          <div className="new-theme-options" data-scroll-surface="panel">
             <button
               className="new-theme-option new-theme-option--image"
               onClick={onImage}
@@ -2607,7 +2614,7 @@ function NewThemeDialog({
             </button>
           </div>
         ) : (
-          <div className="new-theme-existing-list">
+          <div className="new-theme-existing-list" data-scroll-surface="panel">
             {themes.map((theme) => {
               const copy = theme.locales[locale] ?? theme.locales.en;
               const preview = theme.metadata.preview

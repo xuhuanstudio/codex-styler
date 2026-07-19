@@ -70,12 +70,12 @@ describe("injected compatibility runtime", () => {
       window as typeof window & {
         __CODEX_STYLER_RUNTIME__: { version: number; restore: () => void };
       }
-    ).__CODEX_STYLER_RUNTIME__ = { version: 8, restore };
+    ).__CODEX_STYLER_RUNTIME__ = { version: 20, restore };
 
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(18);
+    expect(runtime().version).toBe(31);
   });
 
   it("renders validated scene layers and updates parallax without blocking Codex", async () => {
@@ -115,6 +115,9 @@ describe("injected compatibility runtime", () => {
       }),
     );
     expect(gradient?.style.transform).toContain("translate(");
+
+    window.dispatchEvent(new Event("blur"));
+    expect(gradient?.style.transform).toBe("");
 
     runtime().restore();
     expect(document.querySelector(".cs-layer")).toBeNull();
@@ -221,6 +224,10 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement.dataset.codexStylerPage).toBe("home");
     expect(document.documentElement.dataset.codexStylerLayout).toBe("native");
     expect(document.documentElement.dataset.codexStylerIcons).toBe("contained");
+    expect(document.documentElement.dataset.codexStylerGeometry).toBe(
+      "balanced",
+    );
+    expect(document.documentElement.dataset.codexStylerMotion).toBe("fluid");
     const stylesheet = document.getElementById("codex-styler-runtime-style");
     expect(stylesheet?.textContent).toContain("main.main-surface article");
     expect(stylesheet?.textContent).toContain(
@@ -262,6 +269,63 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       "main.main-surface > header:not(.app-header-tint)",
     );
+    expect(stylesheet?.textContent).toContain(
+      '[role="tab"][aria-selected="true"]',
+    );
+    expect(stylesheet?.textContent).toContain(":focus-visible");
+    expect(stylesheet?.textContent).toContain("accent-color:");
+    expect(stylesheet?.textContent).toContain('[aria-disabled="true"]');
+    expect(stylesheet?.textContent).toContain('[aria-invalid="true"]');
+    expect(stylesheet?.textContent).toContain('[data-state="active"]');
+    expect(stylesheet?.textContent).toContain(
+      "progress::-webkit-progress-value",
+    );
+    expect(stylesheet?.textContent).toContain("::-webkit-scrollbar-thumb");
+    expect(
+      stylesheet?.textContent?.match(/scrollbar-width: thin/g),
+    ).toHaveLength(1);
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-overlay-root] *::-webkit-scrollbar-thumb",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-decorations="expressive"',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[contenteditable="true"] {\n          caret-color:',
+    );
+    expect(stylesheet?.textContent).toContain(':is(a, [role="link"]):hover');
+    expect(stylesheet?.textContent).toContain("::target-text");
+    expect(stylesheet?.textContent).toContain("[data-sonner-toast]");
+    expect(stylesheet?.textContent).toContain('[role="tooltip"]');
+    expect(stylesheet?.textContent).toContain(":not(pre) > code");
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] table",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] details",
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[data-message-author-role="user"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "var(--codex-styler-control-active)",
+    );
+    expect(stylesheet?.textContent).toContain("details[open] > summary");
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] ins",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] del",
+    );
+    expect(stylesheet?.textContent).toContain(":is(samp, output)");
+    expect(stylesheet?.textContent).toContain('[role="progressbar"]');
+    expect(stylesheet?.textContent).toContain('[role="treeitem"]');
+    expect(stylesheet?.textContent).toContain('[role="gridcell"]');
+    expect(stylesheet?.textContent).toContain("fieldset");
+    expect(stylesheet?.textContent).toContain("figcaption");
     const appHeaderRule = stylesheet?.textContent
       ?.split("header.app-header-tint {")[1]
       ?.split("}")[0];
@@ -274,16 +338,52 @@ describe("injected compatibility runtime", () => {
       'data-codex-styler-layout="immersive"] main.main-surface',
     );
     expect(stylesheet?.textContent).toContain(
-      'data-codex-styler-icons="contained"] aside.app-shell-left-panel button > svg:first-child',
+      'data-codex-styler-icons="contained"] body > [data-codex-styler-app-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-icons="themed"] body > [data-codex-styler-overlay-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      ':not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand])',
     );
     expect(stylesheet?.textContent).toContain(
       'data-codex-styler-decorations="subtle"] main.main-surface',
     );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-page="settings"] body > [data-codex-styler-app-root] .main-surface',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-decorations="expressive"] :is(\n          .composer-surface-chrome',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-geometry="precise"] body > [data-codex-styler-app-root] [role="tablist"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-geometry="soft"] body > [data-codex-styler-app-root] [role="tab"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-duration: 175ms",
+    );
     const iconTreatments = stylesheet?.textContent
-      ?.split("/* Icon treatments preserve")[1]
+      ?.split("/*\n         * Icon treatments are semantic")[1]
       ?.split("/* Full home composition")[0];
+    expect(iconTreatments).toBeDefined();
     expect(iconTreatments).not.toMatch(
-      /(?:^|\n)\s*(?:width|height|padding|background)\s*:/,
+      /(?:^|\n)\s*(?:width|height|padding|background|stroke-width)\s*:/,
+    );
+    const decorationTreatments = stylesheet?.textContent
+      ?.split("/* Decoration depth is intentionally geometry-safe")[1]
+      ?.split(
+        'html[data-codex-styler][data-codex-styler-mode="semantic"] ::selection',
+      )[0];
+    expect(decorationTreatments).toBeDefined();
+    expect(decorationTreatments).toContain(
+      '[data-pip-obstacle="thread-summary-panel"]',
+    );
+    expect(decorationTreatments).toContain('[role="alertdialog"]');
+    expect(decorationTreatments).toContain('[role="tabpanel"]');
+    expect(decorationTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:position|display|width|height|z-index|inset)\s*:/,
     );
     expect(stylesheet?.textContent).not.toContain("body > div:first-child");
     expect(stylesheet?.textContent).toContain(
@@ -448,6 +548,7 @@ describe("injected compatibility runtime", () => {
     const image = "data:image/png;base64,iVBORw0KGgo=";
     delete theme.variants.light.background.image;
     theme.variants.light.appearance.surfaceOpacity = 0.3;
+    theme.variants.light.appearance.focusOpacity = 0.97;
     theme.variants.light.appearance.palette = {
       surfaceRaised: theme.variants.light.appearance.text,
       control: theme.variants.light.appearance.text,
@@ -484,6 +585,14 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       `${Math.round(contrastSystem.quietSurfaceOpacity * 100)}%, transparent) !important`,
     );
+    expect(stylesheet?.textContent).toContain(
+      `${Math.round(contrastSystem.strongSurfaceOpacity * 100)}%, transparent) !important`,
+    );
+    expect(contrastSystem.strongSurfaceOpacity).toBeGreaterThanOrEqual(0.97);
+    expect(stylesheet?.textContent).toContain("scrollbar-width: thin");
+    expect(stylesheet?.textContent).toContain(
+      "::-webkit-scrollbar-thumb:hover",
+    );
     expect(stylesheet?.textContent).toContain("color-scheme: light !important");
     expect(stylesheet?.textContent).toContain(
       '[class~="text-token-text-primary"]',
@@ -509,6 +618,12 @@ describe("injected compatibility runtime", () => {
     );
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-contrast",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-geometry",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-motion",
     );
   });
 

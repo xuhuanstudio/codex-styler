@@ -17,6 +17,19 @@ import {
 } from "./compiler";
 import { createCompanionProject } from "./model";
 
+function canvasContextMock() {
+  return {
+    save: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    drawImage: vi.fn(),
+    restore: vi.fn(),
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -82,9 +95,10 @@ describe("generated companion asset formats", () => {
       "createImageBitmap",
       vi.fn().mockResolvedValue({ close: vi.fn(), width: 2, height: 2 }),
     );
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      drawImage: vi.fn(),
-    } as unknown as CanvasRenderingContext2D);
+    const context = canvasContextMock();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context as unknown as CanvasRenderingContext2D,
+    );
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
       (callback) =>
         callback(
@@ -102,13 +116,15 @@ describe("generated companion asset formats", () => {
     project.author = "Codex Styler";
     project.license = "CC0-1.0";
     project.sharedCrop = { x: 0, y: 0, width: 2, height: 2 };
+    project.groundLine = 2;
+    project.contentScale = 0.75;
     project.frames = [
       {
         id: "frame-0",
         sourceIndex: 0,
         excluded: false,
         visualDelta: 0,
-        baselineOffset: { x: 0, y: 0 },
+        baselineOffset: { x: 2, y: 3 },
       },
     ];
 
@@ -129,6 +145,8 @@ describe("generated companion asset formats", () => {
       "previews/portrait.png",
       "assets/companion.png",
     ]);
+    expect(context.scale).toHaveBeenCalledWith(0.75, 0.75);
+    expect(context.translate).toHaveBeenCalledWith(2, 3);
   });
 
   it("renames every atlas page when a WebView falls back to PNG", async () => {
@@ -142,9 +160,9 @@ describe("generated companion asset formats", () => {
       "createImageBitmap",
       vi.fn().mockResolvedValue({ close: vi.fn(), width: 2, height: 2 }),
     );
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      drawImage: vi.fn(),
-    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      canvasContextMock() as unknown as CanvasRenderingContext2D,
+    );
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
       (callback) => callback(new Blob([png], { type: "image/webp" })),
     );

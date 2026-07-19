@@ -54,6 +54,82 @@ import {
   type ThemeEditorSectionId,
 } from "./control-mapping";
 
+const surfaceTreatments = [
+  {
+    id: "refined",
+    label: "treatmentRefined",
+    detail: "treatmentRefinedDescription",
+    layout: "native",
+    iconStyle: "contained",
+    decorations: "subtle",
+  },
+  {
+    id: "editorial",
+    label: "treatmentEditorial",
+    detail: "treatmentEditorialDescription",
+    layout: "editorial",
+    iconStyle: "themed",
+    decorations: "subtle",
+  },
+  {
+    id: "immersive",
+    label: "treatmentImmersive",
+    detail: "treatmentImmersiveDescription",
+    layout: "immersive",
+    iconStyle: "themed",
+    decorations: "expressive",
+  },
+] as const satisfies readonly {
+  id: string;
+  label: MessageKey;
+  detail: MessageKey;
+  layout: NonNullable<
+    ThemeDefinition["variants"]["light"]["appearance"]["layout"]
+  >;
+  iconStyle: NonNullable<
+    ThemeDefinition["variants"]["light"]["appearance"]["iconStyle"]
+  >;
+  decorations: NonNullable<
+    ThemeDefinition["variants"]["light"]["appearance"]["decorations"]
+  >;
+}[];
+
+const surfaceMaterials = [
+  {
+    id: "solid",
+    label: "materialSolid",
+    detail: "materialSolidDescription",
+    surfaceOpacity: 0.96,
+    focusOpacity: 0.98,
+    focusBlur: 0,
+  },
+  {
+    id: "layered",
+    label: "materialLayered",
+    detail: "materialLayeredDescription",
+    surfaceOpacity: 0.88,
+    focusOpacity: 0.95,
+    focusBlur: 10,
+  },
+  {
+    id: "frosted",
+    label: "materialFrosted",
+    detail: "materialFrostedDescription",
+    surfaceOpacity: 0.78,
+    focusOpacity: 0.92,
+    focusBlur: 20,
+  },
+] as const satisfies readonly {
+  id: string;
+  label: MessageKey;
+  detail: MessageKey;
+  surfaceOpacity: number;
+  focusOpacity: number;
+  focusBlur: number;
+}[];
+
+type PreviewVersion = "current" | "saved" | "official";
+
 interface SharedViewProps {
   locale: Locale;
   t: (key: MessageKey) => string;
@@ -135,15 +211,19 @@ export function ThemeEditorView({
 }) {
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const inspectorToggleRef = useRef<HTMLButtonElement>(null);
+  const recipeHistoryRevision = useRef(0);
+  const motionPreviewTimerRef = useRef<number | null>(null);
   const [activeLayer, setActiveLayer] = useState<string>("background");
   const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [previewZoom, setPreviewZoom] = useState<"fit" | "actual">("fit");
-  const [previewVersion, setPreviewVersion] = useState<"current" | "saved">(
-    "current",
-  );
+  const [previewVersion, setPreviewVersion] =
+    useState<PreviewVersion>("current");
+  const [motionPreviewRevision, setMotionPreviewRevision] = useState(0);
+  const [motionPreviewing, setMotionPreviewing] = useState(false);
   const visual = theme.variants[variant];
   const previewTheme = previewVersion === "saved" ? savedTheme : theme;
+  const previewReadOnly = previewVersion !== "current";
   const selectedSceneLayer = theme.scene.layers.find(
     (layer) => activeLayer === `scene:${layer.id}`,
   );
@@ -170,11 +250,16 @@ export function ThemeEditorView({
         ? t("saveAndApply")
         : t("applyTheme");
   useEffect(() => {
-    setPreviewVersion("current");
-  }, [theme]);
-  useEffect(() => {
     if (!dirty) setPreviewVersion("current");
   }, [dirty]);
+  useEffect(
+    () => () => {
+      if (motionPreviewTimerRef.current !== null) {
+        window.clearTimeout(motionPreviewTimerRef.current);
+      }
+    },
+    [],
+  );
   useEffect(() => {
     const handleHistoryShortcut = (event: KeyboardEvent) => {
       if (busy || event.altKey || (!event.metaKey && !event.ctrlKey)) return;
@@ -208,6 +293,27 @@ export function ThemeEditorView({
     setPreviewVersion("current");
     setActiveLayer(layer);
     setInspectorOpen(true);
+  }
+  function previewMotion() {
+    if (
+      reduceMotion ||
+      previewVersion === "official" ||
+      visual.motion.intensity <= 0 ||
+      (visual.motion.parallax ?? 0) <= 0
+    ) {
+      return;
+    }
+    setPreviewVersion("current");
+    onUiPreferencesChange({ themeEditorPreviewScenario: "task" });
+    setMotionPreviewing(true);
+    setMotionPreviewRevision((revision) => revision + 1);
+    if (motionPreviewTimerRef.current !== null) {
+      window.clearTimeout(motionPreviewTimerRef.current);
+    }
+    motionPreviewTimerRef.current = window.setTimeout(() => {
+      setMotionPreviewing(false);
+      motionPreviewTimerRef.current = null;
+    }, 1_500);
   }
   function closeInspector() {
     setInspectorOpen(false);
@@ -490,7 +596,7 @@ export function ThemeEditorView({
               )}
             </div>
           </div>
-          <div className="layer-stack">
+          <div className="layer-stack" data-scroll-surface="panel">
             <button
               className={
                 "layer-item" +
@@ -630,6 +736,11 @@ export function ThemeEditorView({
               {previewVersion === "saved" && (
                 <em className="canvas-preview-version">{t("viewingSaved")}</em>
               )}
+              {previewVersion === "official" && (
+                <em className="canvas-preview-version">
+                  {t("viewingOfficial")}
+                </em>
+              )}
             </span>
             <div className="canvas-toolbar__controls">
               <SelectField
@@ -645,7 +756,10 @@ export function ThemeEditorView({
               >
                 <option value="home">{t("previewHome")}</option>
                 <option value="task">{t("previewTask")}</option>
+                <option value="changes">{t("previewChanges")}</option>
+                <option value="terminal">{t("previewTerminal")}</option>
                 <option value="settings">{t("previewSettings")}</option>
+                <option value="components">{t("previewComponents")}</option>
                 <option value="dialog">{t("previewDialog")}</option>
                 <option value="right-panel">{t("previewRightPanel")}</option>
               </SelectField>
@@ -655,6 +769,7 @@ export function ThemeEditorView({
                 aria-label={t("previewVersion")}
               >
                 <button
+                  type="button"
                   className={previewVersion === "current" ? "is-active" : ""}
                   aria-pressed={previewVersion === "current"}
                   onClick={() => setPreviewVersion("current")}
@@ -662,6 +777,7 @@ export function ThemeEditorView({
                   {t("previewCurrent")}
                 </button>
                 <button
+                  type="button"
                   className={previewVersion === "saved" ? "is-active" : ""}
                   aria-pressed={previewVersion === "saved"}
                   disabled={!dirty}
@@ -670,18 +786,28 @@ export function ThemeEditorView({
                 >
                   {t("previewSaved")}
                 </button>
+                <button
+                  type="button"
+                  className={previewVersion === "official" ? "is-active" : ""}
+                  aria-pressed={previewVersion === "official"}
+                  onClick={() => setPreviewVersion("official")}
+                >
+                  {t("previewOfficial")}
+                </button>
               </div>
               <div
                 className="canvas-zoom-control"
                 aria-label={t("livePreview")}
               >
                 <button
+                  type="button"
                   className={previewZoom === "fit" ? "is-active" : ""}
                   onClick={() => setPreviewZoom("fit")}
                 >
                   {t("fitPreview")}
                 </button>
                 <button
+                  type="button"
                   className={previewZoom === "actual" ? "is-active" : ""}
                   onClick={() => setPreviewZoom("actual")}
                 >
@@ -694,6 +820,9 @@ export function ThemeEditorView({
             className="canvas-stage"
             data-preview-zoom={previewZoom}
             data-preview-version={previewVersion}
+            data-scroll-surface={
+              previewZoom === "actual" ? "canvas" : undefined
+            }
           >
             <PreviewWorkspace
               theme={previewTheme}
@@ -702,6 +831,15 @@ export function ThemeEditorView({
               reduceMotion={reduceMotion}
               resolveAsset={resolveAsset}
               scenario={uiPreferences.themeEditorPreviewScenario}
+              onScenarioChange={(scenario) =>
+                onUiPreferencesChange({
+                  themeEditorPreviewScenario: scenario,
+                })
+              }
+              presentation={
+                previewVersion === "official" ? "official" : "styled"
+              }
+              motionPreviewRevision={motionPreviewRevision}
             />
           </div>
         </section>
@@ -724,9 +862,10 @@ export function ThemeEditorView({
           className={
             "inspector" +
             (inspectorOpen ? " inspector--open" : "") +
-            (previewVersion === "saved" ? " inspector--preview-saved" : "")
+            (previewReadOnly ? " inspector--preview-saved" : "")
           }
           aria-label={t("appearance")}
+          data-scroll-surface="panel"
         >
           <div className="panel-title">
             <span>{t("appearance")}</span>
@@ -741,11 +880,23 @@ export function ThemeEditorView({
               </button>
             </div>
           </div>
-          {previewVersion === "saved" && (
+          {previewReadOnly && (
             <div className="inspector-saved-notice" role="status">
               <span>
-                <strong>{t("savedPreviewReadOnly")}</strong>
-                <small>{t("savedPreviewReadOnlyDetail")}</small>
+                <strong>
+                  {t(
+                    previewVersion === "official"
+                      ? "officialPreviewReadOnly"
+                      : "savedPreviewReadOnly",
+                  )}
+                </strong>
+                <small>
+                  {t(
+                    previewVersion === "official"
+                      ? "officialPreviewReadOnlyDetail"
+                      : "savedPreviewReadOnlyDetail",
+                  )}
+                </small>
               </span>
               <button onClick={() => setPreviewVersion("current")}>
                 {t("returnToCurrent")}
@@ -754,7 +905,7 @@ export function ThemeEditorView({
           )}
           <div
             className="inspector-content"
-            inert={previewVersion === "saved" ? true : undefined}
+            inert={previewReadOnly ? true : undefined}
           >
             <ThemeControlCoverage
               coverage={activeCoverage}
@@ -947,92 +1098,305 @@ export function ThemeEditorView({
                 title={t("surfaces")}
                 icon={<Layers3 size={14} />}
               >
-                <SelectField
-                  compact
-                  data-theme-control="surfaces.layout"
-                  label={t("layoutTreatment")}
-                  value={visual.appearance.layout ?? "native"}
-                  onChange={(event) =>
-                    onUpdateVariant("appearance", "layout", event.target.value)
-                  }
+                <div className="inspector-subsection-heading">
+                  <strong>{t("surfaceTreatment")}</strong>
+                  <span>{t("surfaceTreatmentDescription")}</span>
+                </div>
+                <div
+                  className="surface-treatments"
+                  data-theme-control="surfaces.treatment"
                 >
-                  <option value="native">{t("layoutNative")}</option>
-                  <option value="editorial">{t("layoutEditorial")}</option>
-                  <option value="immersive">{t("layoutImmersive")}</option>
-                </SelectField>
-                <SelectField
-                  compact
-                  data-theme-control="surfaces.icon-style"
-                  label={t("iconTreatment")}
-                  value={visual.appearance.iconStyle ?? "native"}
-                  onChange={(event) =>
-                    onUpdateVariant(
-                      "appearance",
-                      "iconStyle",
-                      event.target.value,
-                    )
-                  }
+                  {surfaceTreatments.map((treatment) => {
+                    const active =
+                      (visual.appearance.layout ?? "native") ===
+                        treatment.layout &&
+                      (visual.appearance.iconStyle ?? "native") ===
+                        treatment.iconStyle &&
+                      (visual.appearance.decorations ?? "none") ===
+                        treatment.decorations;
+                    return (
+                      <button
+                        key={treatment.id}
+                        type="button"
+                        className={active ? "is-active" : ""}
+                        aria-pressed={active}
+                        aria-label={t(treatment.label)}
+                        onClick={() => {
+                          const historyGroup = `surfaces.treatment.${++recipeHistoryRevision.current}`;
+                          onUpdateVariant(
+                            "appearance",
+                            "layout",
+                            treatment.layout,
+                            historyGroup,
+                          );
+                          onUpdateVariant(
+                            "appearance",
+                            "iconStyle",
+                            treatment.iconStyle,
+                            historyGroup,
+                          );
+                          onUpdateVariant(
+                            "appearance",
+                            "decorations",
+                            treatment.decorations,
+                            historyGroup,
+                          );
+                        }}
+                      >
+                        <span>
+                          <strong>{t(treatment.label)}</strong>
+                          <small>{t(treatment.detail)}</small>
+                        </span>
+                        {active && <Check size={13} />}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="inspector-subsection-heading">
+                  <strong>{t("surfaceMaterial")}</strong>
+                  <span>{t("surfaceMaterialDescription")}</span>
+                </div>
+                <div
+                  className="surface-materials"
+                  data-theme-control="surfaces.material"
                 >
-                  <option value="native">{t("iconNative")}</option>
-                  <option value="contained">{t("iconContained")}</option>
-                  <option value="themed">{t("iconThemed")}</option>
-                </SelectField>
-                <SelectField
-                  compact
-                  data-theme-control="surfaces.decorations"
-                  label={t("decorationTreatment")}
-                  value={visual.appearance.decorations ?? "none"}
-                  onChange={(event) =>
-                    onUpdateVariant(
-                      "appearance",
-                      "decorations",
-                      event.target.value,
-                    )
-                  }
-                >
-                  <option value="none">{t("decorationNone")}</option>
-                  <option value="subtle">{t("decorationSubtle")}</option>
-                  <option value="expressive">
-                    {t("decorationExpressive")}
-                  </option>
-                </SelectField>
+                  {surfaceMaterials.map((material) => {
+                    const active =
+                      Math.abs(
+                        visual.appearance.surfaceOpacity -
+                          material.surfaceOpacity,
+                      ) < 0.01 &&
+                      Math.abs(
+                        visual.appearance.focusOpacity - material.focusOpacity,
+                      ) < 0.01 &&
+                      visual.appearance.focusBlur === material.focusBlur;
+                    return (
+                      <button
+                        key={material.id}
+                        type="button"
+                        className={active ? "is-active" : ""}
+                        aria-pressed={active}
+                        aria-label={t(material.label)}
+                        onClick={() => {
+                          const historyGroup = `surfaces.material.${++recipeHistoryRevision.current}`;
+                          onUpdateVariant(
+                            "appearance",
+                            "surfaceOpacity",
+                            material.surfaceOpacity,
+                            historyGroup,
+                          );
+                          onUpdateVariant(
+                            "appearance",
+                            "focusOpacity",
+                            material.focusOpacity,
+                            historyGroup,
+                          );
+                          onUpdateVariant(
+                            "appearance",
+                            "focusBlur",
+                            material.focusBlur,
+                            historyGroup,
+                          );
+                        }}
+                      >
+                        <span>
+                          <strong>{t(material.label)}</strong>
+                          <small>{t(material.detail)}</small>
+                        </span>
+                        {active && <Check size={13} />}
+                      </button>
+                    );
+                  })}
+                </div>
                 <p className="inspector-mode-note">
                   {t("semanticControlsHint")}
                 </p>
-                <ColorControl
-                  controlId="surfaces.accent"
-                  label="Accent"
-                  value={visual.appearance.accent}
-                  onChange={(value) =>
-                    onUpdateVariant("appearance", "accent", value)
-                  }
-                />
-                <RangeControl
-                  controlId="surfaces.opacity"
-                  label={t("surfaceOpacity")}
-                  value={visual.appearance.surfaceOpacity}
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  display={
-                    Math.round(visual.appearance.surfaceOpacity * 100) + "%"
-                  }
-                  onChange={(value) =>
-                    onUpdateVariant("appearance", "surfaceOpacity", value)
-                  }
-                />
-                <RangeControl
-                  controlId="surfaces.radius"
-                  label={t("radius")}
-                  value={visual.appearance.radius}
-                  min={0}
-                  max={32}
-                  step={1}
-                  display={visual.appearance.radius + "px"}
-                  onChange={(value) =>
-                    onUpdateVariant("appearance", "radius", value)
-                  }
-                />
+                <div className="interface-system-status">
+                  <Sparkles size={14} />
+                  <span>
+                    <strong>{t("adaptiveInteractionChrome")}</strong>
+                    <small>{t("adaptiveInteractionChromeDetail")}</small>
+                  </span>
+                </div>
+                <details className="inspector-disclosure">
+                  <summary>
+                    <span>
+                      <strong>{t("fineTune")}</strong>
+                      <small>{t("fineTuneDescription")}</small>
+                    </span>
+                    <ChevronRight size={14} />
+                  </summary>
+                  <div className="inspector-disclosure__content">
+                    <SelectField
+                      compact
+                      data-theme-control="surfaces.layout"
+                      label={t("layoutTreatment")}
+                      value={visual.appearance.layout ?? "native"}
+                      onChange={(event) =>
+                        onUpdateVariant(
+                          "appearance",
+                          "layout",
+                          event.target.value,
+                        )
+                      }
+                    >
+                      <option value="native">{t("layoutNative")}</option>
+                      <option value="editorial">{t("layoutEditorial")}</option>
+                      <option value="immersive">{t("layoutImmersive")}</option>
+                    </SelectField>
+                    <SelectField
+                      compact
+                      data-theme-control="surfaces.icon-style"
+                      label={t("iconTreatment")}
+                      value={visual.appearance.iconStyle ?? "native"}
+                      onChange={(event) =>
+                        onUpdateVariant(
+                          "appearance",
+                          "iconStyle",
+                          event.target.value,
+                        )
+                      }
+                    >
+                      <option value="native">{t("iconNative")}</option>
+                      <option value="contained">{t("iconContained")}</option>
+                      <option value="themed">{t("iconThemed")}</option>
+                    </SelectField>
+                    <SelectField
+                      compact
+                      data-theme-control="surfaces.decorations"
+                      label={t("decorationTreatment")}
+                      value={visual.appearance.decorations ?? "none"}
+                      onChange={(event) =>
+                        onUpdateVariant(
+                          "appearance",
+                          "decorations",
+                          event.target.value,
+                        )
+                      }
+                    >
+                      <option value="none">{t("decorationNone")}</option>
+                      <option value="subtle">{t("decorationSubtle")}</option>
+                      <option value="expressive">
+                        {t("decorationExpressive")}
+                      </option>
+                    </SelectField>
+                    <ColorControl
+                      controlId="surfaces.accent"
+                      label="Accent"
+                      value={visual.appearance.accent}
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "accent", value)
+                      }
+                    />
+                    <ColorControl
+                      controlId="surfaces.surface-color"
+                      label={t("surfaceColor")}
+                      value={visual.appearance.surface}
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "surface", value)
+                      }
+                    />
+                    <ColorControl
+                      controlId="surfaces.border-color"
+                      label={t("borderColor")}
+                      value={visual.appearance.border}
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "border", value)
+                      }
+                    />
+                    <div
+                      className="semantic-harmony-status"
+                      data-theme-control="surfaces.color-harmony"
+                      data-authored={
+                        visual.appearance.palette ? "true" : "false"
+                      }
+                    >
+                      <Sparkles size={14} />
+                      <span>
+                        <strong>
+                          {t(
+                            visual.appearance.palette
+                              ? "authoredColorHarmony"
+                              : "automaticColorHarmony",
+                          )}
+                        </strong>
+                        <small>
+                          {t(
+                            visual.appearance.palette
+                              ? "authoredColorHarmonyDetail"
+                              : "automaticColorHarmonyDetail",
+                          )}
+                        </small>
+                      </span>
+                      {visual.appearance.palette && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onUpdateVariant(
+                              "appearance",
+                              "accent",
+                              visual.appearance.accent,
+                            )
+                          }
+                        >
+                          {t("matchBaseColors")}
+                        </button>
+                      )}
+                    </div>
+                    <RangeControl
+                      controlId="surfaces.opacity"
+                      label={t("surfaceOpacity")}
+                      value={visual.appearance.surfaceOpacity}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      display={
+                        Math.round(visual.appearance.surfaceOpacity * 100) + "%"
+                      }
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "surfaceOpacity", value)
+                      }
+                    />
+                    <RangeControl
+                      controlId="surfaces.focus-opacity"
+                      label={t("focusSurfaceOpacity")}
+                      value={visual.appearance.focusOpacity}
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      display={
+                        Math.round(visual.appearance.focusOpacity * 100) + "%"
+                      }
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "focusOpacity", value)
+                      }
+                    />
+                    <RangeControl
+                      controlId="surfaces.focus-blur"
+                      label={t("surfaceBlur")}
+                      value={visual.appearance.focusBlur}
+                      min={0}
+                      max={32}
+                      step={1}
+                      display={visual.appearance.focusBlur + "px"}
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "focusBlur", value)
+                      }
+                    />
+                    <RangeControl
+                      controlId="surfaces.radius"
+                      label={t("radius")}
+                      value={visual.appearance.radius}
+                      min={0}
+                      max={32}
+                      step={1}
+                      display={visual.appearance.radius + "px"}
+                      onChange={(value) =>
+                        onUpdateVariant("appearance", "radius", value)
+                      }
+                    />
+                  </div>
+                </details>
                 <div className="contrast-note">
                   <ShieldCheck size={14} />
                   <span>
@@ -1074,23 +1438,24 @@ export function ThemeEditorView({
                         key={recipe.id}
                         className={active ? "is-active" : ""}
                         onClick={() => {
+                          const historyGroup = `motion.recipe.${++recipeHistoryRevision.current}`;
                           onUpdateVariant(
                             "motion",
                             "intensity",
                             recipe.intensity,
-                            "motion.recipe",
+                            historyGroup,
                           );
                           onUpdateVariant(
                             "motion",
                             "parallax",
                             recipe.parallax,
-                            "motion.recipe",
+                            historyGroup,
                           );
                           onUpdateVariant(
                             "motion",
                             "targetFps",
                             recipe.fps,
-                            "motion.recipe",
+                            historyGroup,
                           );
                         }}
                       >
@@ -1102,6 +1467,35 @@ export function ThemeEditorView({
                   })}
                 </div>
                 <p className="inspector-mode-note">{t("motionDescription")}</p>
+                <div className="motion-preview-action">
+                  <button
+                    type="button"
+                    onClick={previewMotion}
+                    disabled={
+                      motionPreviewing ||
+                      reduceMotion ||
+                      previewVersion === "official" ||
+                      visual.motion.intensity <= 0 ||
+                      (visual.motion.parallax ?? 0) <= 0
+                    }
+                    aria-describedby="motion-preview-help"
+                  >
+                    <Play size={13} />
+                    {motionPreviewing
+                      ? t("previewMotionPlaying")
+                      : t("previewMotion")}
+                  </button>
+                  <small id="motion-preview-help" aria-live="polite">
+                    {reduceMotion
+                      ? t("motionPreviewReduced")
+                      : previewVersion === "official"
+                        ? t("motionPreviewOfficial")
+                        : visual.motion.intensity <= 0 ||
+                            (visual.motion.parallax ?? 0) <= 0
+                          ? t("motionPreviewDisabled")
+                          : t("motionPreviewDescription")}
+                  </small>
+                </div>
                 <RangeControl
                   controlId="motion.intensity"
                   label={t("motionIntensity")}
@@ -1247,11 +1641,17 @@ function previewScenarioLabel(
       ? "previewHome"
       : scenario === "task"
         ? "previewTask"
-        : scenario === "settings"
-          ? "previewSettings"
-          : scenario === "dialog"
-            ? "previewDialog"
-            : "previewRightPanel",
+        : scenario === "changes"
+          ? "previewChanges"
+          : scenario === "terminal"
+            ? "previewTerminal"
+            : scenario === "settings"
+              ? "previewSettings"
+              : scenario === "components"
+                ? "previewComponents"
+                : scenario === "dialog"
+                  ? "previewDialog"
+                  : "previewRightPanel",
   );
 }
 

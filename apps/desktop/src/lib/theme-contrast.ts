@@ -114,6 +114,7 @@ export function resolveThemeContrast(
     0.98,
     Math.max(
       authoredSurfaceOpacity,
+      appearance.focusOpacity,
       quietSurfaceOpacity + (imageBacked ? 0.12 : 0.08),
     ),
   );

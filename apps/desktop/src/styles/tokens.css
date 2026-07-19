@@ -46,10 +46,10 @@
   --shadow-flyout: 0 18px 48px rgba(8, 10, 14, 0.22);
 
   /* Scroll surfaces are part of the application chrome, not browser chrome. */
-  --scrollbar-size: 10px;
-  --scrollbar-size-compact: 8px;
-  --scrollbar-thumb: color-mix(in srgb, var(--ink) 18%, transparent);
-  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 32%, transparent);
+  --scrollbar-size: 8px;
+  --scrollbar-size-compact: 6px;
+  --scrollbar-thumb: color-mix(in srgb, var(--ink) 22%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--ink) 38%, transparent);
   --scrollbar-thumb-active: color-mix(
     in srgb,
     var(--accent) 54%,

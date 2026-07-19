@@ -5,6 +5,8 @@ import {
   calibrateDirections,
   commonSubjectCrop,
   diagnoseSharedAlignment,
+  expandSharedCanvasToContent,
+  fitSharedContentScale,
   nearestDirectionFrame,
   normalizeAngle,
   pointerAngle,
@@ -178,6 +180,42 @@ describe("shared alignment and atlas slicing", () => {
     expect(diagnostics.missingBounds).toBe(1);
     expect(diagnostics.outsideCrop).toBe(1);
     expect(diagnostics.baselineOutliers).toBe(1);
+  });
+
+  it("fits every frame with one shared scale around the center and ground line", () => {
+    const input = frames([0, 1]);
+    input[0]!.subjectBounds = { x: 0, y: 0, width: 100, height: 100 };
+    input[1]!.subjectBounds = { x: 10, y: 20, width: 80, height: 80 };
+    const crop = { x: 0, y: 0, width: 100, height: 100 };
+    const scale = fitSharedContentScale(input, crop, 100);
+
+    expect(scale).toBeCloseTo(0.92, 4);
+    const diagnostics = diagnoseSharedAlignment(input, crop, 100, scale!);
+    expect(diagnostics.ready).toBe(true);
+    expect(diagnostics.outsideCrop).toBe(0);
+    expect(diagnostics.maximumBaselineDelta).toBe(0);
+    expect(diagnostics.maximumCenterDelta).toBe(0);
+  });
+
+  it("expands and shifts the shared canvas without changing alignment", () => {
+    const input = frames([0]);
+    input[0]!.subjectBounds = { x: 0, y: 0, width: 100, height: 100 };
+    const expanded = expandSharedCanvasToContent(
+      input,
+      { x: 20, y: 20, width: 60, height: 80 },
+      100,
+      1,
+      { width: 120, height: 120 },
+    );
+    expect(expanded).not.toBeNull();
+    expect(expanded!.offsetDelta).toEqual({ x: 8, y: 8 });
+    input[0]!.baselineOffset = expanded!.offsetDelta;
+    const diagnostics = diagnoseSharedAlignment(
+      input,
+      expanded!.crop,
+      expanded!.groundLine,
+    );
+    expect(diagnostics.ready).toBe(true);
   });
 
   it("calculates atlas cells and flags cells outside the source image", () => {

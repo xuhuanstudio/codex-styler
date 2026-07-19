@@ -150,7 +150,6 @@
   overflow-x: auto;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-subtle);
-  scrollbar-width: thin;
 }
 
 .creator-step {

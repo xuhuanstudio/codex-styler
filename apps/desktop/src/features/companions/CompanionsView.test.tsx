@@ -24,7 +24,7 @@ describe("CompanionsView installed companion management", () => {
       <CompanionsView
         locale="en"
         selected={companion}
-        theme={builtinThemes[0]}
+        previewThemeFor={() => builtinThemes[0]}
         localCompanions={[companion]}
         projects={[project]}
         collection="mine"

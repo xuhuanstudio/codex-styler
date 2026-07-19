@@ -1,8 +1,10 @@
-import type {
-  AtlasSliceSettings,
-  DirectionAnchor,
-  FrameBounds,
-  LogicalFrame,
+import {
+  MAX_CONTENT_SCALE,
+  MIN_CONTENT_SCALE,
+  type AtlasSliceSettings,
+  type DirectionAnchor,
+  type FrameBounds,
+  type LogicalFrame,
 } from "./model";
 
 export function naturalFileOrder(files: File[]): File[] {
@@ -289,13 +291,171 @@ export interface SuggestedSharedAlignment {
   offsets: Array<{ x: number; y: number } | null>;
 }
 
-function translatedSubjectBounds(frame: LogicalFrame): FrameBounds | null {
+export function translatedSubjectBounds(
+  frame: LogicalFrame,
+): FrameBounds | null {
   if (!frame.subjectBounds) return null;
   return {
     x: frame.subjectBounds.x + frame.baselineOffset.x,
     y: frame.subjectBounds.y + frame.baselineOffset.y,
     width: frame.subjectBounds.width,
     height: frame.subjectBounds.height,
+  };
+}
+
+export function sharedTransformPivot(
+  crop: FrameBounds,
+  groundLine: number | null,
+): { x: number; y: number } {
+  return {
+    x: crop.x + crop.width / 2,
+    y: groundLine ?? crop.y + crop.height,
+  };
+}
+
+export function scaleBoundsAroundPivot(
+  bounds: FrameBounds,
+  scale: number,
+  pivot: { x: number; y: number },
+): FrameBounds {
+  return {
+    x: pivot.x + (bounds.x - pivot.x) * scale,
+    y: pivot.y + (bounds.y - pivot.y) * scale,
+    width: bounds.width * scale,
+    height: bounds.height * scale,
+  };
+}
+
+export function transformedSubjectBounds(
+  frame: LogicalFrame,
+  crop: FrameBounds,
+  groundLine: number | null,
+  contentScale = 1,
+): FrameBounds | null {
+  const bounds = translatedSubjectBounds(frame);
+  if (!bounds) return null;
+  return scaleBoundsAroundPivot(
+    bounds,
+    contentScale,
+    sharedTransformPivot(crop, groundLine),
+  );
+}
+
+/**
+ * Finds one uniform scale that keeps every included subject inside the shared
+ * canvas. The bottom stays on the ground line while the top and sides retain
+ * a small safety margin. Source pixels and per-frame proportions are untouched.
+ */
+export function fitSharedContentScale(
+  frames: LogicalFrame[],
+  crop: FrameBounds | null,
+  groundLine: number | null,
+  paddingRatio = 0.04,
+): number | null {
+  if (!crop || groundLine === null) return null;
+  const bounds = frames.flatMap((frame) => {
+    if (frame.excluded) return [];
+    const translated = translatedSubjectBounds(frame);
+    return translated ? [translated] : [];
+  });
+  if (bounds.length === 0) return null;
+
+  const pivot = sharedTransformPivot(crop, groundLine);
+  const left = crop.x + crop.width * paddingRatio;
+  const right = crop.x + crop.width * (1 - paddingRatio);
+  const top = crop.y + crop.height * paddingRatio;
+  const bottom = crop.y + crop.height;
+  let maximumScale = 1;
+  const constrain = (distance: number, available: number) => {
+    if (distance <= 0) return;
+    maximumScale = Math.min(maximumScale, available / distance);
+  };
+
+  for (const bound of bounds) {
+    constrain(pivot.x - bound.x, pivot.x - left);
+    constrain(bound.x + bound.width - pivot.x, right - pivot.x);
+    constrain(pivot.y - bound.y, pivot.y - top);
+    constrain(bound.y + bound.height - pivot.y, bottom - pivot.y);
+  }
+
+  if (!Number.isFinite(maximumScale) || maximumScale <= 0) return null;
+  return Math.max(
+    MIN_CONTENT_SCALE,
+    Math.min(1, MAX_CONTENT_SCALE, maximumScale),
+  );
+}
+
+export interface ExpandedSharedCanvas {
+  crop: FrameBounds;
+  groundLine: number;
+  offsetDelta: { x: number; y: number };
+}
+
+/**
+ * Expands the crop around the existing transform pivot. When the crop reaches
+ * a source edge, the crop, ground line and every frame shift together so the
+ * visual alignment remains unchanged.
+ */
+export function expandSharedCanvasToContent(
+  frames: LogicalFrame[],
+  crop: FrameBounds | null,
+  groundLine: number | null,
+  contentScale: number,
+  canvas?: { width: number; height: number },
+  paddingRatio = 0.04,
+): ExpandedSharedCanvas | null {
+  if (!crop || groundLine === null || !canvas) return null;
+  const bounds = frames.flatMap((frame) => {
+    if (frame.excluded) return [];
+    const transformed = transformedSubjectBounds(
+      frame,
+      crop,
+      groundLine,
+      contentScale,
+    );
+    return transformed ? [transformed] : [];
+  });
+  if (bounds.length === 0) return null;
+
+  const pivot = sharedTransformPivot(crop, groundLine);
+  const minimumX = Math.min(...bounds.map((bound) => bound.x));
+  const maximumX = Math.max(...bounds.map((bound) => bound.x + bound.width));
+  const minimumY = Math.min(...bounds.map((bound) => bound.y));
+  const maximumY = Math.max(...bounds.map((bound) => bound.y + bound.height));
+  const padding = Math.max(8, Math.min(crop.width, crop.height) * paddingRatio);
+  const halfWidth = Math.max(
+    crop.width / 2,
+    pivot.x - minimumX + padding,
+    maximumX - pivot.x + padding,
+  );
+  const width = halfWidth * 2;
+  const rawX = pivot.x - halfWidth;
+  const rawY = Math.min(crop.y, minimumY - padding);
+  const rawBottom = Math.max(crop.y + crop.height, maximumY);
+  const height = rawBottom - rawY;
+  if (width > canvas.width || height > canvas.height) return null;
+
+  const x = Math.max(0, Math.min(canvas.width - width, rawX));
+  const y = Math.max(0, Math.min(canvas.height - height, rawY));
+  const offsetDelta = { x: x - rawX, y: y - rawY };
+  const expanded = {
+    x,
+    y,
+    width,
+    height,
+  };
+  const changed =
+    Math.abs(expanded.x - crop.x) > 0.01 ||
+    Math.abs(expanded.y - crop.y) > 0.01 ||
+    Math.abs(expanded.width - crop.width) > 0.01 ||
+    Math.abs(expanded.height - crop.height) > 0.01 ||
+    Math.abs(offsetDelta.x) > 0.01 ||
+    Math.abs(offsetDelta.y) > 0.01;
+  if (!changed) return null;
+  return {
+    crop: expanded,
+    groundLine: groundLine + offsetDelta.y,
+    offsetDelta,
   };
 }
 
@@ -392,6 +552,7 @@ export function diagnoseSharedAlignment(
   frames: LogicalFrame[],
   crop: FrameBounds | null,
   groundLine: number | null,
+  contentScale = 1,
   tolerance = 2,
 ): AlignmentDiagnostics {
   const diagnostics: AlignmentFrameDiagnostic[] = [];
@@ -406,7 +567,9 @@ export function diagnoseSharedAlignment(
 
   frames.forEach((frame, frameIndex) => {
     if (frame.excluded) return;
-    const bounds = translatedSubjectBounds(frame);
+    const bounds = crop
+      ? transformedSubjectBounds(frame, crop, groundLine, contentScale)
+      : translatedSubjectBounds(frame);
     if (!bounds || !crop || groundLine === null) {
       missingBounds += bounds ? 0 : 1;
       diagnostics.push({

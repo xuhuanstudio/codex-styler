@@ -1,6 +1,10 @@
 export const COMPANION_PROJECT_FORMAT =
   "codex-styler-companion-project-v1" as const;
 
+export const DEFAULT_CONTENT_SCALE = 1;
+export const MIN_CONTENT_SCALE = 0.25;
+export const MAX_CONTENT_SCALE = 1.5;
+
 export type CompanionImportKind = "image" | "sequence" | "video" | "atlas";
 export type CreatorStep =
   "import" | "extract" | "cleanup" | "align" | "calibrate" | "motions" | "test";
@@ -103,6 +107,8 @@ export interface CompanionCreatorProject {
   frames: LogicalFrame[];
   sharedCrop: FrameBounds | null;
   groundLine: number | null;
+  /** Uniform project-space scale applied around the crop center and ground line. */
+  contentScale: number;
   cleanup: CleanupSettings;
   directionAnchors: DirectionAnchor[];
   motionRanges: MotionRange[];
@@ -166,6 +172,7 @@ export function createCompanionProject(
     frames: [],
     sharedCrop: null,
     groundLine: null,
+    contentScale: DEFAULT_CONTENT_SCALE,
     cleanup: {
       mode: "preserve-alpha",
       sampledColor: "#ffffff",
@@ -202,6 +209,7 @@ export function resetCompanionProjectDerivedState(
   project.frames = [];
   project.sharedCrop = null;
   project.groundLine = null;
+  project.contentScale = defaults.contentScale;
   project.cleanup = structuredClone(defaults.cleanup);
   project.directionAnchors = [];
   project.motionRanges = [];
@@ -225,6 +233,7 @@ export function companionProjectIsPristine(
     project.frames.length === 0 &&
     project.sharedCrop === null &&
     project.groundLine === null &&
+    project.contentScale === defaults.contentScale &&
     project.directionAnchors.length === 0 &&
     project.motionRanges.length === 0 &&
     project.name === defaults.name &&
@@ -246,6 +255,15 @@ export function normalizeCompanionProject(
     description: project.description ?? defaults.description,
     author: project.author ?? defaults.author,
     license: project.license ?? defaults.license,
+    contentScale: Math.max(
+      MIN_CONTENT_SCALE,
+      Math.min(
+        MAX_CONTENT_SCALE,
+        Number.isFinite(project.contentScale)
+          ? project.contentScale
+          : defaults.contentScale,
+      ),
+    ),
     placement: {
       ...defaults.placement,
       ...(project.placement ?? {}),

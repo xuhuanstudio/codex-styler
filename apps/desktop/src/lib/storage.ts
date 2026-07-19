@@ -10,7 +10,14 @@ export type ManagerAppearance = "system" | "light" | "dark";
 export type RuntimeStrategy = "enhanced" | "conservative";
 export type CompanionMode = "theme-default" | "custom" | "disabled";
 export type PreviewScenario =
-  "home" | "task" | "settings" | "dialog" | "right-panel";
+  | "home"
+  | "task"
+  | "changes"
+  | "terminal"
+  | "settings"
+  | "components"
+  | "dialog"
+  | "right-panel";
 
 export interface WorkspaceUiPreferences {
   focusMode: boolean;
@@ -247,9 +254,16 @@ function finiteClamped(
 }
 
 function isPreviewScenario(value: unknown): value is PreviewScenario {
-  return ["home", "task", "settings", "dialog", "right-panel"].includes(
-    String(value),
-  );
+  return [
+    "home",
+    "task",
+    "changes",
+    "terminal",
+    "settings",
+    "components",
+    "dialog",
+    "right-panel",
+  ].includes(String(value));
 }
 
 export function saveWorkspaceUiPreferences(

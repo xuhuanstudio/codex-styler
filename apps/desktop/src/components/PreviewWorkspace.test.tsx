@@ -1,0 +1,213 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import {
+  gildedGrandeur,
+  merryBigTop,
+  nativeRefined,
+} from "@codex-styler/theme-core";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PreviewWorkspace } from "./PreviewWorkspace";
+
+describe("PreviewWorkspace task views", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("lets the theme editor move between conversation, changes, and terminal", () => {
+    const onScenarioChange = vi.fn();
+    render(
+      <PreviewWorkspace
+        theme={nativeRefined}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="task"
+        onScenarioChange={onScenarioChange}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Conversation" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    fireEvent.click(screen.getByRole("tab", { name: "Changes" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Terminal" }));
+
+    expect(onScenarioChange).toHaveBeenNthCalledWith(1, "changes");
+    expect(onScenarioChange).toHaveBeenNthCalledWith(2, "terminal");
+  });
+
+  it("renders dedicated changes and terminal compositions", () => {
+    const { rerender } = render(
+      <PreviewWorkspace
+        theme={nativeRefined}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="changes"
+      />,
+    );
+
+    expect(screen.getByText("Working tree")).toBeInTheDocument();
+
+    rerender(
+      <PreviewWorkspace
+        theme={nativeRefined}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="terminal"
+      />,
+    );
+
+    expect(screen.getByText("Theme verification")).toBeInTheDocument();
+  });
+
+  it("exposes the derived geometry and motion character to every preview", () => {
+    const { container, rerender } = render(
+      <PreviewWorkspace
+        theme={gildedGrandeur}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+      />,
+    );
+    const preview = container.querySelector(".workspace-preview");
+
+    expect(preview).toHaveAttribute("data-geometry", "precise");
+    expect(preview).toHaveAttribute("data-motion-character", "fluid");
+
+    rerender(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+      />,
+    );
+
+    expect(preview).toHaveAttribute("data-geometry", "soft");
+    expect(preview).toHaveAttribute("data-motion-character", "expressive");
+  });
+
+  it("keeps expressive material depth available in every focus scenario", () => {
+    const { container, rerender } = render(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="settings"
+      />,
+    );
+    const preview = container.querySelector(".workspace-preview");
+
+    expect(preview).toHaveAttribute("data-decorations", "expressive");
+    expect(container.querySelector(".workspace-settings-state")).toBeTruthy();
+
+    rerender(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="right-panel"
+      />,
+    );
+    expect(container.querySelector(".workspace-right-panel")).toBeTruthy();
+
+    rerender(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="dialog"
+      />,
+    );
+    expect(container.querySelector(".workspace-dialog-layer")).toBeTruthy();
+  });
+
+  it("previews the interaction chrome derived from the theme accent", () => {
+    const { container } = render(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        scenario="components"
+      />,
+    );
+
+    expect(container.querySelector(".workspace-component-caret")).toBeTruthy();
+    expect(
+      container.querySelector(".workspace-component-selection"),
+    ).toHaveTextContent("Selected text");
+    expect(
+      container.querySelector(".workspace-component-link"),
+    ).toHaveTextContent("View guide");
+    expect(
+      container.querySelector(".workspace-component-scroll-sample"),
+    ).toBeTruthy();
+  });
+
+  it("runs a controlled motion preview and preserves each scene layer scale", () => {
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn(() => 42),
+    );
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const { container } = render(
+      <PreviewWorkspace
+        theme={gildedGrandeur}
+        variant="dark"
+        locale="en"
+        reduceMotion={false}
+        resolveAsset={(_, path) => path}
+        motionPreviewRevision={1}
+      />,
+    );
+
+    const preview = container.querySelector(".workspace-preview");
+    const backdrop = container.querySelector<HTMLElement>(
+      ".workspace-preview__backdrop",
+    );
+    expect(preview).toHaveAttribute("data-motion-preview", "playing");
+
+    fireEvent.mouseMove(preview as Element, { clientX: 100, clientY: 80 });
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(42);
+    expect(backdrop?.style.transform).toContain(
+      "scale(var(--preview-parallax-scale, 1.015))",
+    );
+  });
+
+  it("does not run guided motion when Reduce Motion is enabled", () => {
+    const requestAnimationFrame = vi.fn(() => 42);
+    vi.stubGlobal("requestAnimationFrame", requestAnimationFrame);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    const { container } = render(
+      <PreviewWorkspace
+        theme={gildedGrandeur}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        motionPreviewRevision={1}
+      />,
+    );
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(container.querySelector(".workspace-preview")).not.toHaveAttribute(
+      "data-motion-preview",
+    );
+  });
+});

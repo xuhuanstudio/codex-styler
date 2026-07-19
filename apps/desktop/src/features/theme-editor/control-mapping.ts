@@ -17,11 +17,18 @@ export type ThemeEditorControlId =
   | "scene.parallax"
   | "scene.add-layer"
   | "scene.remove-layer"
+  | "surfaces.treatment"
+  | "surfaces.material"
   | "surfaces.layout"
   | "surfaces.icon-style"
   | "surfaces.decorations"
   | "surfaces.accent"
+  | "surfaces.surface-color"
+  | "surfaces.border-color"
+  | "surfaces.color-harmony"
   | "surfaces.opacity"
+  | "surfaces.focus-opacity"
+  | "surfaces.focus-blur"
   | "surfaces.radius"
   | "motion.recipe"
   | "motion.intensity"
@@ -40,7 +47,10 @@ export interface ThemeEditorControlMapping {
 const allPreviewScenarios = [
   "home",
   "task",
+  "changes",
+  "terminal",
   "settings",
+  "components",
   "dialog",
   "right-panel",
 ] as const satisfies readonly PreviewScenario[];
@@ -141,6 +151,16 @@ export const themeEditorControlMappings: Readonly<
     "home",
     "#codex-styler-scene-root [data-layer-id]",
   ),
+  "surfaces.treatment": semantic(
+    "surfaces.treatment",
+    "components",
+    "html[data-codex-styler-layout]+html[data-codex-styler-icons]+html[data-codex-styler-decorations]",
+  ),
+  "surfaces.material": semantic(
+    "surfaces.material",
+    "dialog",
+    "theme.appearance/surfaceOpacity+focusOpacity+focusBlur",
+  ),
   "surfaces.layout": semantic(
     "surfaces.layout",
     "task",
@@ -158,13 +178,38 @@ export const themeEditorControlMappings: Readonly<
   ),
   "surfaces.accent": semantic(
     "surfaces.accent",
-    "settings",
+    "components",
     "--codex-styler-accent",
+  ),
+  "surfaces.surface-color": semantic(
+    "surfaces.surface-color",
+    "components",
+    "--codex-styler-surface",
+  ),
+  "surfaces.border-color": semantic(
+    "surfaces.border-color",
+    "components",
+    "--codex-styler-border",
+  ),
+  "surfaces.color-harmony": semantic(
+    "surfaces.color-harmony",
+    "components",
+    "theme.appearance.palette/semantic component roles",
   ),
   "surfaces.opacity": semantic(
     "surfaces.opacity",
     "settings",
     "--codex-styler-surface/quietSurfaceOpacity",
+  ),
+  "surfaces.focus-opacity": semantic(
+    "surfaces.focus-opacity",
+    "dialog",
+    "--codex-styler-surface/strongSurfaceOpacity",
+  ),
+  "surfaces.focus-blur": semantic(
+    "surfaces.focus-blur",
+    "dialog",
+    "[role=dialog]/backdrop-filter",
   ),
   "surfaces.radius": semantic(
     "surfaces.radius",

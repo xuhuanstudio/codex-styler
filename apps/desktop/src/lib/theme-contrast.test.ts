@@ -31,6 +31,18 @@ describe("theme contrast system", () => {
     expect(system.quietSurfaceOpacity).toBeLessThan(0.64);
   });
 
+  it("uses authored focus opacity for dialogs and other raised surfaces", () => {
+    const theme = structuredClone(nocturneStudio);
+    theme.variants.dark.appearance.focusOpacity = 0.97;
+
+    const system = resolveThemeContrast(theme, "dark");
+
+    expect(system.strongSurfaceOpacity).toBeGreaterThanOrEqual(0.97);
+    expect(system.strongSurfaceOpacity).toBeGreaterThan(
+      system.quietSurfaceOpacity,
+    );
+  });
+
   it("keeps every built-in variant readable on its quiet and strong UI surfaces", () => {
     for (const theme of builtinThemes) {
       for (const variant of ["light", "dark"] as const) {

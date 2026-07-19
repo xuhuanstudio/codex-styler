@@ -5,7 +5,11 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent,
 } from "react";
-import { calibrateDirections, normalizeAngle } from "./calibration";
+import {
+  calibrateDirections,
+  normalizeAngle,
+  sharedTransformPivot,
+} from "./calibration";
 import type { ExtractedFrame } from "./media";
 import type {
   CompanionCreatorProject,
@@ -28,25 +32,43 @@ export function FrameStage({
   currentFrame: number;
   overlay?: boolean;
 }) {
+  const logicalFrame = project.frames[currentFrame];
+  const crop = project.sharedCrop;
+  const pivot = crop
+    ? sharedTransformPivot(crop, project.groundLine)
+    : undefined;
   return (
     <div className="alignment-stage">
-      {frame && <img src={frame.url} alt="" />}
-      {overlay && project.sharedCrop && (
-        <span
-          className="shared-crop-box"
-          style={{
-            left: `${(project.sharedCrop.x / frame!.width) * 100}%`,
-            top: `${(project.sharedCrop.y / frame!.height) * 100}%`,
-            width: `${(project.sharedCrop.width / frame!.width) * 100}%`,
-            height: `${(project.sharedCrop.height / frame!.height) * 100}%`,
-          }}
-        />
-      )}
-      {overlay && project.groundLine !== null && frame && (
-        <span
-          className="ground-line"
-          style={{ top: `${(project.groundLine / frame.height) * 100}%` }}
-        />
+      {frame && crop && logicalFrame && pivot ? (
+        <svg
+          className="alignment-stage__compiled-preview"
+          viewBox={`${crop.x} ${crop.y} ${crop.width} ${crop.height}`}
+          preserveAspectRatio="xMidYMid meet"
+          aria-hidden="true"
+        >
+          <g
+            transform={`translate(${pivot.x} ${pivot.y}) scale(${project.contentScale}) translate(${-pivot.x} ${-pivot.y})`}
+          >
+            <image
+              href={frame.url}
+              x={logicalFrame.baselineOffset.x}
+              y={logicalFrame.baselineOffset.y}
+              width={frame.width}
+              height={frame.height}
+            />
+          </g>
+          {overlay && project.groundLine !== null && (
+            <line
+              className="alignment-ground-line"
+              x1={crop.x}
+              x2={crop.x + crop.width}
+              y1={project.groundLine}
+              y2={project.groundLine}
+            />
+          )}
+        </svg>
+      ) : (
+        frame && <img src={frame.url} alt="" />
       )}
       <span className="stage-index">{currentFrame + 1}</span>
     </div>
@@ -60,6 +82,7 @@ export function InteractiveAlignmentStage({
   canvas,
   crop,
   groundLine,
+  contentScale,
   currentFrame,
   tool,
   view,
@@ -78,6 +101,7 @@ export function InteractiveAlignmentStage({
   canvas?: { width: number; height: number };
   crop: FrameBounds | null;
   groundLine: number | null;
+  contentScale: number;
   currentFrame: number;
   tool: "canvas" | "frame";
   view: "current" | "overlay";
@@ -138,8 +162,16 @@ export function InteractiveAlignmentStage({
     }
     if (drag.mode === "frame") {
       onFrameOffsetChange({
-        x: clamp(drag.offset.x + dx, -frame.width, frame.width),
-        y: clamp(drag.offset.y + dy, -frame.height, frame.height),
+        x: clamp(
+          drag.offset.x + dx / Math.max(contentScale, 0.01),
+          -frame.width,
+          frame.width,
+        ),
+        y: clamp(
+          drag.offset.y + dy / Math.max(contentScale, 0.01),
+          -frame.height,
+          frame.height,
+        ),
       });
       return;
     }
@@ -194,6 +226,8 @@ export function InteractiveAlignmentStage({
   ] as const;
   const currentOffset = logicalFrame?.baselineOffset ?? { x: 0, y: 0 };
   const currentBounds = logicalFrame?.subjectBounds;
+  const pivot = sharedTransformPivot(crop, groundLine);
+  const artworkTransform = `translate(${pivot.x} ${pivot.y}) scale(${contentScale}) translate(${-pivot.x} ${-pivot.y})`;
   return (
     <div
       className={`alignment-stage alignment-stage--interactive alignment-stage--${tool}`}
@@ -212,28 +246,39 @@ export function InteractiveAlignmentStage({
             : "Interactive shared crop, frame offset, and ground line"
         }
       >
-        {view === "overlay" &&
-          comparisonFrames
-            .filter((item) => item.index !== currentFrame)
-            .map((item) => (
-              <image
-                key={item.logical.id}
-                className="alignment-onion-frame"
-                href={item.frame.url}
-                x={item.logical.baselineOffset.x}
-                y={item.logical.baselineOffset.y}
-                width={item.frame.width}
-                height={item.frame.height}
-              />
-            ))}
-        <image
-          className="alignment-current-frame"
-          href={frame.url}
-          x={currentOffset.x}
-          y={currentOffset.y}
-          width={frame.width}
-          height={frame.height}
-        />
+        <g transform={artworkTransform}>
+          {view === "overlay" &&
+            comparisonFrames
+              .filter((item) => item.index !== currentFrame)
+              .map((item) => (
+                <image
+                  key={item.logical.id}
+                  className="alignment-onion-frame"
+                  href={item.frame.url}
+                  x={item.logical.baselineOffset.x}
+                  y={item.logical.baselineOffset.y}
+                  width={item.frame.width}
+                  height={item.frame.height}
+                />
+              ))}
+          <image
+            className="alignment-current-frame"
+            href={frame.url}
+            x={currentOffset.x}
+            y={currentOffset.y}
+            width={frame.width}
+            height={frame.height}
+          />
+          {currentBounds && (
+            <rect
+              className="alignment-subject-outline"
+              x={currentBounds.x + currentOffset.x}
+              y={currentBounds.y + currentOffset.y}
+              width={currentBounds.width}
+              height={currentBounds.height}
+            />
+          )}
+        </g>
         {tool === "frame" && (
           <rect
             className="alignment-frame-hit"
@@ -291,15 +336,6 @@ export function InteractiveAlignmentStage({
           y1={groundLine ?? 0}
           y2={groundLine ?? 0}
         />
-        {currentBounds && (
-          <rect
-            className="alignment-subject-outline"
-            x={currentBounds.x + currentOffset.x}
-            y={currentBounds.y + currentOffset.y}
-            width={currentBounds.width}
-            height={currentBounds.height}
-          />
-        )}
       </svg>
       <span className="alignment-stage__legend">
         <i />
@@ -499,7 +535,11 @@ export function DirectionTimeline({
             ),
         )}
       </div>
-      <div ref={thumbnailsRef} className="timeline-thumbs">
+      <div
+        ref={thumbnailsRef}
+        className="timeline-thumbs"
+        data-scroll-surface="horizontal"
+      >
         {project.frames.map((logical, index) => {
           const frame = frames.find(
             (item) => item.sourceIndex === logical.sourceIndex,
@@ -536,6 +576,10 @@ export function DirectionTimeline({
 
 export function PointerTestStage({
   frame,
+  logicalFrame,
+  crop,
+  groundLine,
+  contentScale,
   pointer,
   onPointer,
   placement,
@@ -547,6 +591,10 @@ export function PointerTestStage({
   workspaceLabel,
 }: {
   frame?: ExtractedFrame;
+  logicalFrame?: LogicalFrame;
+  crop: FrameBounds | null;
+  groundLine: number | null;
+  contentScale: number;
   pointer: { x: number; y: number };
   onPointer: (pointer: { x: number; y: number }) => void;
   placement: CompanionCreatorProject["placement"];
@@ -566,6 +614,7 @@ export function PointerTestStage({
     placement: CompanionCreatorProject["placement"];
   } | null>(null);
   const displayedPlacement = dragPreview ?? placement;
+  const pivot = crop ? sharedTransformPivot(crop, groundLine) : undefined;
   const update = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     onPointer({
@@ -658,7 +707,27 @@ export function PointerTestStage({
             height: displayedPlacement.size * 1.42,
           }}
         >
-          <img src={frame.url} alt="" />
+          {crop && logicalFrame && pivot ? (
+            <svg
+              viewBox={`${crop.x} ${crop.y} ${crop.width} ${crop.height}`}
+              preserveAspectRatio="xMidYMid meet"
+              aria-hidden="true"
+            >
+              <g
+                transform={`translate(${pivot.x} ${pivot.y}) scale(${contentScale}) translate(${-pivot.x} ${-pivot.y})`}
+              >
+                <image
+                  href={frame.url}
+                  x={logicalFrame.baselineOffset.x}
+                  y={logicalFrame.baselineOffset.y}
+                  width={frame.width}
+                  height={frame.height}
+                />
+              </g>
+            </svg>
+          ) : (
+            <img src={frame.url} alt="" />
+          )}
           <span>{dragLabel}</span>
         </button>
       )}

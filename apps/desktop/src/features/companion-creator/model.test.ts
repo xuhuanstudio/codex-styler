@@ -55,6 +55,7 @@ describe("companion creator project model", () => {
     delete legacy.author;
     delete legacy.license;
     delete legacy.placement;
+    delete legacy.contentScale;
 
     const migrated = normalizeCompanionProject(
       legacy as CompanionCreatorProject,
@@ -63,6 +64,7 @@ describe("companion creator project model", () => {
     expect(migrated.description).toBe("");
     expect(migrated.author).toBe("");
     expect(migrated.license).toBe("");
+    expect(migrated.contentScale).toBe(1);
     expect(migrated.placement).toEqual({
       align: 0.82,
       offsetX: 0,
@@ -121,6 +123,7 @@ describe("companion creator project model", () => {
     ];
     project.sharedCrop = { x: 1, y: 2, width: 30, height: 40 };
     project.groundLine = 42;
+    project.contentScale = 0.72;
     project.cleanup.mode = "sampled-color";
     project.cleanup.strokes.push({
       frame: 0,
@@ -155,6 +158,7 @@ describe("companion creator project model", () => {
       frames: [],
       sharedCrop: null,
       groundLine: null,
+      contentScale: 1,
       directionAnchors: [],
       motionRanges: [],
       neutralFrame: 0,
