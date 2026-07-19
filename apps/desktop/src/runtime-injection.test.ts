@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nativeRefined } from "@codex-styler/theme-core";
+import { nativeRefined, type SceneEntity } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
 import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
@@ -46,6 +46,54 @@ function runtimeInternals(): InjectedRuntimeInternals {
       __CODEX_STYLER_RUNTIME_INTERNALS__: InjectedRuntimeInternals;
     }
   ).__CODEX_STYLER_RUNTIME_INTERNALS__;
+}
+
+const TEST_IMAGE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA" +
+  "DUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
+
+function testSpriteEntity(overrides: Partial<SceneEntity> = {}): SceneEntity {
+  return {
+    id: "test-companion",
+    name: "Test companion",
+    renderer: {
+      type: "sprite-atlas",
+      asset: TEST_IMAGE,
+      pages: [TEST_IMAGE],
+      columns: 2,
+      rows: 2,
+      framesPerPage: 4,
+      frameWidth: 1,
+      frameHeight: 1,
+      directions: 4,
+      frameCount: 4,
+      poses: [
+        { id: "pose-up", angle: 0, frame: 0 },
+        { id: "pose-right", angle: 90, frame: 1 },
+        { id: "pose-down", angle: 180, frame: 2 },
+        { id: "pose-left", angle: 270, frame: 3 },
+      ],
+      idleClips: [
+        {
+          id: "blink",
+          poseIds: ["pose-up"],
+          frames: [{ frame: 0, durationMs: 80 }],
+          minimumDelayMs: 500,
+          maximumDelayMs: 1000,
+        },
+      ],
+      neutralFrame: 0,
+      reducedMotionFrame: 0,
+      transitionFps: 30,
+      normalization: "preserve",
+      alphaThreshold: 12,
+    },
+    behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
+    anchor: { x: 80, y: 70 },
+    size: 80,
+    opacity: 1,
+    ...overrides,
+  };
 }
 
 describe("injected compatibility runtime", () => {
@@ -96,7 +144,7 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(32);
+    expect(runtime().version).toBe(33);
   });
 
   it.each(["light", "dark"] as const)(
@@ -852,54 +900,8 @@ describe("injected compatibility runtime", () => {
       clearRect: vi.fn(),
       drawImage: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
-    const image =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA" +
-      "DUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
     const theme = structuredClone(nativeRefined);
-    const entity = {
-      id: "test-companion",
-      name: "Test companion",
-      renderer: {
-        type: "sprite-atlas" as const,
-        asset: image,
-        pages: [image],
-        columns: 2,
-        rows: 2,
-        framesPerPage: 4,
-        frameWidth: 1,
-        frameHeight: 1,
-        directions: 4,
-        frameCount: 4,
-        poses: [
-          { id: "pose-up", angle: 0, frame: 0 },
-          { id: "pose-right", angle: 90, frame: 1 },
-          { id: "pose-down", angle: 180, frame: 2 },
-          { id: "pose-left", angle: 270, frame: 3 },
-        ],
-        idleClips: [
-          {
-            id: "blink",
-            poseIds: ["pose-up"],
-            frames: [{ frame: 0, durationMs: 80 }],
-            minimumDelayMs: 500,
-            maximumDelayMs: 1000,
-          },
-        ],
-        neutralFrame: 0,
-        reducedMotionFrame: 0,
-        transitionFps: 30,
-        normalization: "preserve" as const,
-        alphaThreshold: 12,
-      },
-      behaviors: [
-        "idle" as const,
-        "look-at-pointer" as const,
-        "reduce-motion-fallback" as const,
-      ],
-      anchor: { x: 80, y: 70 },
-      size: 80,
-      opacity: 1,
-    };
+    const entity = testSpriteEntity();
     theme.scene.entities = [entity];
 
     const outcome = await runtime().apply(theme, "dark", "compatibility", 5);
@@ -914,5 +916,89 @@ describe("injected compatibility runtime", () => {
     expect(
       document.getElementById("codex-styler-entity-root")?.childElementCount,
     ).toBe(0);
+  });
+
+  it("keeps free and attached companions inside a size-aware safe area", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(360);
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(280);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+
+    const theme = structuredClone(nativeRefined);
+    const entity = testSpriteEntity({
+      anchor: { x: 99, y: 99 },
+      size: 140,
+    });
+    theme.scene.entities = [entity];
+    await runtime().apply(theme, "dark", "compatibility", 5);
+
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(canvas).toHaveStyle({ left: "282px", top: "202px" });
+
+    const composer = document.createElement("div");
+    composer.className = "composer-surface-chrome";
+    let targetX = 260;
+    vi.spyOn(composer, "getBoundingClientRect").mockImplementation(
+      () =>
+        ({
+          x: targetX,
+          y: 210,
+          left: targetX,
+          top: 210,
+          right: targetX + 80,
+          bottom: 258,
+          width: 80,
+          height: 48,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    );
+    document.body.appendChild(composer);
+    runtime().updateEntity(
+      {
+        ...entity,
+        attachment: {
+          target: "composer",
+          edge: "top",
+          align: 1,
+          offset: { x: 12, y: 3 },
+        },
+      },
+      6,
+    );
+    const attachedCanvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(attachedCanvas).toHaveStyle({ left: "282px", top: "213px" });
+
+    targetX = 20;
+    document.dispatchEvent(new Event("scroll"));
+    expect(attachedCanvas).toHaveStyle({ left: "112px", top: "213px" });
+
+    composer.remove();
+    runtime().updateEntity(
+      {
+        ...entity,
+        attachment: {
+          target: "composer",
+          edge: "top",
+          align: 1,
+          offset: { x: 12, y: 3 },
+        },
+      },
+      7,
+    );
+    const fallbackCanvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(fallbackCanvas).toHaveStyle({ left: "282px", top: "202px" });
   });
 });

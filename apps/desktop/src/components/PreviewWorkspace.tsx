@@ -17,6 +17,11 @@ import {
 } from "@codex-styler/theme-core";
 import type { Locale } from "../lib/i18n";
 import type { PreviewScenario } from "../lib/storage";
+import {
+  resolveAttachedEntityPosition,
+  resolveFreeEntityAnchor,
+  resolveFreeEntityPosition,
+} from "../lib/entity-placement";
 import { previewEntityDimensions } from "../lib/preview-entity-layout";
 import { drawSpriteFrame } from "../lib/sprite-normalization";
 import { resolveThemeContrast } from "../lib/theme-contrast";
@@ -66,7 +71,10 @@ export function PreviewWorkspace({
   const [direction, setDirection] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [spriteReady, setSpriteReady] = useState(0);
-  const [previewViewportHeight, setPreviewViewportHeight] = useState(0);
+  const [previewViewport, setPreviewViewport] = useState({
+    width: 0,
+    height: 0,
+  });
   const interactive = Boolean(
     onScenarioChange || onEntityAnchorChange || onEntityAttachmentChange,
   );
@@ -118,7 +126,7 @@ export function PreviewWorkspace({
     ? previewEntityDimensions(
         entity.size,
         sourceEntityHeight,
-        previewViewportHeight,
+        previewViewport.height,
       )
     : null;
 
@@ -126,8 +134,18 @@ export function PreviewWorkspace({
     const preview = previewRef.current;
     if (!preview) return;
     const update = () => {
-      const nextHeight = preview.clientHeight;
-      if (nextHeight > 0) setPreviewViewportHeight(nextHeight);
+      const nextViewport = {
+        width: preview.clientWidth,
+        height: preview.clientHeight,
+      };
+      if (nextViewport.width > 0 && nextViewport.height > 0) {
+        setPreviewViewport((current) =>
+          current.width === nextViewport.width &&
+          current.height === nextViewport.height
+            ? current
+            : nextViewport,
+        );
+      }
     };
     update();
     if (typeof ResizeObserver === "undefined") return;
@@ -368,17 +386,31 @@ export function PreviewWorkspace({
       const scaleY = preview.clientHeight
         ? previewBounds.height / preview.clientHeight
         : 1;
-      const edgeY =
-        attachment.edge === "bottom" ? targetBounds.bottom : targetBounds.top;
-      element.style.left =
-        (targetBounds.left - previewBounds.left) / scaleX +
-        (targetBounds.width / scaleX) * attachment.align +
-        attachment.offset.x * (previewEntity?.scale ?? 1) +
-        "px";
-      element.style.top =
-        (edgeY - previewBounds.top) / scaleY +
-        attachment.offset.y * (previewEntity?.scale ?? 1) +
-        "px";
+      const position = resolveAttachedEntityPosition(
+        {
+          x: (targetBounds.left - previewBounds.left) / scaleX,
+          y: (targetBounds.top - previewBounds.top) / scaleY,
+          width: targetBounds.width / scaleX,
+          height: targetBounds.height / scaleY,
+        },
+        {
+          ...attachment,
+          offset: {
+            x: attachment.offset.x * (previewEntity?.scale ?? 1),
+            y: attachment.offset.y * (previewEntity?.scale ?? 1),
+          },
+        },
+        {
+          width: previewEntity?.width ?? entity.size,
+          height: previewEntity?.height ?? sourceEntityHeight,
+        },
+        {
+          width: preview.clientWidth,
+          height: preview.clientHeight,
+        },
+      );
+      element.style.left = `${position.x}px`;
+      element.style.top = `${position.y}px`;
     };
     update();
     let settleFrame = window.requestAnimationFrame(() => {
@@ -567,9 +599,10 @@ export function PreviewWorkspace({
   }
 
   function handleEntityPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!dragging) return;
-    const bounds = previewRef.current?.getBoundingClientRect();
-    if (!bounds) return;
+    if (!dragging || !entity) return;
+    const preview = previewRef.current;
+    const bounds = preview?.getBoundingClientRect();
+    if (!preview || !bounds) return;
     const composerBounds = composerRef.current?.getBoundingClientRect();
     if (
       composerBounds &&
@@ -592,16 +625,24 @@ export function PreviewWorkspace({
     }
     onEntityAttachmentChange?.(null);
     if (!onEntityAnchorChange) return;
-    onEntityAnchorChange({
-      x: Math.max(
-        4,
-        Math.min(96, ((event.clientX - bounds.left) / bounds.width) * 100),
+    const scaleX = bounds.width / Math.max(1, preview.clientWidth);
+    const scaleY = bounds.height / Math.max(1, preview.clientHeight);
+    onEntityAnchorChange(
+      resolveFreeEntityAnchor(
+        {
+          x: (event.clientX - bounds.left) / scaleX,
+          y: (event.clientY - bounds.top) / scaleY,
+        },
+        {
+          width: previewEntity?.width ?? entity.size,
+          height: previewEntity?.height ?? sourceEntityHeight,
+        },
+        {
+          width: preview.clientWidth,
+          height: preview.clientHeight,
+        },
       ),
-      y: Math.max(
-        6,
-        Math.min(94, ((event.clientY - bounds.top) / bounds.height) * 100),
-      ),
-    });
+    );
   }
 
   function handleEntityPointerUp(event: PointerEvent<HTMLDivElement>) {
@@ -613,11 +654,26 @@ export function PreviewWorkspace({
   }
 
   const isChinese = locale === "zh-CN";
+  const safeFreePosition =
+    entity && previewEntity && previewViewport.width > 0
+      ? resolveFreeEntityPosition(
+          {
+            x: (entity.anchor.x / 100) * previewViewport.width,
+            y: (entity.anchor.y / 100) * previewViewport.height,
+          },
+          previewEntity,
+          previewViewport,
+        )
+      : null;
   const entityStyle = entity
     ? ({
         "--entity-image": entityImage ? "url(" + entityImage + ")" : "none",
-        "--entity-x": entity.anchor.x + "%",
-        "--entity-y": entity.anchor.y + "%",
+        "--entity-x": safeFreePosition
+          ? `${safeFreePosition.x}px`
+          : entity.anchor.x + "%",
+        "--entity-y": safeFreePosition
+          ? `${safeFreePosition.y}px`
+          : entity.anchor.y + "%",
         "--entity-size": (previewEntity?.width ?? entity.size) + "px",
         "--entity-height": (previewEntity?.height ?? sourceEntityHeight) + "px",
         "--entity-opacity": entity.opacity,

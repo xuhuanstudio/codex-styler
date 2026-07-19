@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 32) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 33) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -52,6 +52,61 @@
     Number.isFinite(value) &&
     value >= minimum &&
     value <= maximum;
+
+  const ENTITY_SAFE_INSET = 8;
+  const clampEntityCenter = (value, extent, viewportExtent) => {
+    const viewport = Math.max(0, viewportExtent);
+    const halfExtent = Math.max(0, extent) / 2;
+    const minimum = ENTITY_SAFE_INSET + halfExtent;
+    const maximum = viewport - ENTITY_SAFE_INSET - halfExtent;
+    if (minimum > maximum) return viewport / 2;
+    return Math.max(minimum, Math.min(maximum, value));
+  };
+  const safeFreeEntityPosition = (
+    x,
+    y,
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  ) => ({
+    x: clampEntityCenter(x, width, viewportWidth),
+    y: clampEntityCenter(y, height, viewportHeight),
+  });
+  const safeAttachedEntityPosition = (
+    target,
+    attachment,
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  ) => {
+    const rawY =
+      (attachment.edge === "bottom" ? target.bottom : target.top) +
+      attachment.offset.y;
+    const minimumY =
+      attachment.edge === "top"
+        ? ENTITY_SAFE_INSET + height
+        : ENTITY_SAFE_INSET;
+    const maximumY =
+      attachment.edge === "top"
+        ? viewportHeight - ENTITY_SAFE_INSET
+        : viewportHeight - ENTITY_SAFE_INSET - height;
+    const y =
+      minimumY > maximumY
+        ? attachment.edge === "top"
+          ? viewportHeight - ENTITY_SAFE_INSET
+          : ENTITY_SAFE_INSET
+        : Math.max(minimumY, Math.min(maximumY, rawY));
+    return {
+      x: clampEntityCenter(
+        target.left + target.width * attachment.align + attachment.offset.x,
+        width,
+        viewportWidth,
+      ),
+      y,
+    };
+  };
 
   const rgb = (hex) =>
     [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
@@ -2174,29 +2229,50 @@
       typeof ResizeObserver === "undefined"
         ? null
         : new ResizeObserver(() => entityPositioner?.());
+    const positionAtAnchor = () => {
+      const point = safeFreeEntityPosition(
+        (entity.anchor.x / 100) * window.innerWidth,
+        (entity.anchor.y / 100) * window.innerHeight,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      canvas.style.left = `${point.x}px`;
+      canvas.style.top = `${point.y}px`;
+      canvas.style.transform = "translate(-50%, -50%)";
+    };
     const position = () => {
       const attachment = entity.attachment;
       if (!attachment) {
-        canvas.style.left = `${entity.anchor.x}%`;
-        canvas.style.top = `${entity.anchor.y}%`;
-        canvas.style.transform = "translate(-50%, -50%)";
+        positionAtAnchor();
         if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
         watchedTarget = null;
         return;
       }
       const target = entityTarget(attachment.target);
-      if (!target) return;
+      if (!target) {
+        positionAtAnchor();
+        if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
+        watchedTarget = null;
+        return;
+      }
       if (watchedTarget !== target) {
         if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
         watchedTarget = target;
         attachmentObserver?.observe(target);
       }
       const bounds = target.getBoundingClientRect();
-      canvas.style.left = `${bounds.left + bounds.width * attachment.align + attachment.offset.x}px`;
-      canvas.style.top = `${
-        (attachment.edge === "bottom" ? bounds.bottom : bounds.top) +
-        attachment.offset.y
-      }px`;
+      const point = safeAttachedEntityPosition(
+        bounds,
+        attachment,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      canvas.style.left = `${point.x}px`;
+      canvas.style.top = `${point.y}px`;
       canvas.style.transform =
         attachment.edge === "bottom"
           ? "translate(-50%, 0)"
@@ -2235,15 +2311,18 @@
         return;
       }
       delete entity.attachment;
-      const x = Math.max(
-        3,
-        Math.min(97, (event.clientX / window.innerWidth) * 100),
+      const point = safeFreeEntityPosition(
+        event.clientX,
+        event.clientY,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
       );
-      const y = Math.max(
-        5,
-        Math.min(95, (event.clientY / window.innerHeight) * 100),
-      );
-      entity.anchor = { x, y };
+      entity.anchor = {
+        x: window.innerWidth > 0 ? (point.x / window.innerWidth) * 100 : 50,
+        y: window.innerHeight > 0 ? (point.y / window.innerHeight) * 100 : 50,
+      };
       position();
     };
     const onUp = (event) => {
@@ -2530,6 +2609,11 @@
       scheduleDraw();
     };
     window.addEventListener("resize", resizeHandler, { passive: true });
+    const scrollHandler = () => position();
+    document.addEventListener("scroll", scrollHandler, {
+      capture: true,
+      passive: true,
+    });
     entityCleanup = () => {
       cancelIdle();
       document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -2537,6 +2621,7 @@
         entry.image.removeAttribute("src");
       pageCache.clear();
       attachmentObserver?.disconnect();
+      document.removeEventListener("scroll", scrollHandler, true);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
@@ -3026,7 +3111,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 32,
+    version: 33,
     apply,
     updateEntity,
     pause: remove,
