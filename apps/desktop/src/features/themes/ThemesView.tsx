@@ -307,6 +307,17 @@ export function ThemesView({
               {t("backToThemes")}
             </button>
             <div className="featured-theme__preview">
+              <PreviewWorkspace
+                theme={previewThemeFor(browsedTheme)}
+                variant={variant}
+                locale={locale}
+                reduceMotion={reduceMotion}
+                resolveAsset={resolveAsset}
+                presentation={previewPresentation}
+                compact
+                scenario={previewScenario}
+                motionPreviewRevision={motionPreviewRevision}
+              />
               <ThemePreviewControls
                 scenario={previewScenario}
                 presentation={previewPresentation}
@@ -323,17 +334,6 @@ export function ThemesView({
                   setPreviewPresentation(presentation);
                 }}
                 onPreviewMotion={previewMotion}
-              />
-              <PreviewWorkspace
-                theme={previewThemeFor(browsedTheme)}
-                variant={variant}
-                locale={locale}
-                reduceMotion={reduceMotion}
-                resolveAsset={resolveAsset}
-                presentation={previewPresentation}
-                compact
-                scenario={previewScenario}
-                motionPreviewRevision={motionPreviewRevision}
               />
             </div>
             <div className="featured-theme__copy">

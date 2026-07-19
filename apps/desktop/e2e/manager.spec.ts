@@ -785,6 +785,20 @@ test("keyboard companion creator completes a static-image project", async ({
     .fill("A keyboard-tested local companion.");
   await page.getByLabel("Author").fill("Test creator");
   await page.getByLabel("Asset license").selectOption("CC0-1.0");
+
+  await reviewSetup.press("Enter");
+  const edgeReview = page.getByRole("group", {
+    name: "Edge review backgrounds",
+  });
+  for (const backdrop of ["Black", "White", "Theme color"] as const) {
+    await edgeReview.getByRole("button", { name: backdrop, exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`Confirm edges on ${backdrop.toLowerCase()}`),
+      })
+      .click();
+  }
+
   const buildCompanion = page.getByRole("button", {
     name: /Build and install companion/,
   });
