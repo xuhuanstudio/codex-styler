@@ -665,6 +665,62 @@
     inset 0 1px color-mix(in srgb, var(--preview-accent) 12%, transparent);
 }
 
+/*
+ * Theme typography changes reading rhythm without replacing Codex fonts,
+ * changing font sizes, or altering component geometry. This keeps CJK and
+ * code rendering stable while letting layout treatments carry through the
+ * actual content surface.
+ */
+.workspace-preview[data-typography="balanced"] {
+  --preview-content-leading: 1.5;
+  --preview-heading-leading: 1.28;
+  --preview-heading-weight: 650;
+  --preview-heading-tracking: -0.008em;
+}
+
+.workspace-preview[data-typography="editorial"] {
+  --preview-content-leading: 1.58;
+  --preview-heading-leading: 1.2;
+  --preview-heading-weight: 690;
+  --preview-heading-tracking: -0.018em;
+}
+
+.workspace-preview[data-typography="cinematic"] {
+  --preview-content-leading: 1.64;
+  --preview-heading-leading: 1.16;
+  --preview-heading-weight: 720;
+  --preview-heading-tracking: -0.026em;
+}
+
+.workspace-preview[data-typography]
+  :is(
+    .workspace-task-prompt p,
+    .workspace-task-tool__body > span,
+    .workspace-task-changes > span:not(.workspace-task-changes__icon)
+  ) {
+  line-height: var(--preview-content-leading);
+}
+
+.workspace-preview[data-typography]
+  :is(
+    .workspace-task-plan strong,
+    .workspace-task-tool strong,
+    .workspace-task-changes strong
+  ) {
+  font-weight: var(--preview-heading-weight);
+  line-height: var(--preview-heading-leading);
+  letter-spacing: var(--preview-heading-tracking);
+}
+
+.workspace-preview[data-typography]:lang(zh)
+  :is(
+    .workspace-task-plan strong,
+    .workspace-task-tool strong,
+    .workspace-task-changes strong
+  ) {
+  letter-spacing: normal;
+}
+
 .workspace-preview--compact .workspace-task-activity {
   gap: 6px;
 }

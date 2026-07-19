@@ -95,7 +95,7 @@ describe("PreviewWorkspace task views", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("exposes the derived geometry and motion character to every preview", () => {
+  it("exposes the derived geometry, typography, and motion character", () => {
     const { container, rerender } = render(
       <PreviewWorkspace
         theme={gildedGrandeur}
@@ -108,6 +108,7 @@ describe("PreviewWorkspace task views", () => {
     const preview = container.querySelector(".workspace-preview");
 
     expect(preview).toHaveAttribute("data-geometry", "precise");
+    expect(preview).toHaveAttribute("data-typography", "editorial");
     expect(preview).toHaveAttribute("data-motion-character", "fluid");
 
     rerender(
@@ -121,7 +122,25 @@ describe("PreviewWorkspace task views", () => {
     );
 
     expect(preview).toHaveAttribute("data-geometry", "soft");
+    expect(preview).toHaveAttribute("data-typography", "cinematic");
     expect(preview).toHaveAttribute("data-motion-character", "expressive");
+  });
+
+  it("keeps the official comparison outside Styler typography", () => {
+    const { container } = render(
+      <PreviewWorkspace
+        theme={merryBigTop}
+        variant="dark"
+        locale="en"
+        reduceMotion
+        resolveAsset={(_, path) => path}
+        presentation="official"
+      />,
+    );
+
+    expect(container.querySelector(".workspace-preview")).not.toHaveAttribute(
+      "data-typography",
+    );
   });
 
   it("keeps expressive material depth available in every focus scenario", () => {

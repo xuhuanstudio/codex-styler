@@ -116,6 +116,7 @@ export function ThemesView({
     surfaces: "effectSurfaces",
     controls: "effectControls",
     icons: "effectIcons",
+    typography: "effectTypography",
     motion: "effectMotion",
     readability: "effectReadability",
   };
@@ -127,6 +128,7 @@ export function ThemesView({
     surfaces: "dialog",
     controls: "components",
     icons: "right-panel",
+    typography: "task",
     motion: "task",
     readability: "settings",
   } satisfies Record<ThemeEffectId, PreviewScenario>;

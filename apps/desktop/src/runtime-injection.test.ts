@@ -145,8 +145,26 @@ describe("injected compatibility runtime", () => {
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(34);
+    expect(runtime().version).toBe(35);
   });
+
+  it.each([
+    ["native", "balanced"],
+    ["editorial", "editorial"],
+    ["immersive", "cinematic"],
+  ] as const)(
+    "derives the %s layout as %s typography without extending the theme format",
+    async (layout, expectedTypography) => {
+      const theme = structuredClone(nativeRefined);
+      theme.variants.dark.appearance.layout = layout;
+
+      await runtime().apply(theme, "dark", "compatibility");
+
+      expect(document.documentElement.dataset.codexStylerTypography).toBe(
+        expectedTypography,
+      );
+    },
+  );
 
   it.each(["light", "dark"] as const)(
     "keeps the %s preview palette identical to the injected runtime",
@@ -385,6 +403,9 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement.dataset.codexStylerGeometry).toBe(
       "balanced",
     );
+    expect(document.documentElement.dataset.codexStylerTypography).toBe(
+      "balanced",
+    );
     expect(document.documentElement.dataset.codexStylerMotion).toBe("fluid");
     const stylesheet = document.getElementById("codex-styler-runtime-style");
     expect(stylesheet?.textContent).toContain("main.main-surface article");
@@ -524,6 +545,24 @@ describe("injected compatibility runtime", () => {
     );
     expect(stylesheet?.textContent).toContain(
       'data-codex-styler-geometry="soft"] body > [data-codex-styler-app-root] [role="tab"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-typography="editorial"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "line-height: var(--codex-styler-content-leading) !important",
+    );
+    const typographyTreatments = stylesheet?.textContent
+      ?.split("/* Theme typography is content-scoped")[1]
+      ?.split(
+        'html[data-codex-styler][data-codex-styler-mode="semantic"] body > [data-codex-styler-app-root] :is(fieldset',
+      )[0];
+    expect(typographyTreatments).toBeDefined();
+    expect(typographyTreatments).toContain("[data-message-author-role]");
+    expect(typographyTreatments).toContain(".ProseMirror");
+    expect(typographyTreatments).toContain("html:lang(zh)");
+    expect(typographyTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:font-family|font-size|width|height|padding|margin)\s*:/,
     );
     expect(stylesheet?.textContent).toContain(
       "--codex-styler-motion-duration: 175ms",
@@ -800,6 +839,9 @@ describe("injected compatibility runtime", () => {
     );
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-geometry",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-typography",
     );
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-motion",

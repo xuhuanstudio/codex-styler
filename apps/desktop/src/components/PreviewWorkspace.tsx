@@ -743,6 +743,9 @@ export function PreviewWorkspace({
         officialPreview ? "none" : (visual.appearance.decorations ?? "none")
       }
       data-geometry={officialPreview ? "native" : visualPersonality.geometry}
+      data-typography={
+        officialPreview ? undefined : visualPersonality.typography
+      }
       data-motion-character={
         officialPreview ? "still" : visualPersonality.motion
       }

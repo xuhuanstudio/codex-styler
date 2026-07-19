@@ -22,6 +22,9 @@ describe("resolveThemeEffectCoverage", () => {
     expect(coverage.find((effect) => effect.id === "readability")?.active).toBe(
       true,
     );
+    expect(coverage.find((effect) => effect.id === "typography")?.active).toBe(
+      true,
+    );
   });
 
   it("does not promise semantic component styling for safe themes", () => {
@@ -39,6 +42,9 @@ describe("resolveThemeEffectCoverage", () => {
     expect(coverage.find((effect) => effect.id === "controls")?.active).toBe(
       false,
     );
+    expect(coverage.find((effect) => effect.id === "typography")?.active).toBe(
+      false,
+    );
   });
 });
 
@@ -49,6 +55,7 @@ describe("resolveThemeVisualPersonality", () => {
       geometry: "precise",
       iconStyle: "themed",
       decorations: "expressive",
+      typography: "editorial",
       motion: "fluid",
     });
     expect(resolveThemeVisualPersonality(merryBigTop, "dark")).toEqual({
@@ -56,6 +63,7 @@ describe("resolveThemeVisualPersonality", () => {
       geometry: "soft",
       iconStyle: "themed",
       decorations: "expressive",
+      typography: "cinematic",
       motion: "expressive",
     });
   });
@@ -67,6 +75,7 @@ describe("resolveThemeVisualPersonality", () => {
     expect(resolveThemeVisualPersonality(theme, "dark")).toMatchObject({
       layout: "native",
       geometry: "balanced",
+      typography: "balanced",
       motion: "still",
     });
   });

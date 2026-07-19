@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 34) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 35) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -481,6 +481,7 @@
     document.documentElement.removeAttribute("data-codex-styler-icons");
     document.documentElement.removeAttribute("data-codex-styler-decorations");
     document.documentElement.removeAttribute("data-codex-styler-geometry");
+    document.documentElement.removeAttribute("data-codex-styler-typography");
     document.documentElement.removeAttribute("data-codex-styler-motion");
     document.documentElement.removeAttribute("data-codex-styler-variant");
     document.documentElement.removeAttribute("data-codex-styler-contrast");
@@ -1267,6 +1268,24 @@
           --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 54%, var(--codex-styler-border-strong));
           --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 78%, var(--codex-styler-text-primary));
         }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="balanced"] {
+          --codex-styler-content-leading: 1.5;
+          --codex-styler-heading-leading: 1.28;
+          --codex-styler-heading-weight: 650;
+          --codex-styler-heading-tracking: -.008em;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="editorial"] {
+          --codex-styler-content-leading: 1.58;
+          --codex-styler-heading-leading: 1.2;
+          --codex-styler-heading-weight: 690;
+          --codex-styler-heading-tracking: -.018em;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="cinematic"] {
+          --codex-styler-content-leading: 1.64;
+          --codex-styler-heading-leading: 1.16;
+          --codex-styler-heading-weight: 720;
+          --codex-styler-heading-tracking: -.026em;
+        }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           background: transparent !important;
@@ -1927,6 +1946,24 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] pre :is(samp, output) {
           font-family: inherit !important;
+        }
+        /* Theme typography is content-scoped and geometry-safe: it changes
+           reading rhythm without replacing fonts, resizing text, or moving
+           controls. Codex keeps ownership of the underlying typefaces. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(p, li, blockquote),
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] .ProseMirror,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(p, li) {
+          line-height: var(--codex-styler-content-leading) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(h1, h2, h3),
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(h1, h2, h3) {
+          font-weight: var(--codex-styler-heading-weight) !important;
+          line-height: var(--codex-styler-heading-leading) !important;
+          letter-spacing: var(--codex-styler-heading-tracking) !important;
+        }
+        html:lang(zh)[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(h1, h2, h3),
+        html:lang(zh)[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(h1, h2, h3) {
+          letter-spacing: normal !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(fieldset, [role="tree"], [role="grid"]) {
           border-color: color-mix(in srgb, ${appearance.border} 78%, transparent) !important;
@@ -2826,6 +2863,14 @@
           : "balanced",
     );
     document.documentElement.setAttribute(
+      "data-codex-styler-typography",
+      appearance.layout === "editorial"
+        ? "editorial"
+        : appearance.layout === "immersive"
+          ? "cinematic"
+          : "balanced",
+    );
+    document.documentElement.setAttribute(
       "data-codex-styler-motion",
       theme.variants[variant].motion.intensity <= 0.05
         ? "still"
@@ -3177,7 +3222,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 34,
+    version: 35,
     apply,
     updateEntity,
     pause: remove,

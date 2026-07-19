@@ -238,6 +238,11 @@ working control behind another page, revert it.
   retain authored hues when safe and receive the smallest necessary neutral
   correction otherwise; the Theme Editor exposes status and code-change
   evidence from the same preview/runtime contract.
+- theme layout now carries a bounded typography rhythm into Codex content.
+  Balanced, editorial, and cinematic treatments coordinate heading weight,
+  heading spacing, and prose leading without replacing Codex fonts, resizing
+  text, or changing component geometry; CJK headings keep neutral tracking and
+  the library preview uses the same derived personality as the runtime.
 
 ## RC — reliability proof
 

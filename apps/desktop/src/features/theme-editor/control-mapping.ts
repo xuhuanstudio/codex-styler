@@ -164,7 +164,7 @@ export const themeEditorControlMappings: Readonly<
   "surfaces.layout": semantic(
     "surfaces.layout",
     "task",
-    "html[data-codex-styler-layout]",
+    "html[data-codex-styler-layout]+html[data-codex-styler-typography]",
   ),
   "surfaces.icon-style": semantic(
     "surfaces.icon-style",

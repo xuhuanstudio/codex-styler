@@ -4,7 +4,13 @@ import type {
 } from "@codex-styler/theme-core";
 
 export type ThemeEffectId =
-  "background" | "surfaces" | "controls" | "icons" | "motion" | "readability";
+  | "background"
+  | "surfaces"
+  | "controls"
+  | "icons"
+  | "typography"
+  | "motion"
+  | "readability";
 
 export interface ThemeEffectCoverage {
   id: ThemeEffectId;
@@ -13,12 +19,14 @@ export interface ThemeEffectCoverage {
 
 export type ThemeGeometry = "precise" | "balanced" | "soft";
 export type ThemeMotionCharacter = "still" | "calm" | "fluid" | "expressive";
+export type ThemeTypographyCharacter = "balanced" | "editorial" | "cinematic";
 
 export interface ThemeVisualPersonality {
   layout: "native" | "editorial" | "immersive";
   geometry: ThemeGeometry;
   iconStyle: "native" | "contained" | "themed";
   decorations: "none" | "subtle" | "expressive";
+  typography: ThemeTypographyCharacter;
   motion: ThemeMotionCharacter;
 }
 
@@ -40,6 +48,12 @@ export function resolveThemeVisualPersonality(
     geometry: radius <= 11 ? "precise" : radius >= 17 ? "soft" : "balanced",
     iconStyle: visual.appearance.iconStyle ?? "native",
     decorations: visual.appearance.decorations ?? "none",
+    typography:
+      visual.appearance.layout === "editorial"
+        ? "editorial"
+        : visual.appearance.layout === "immersive"
+          ? "cinematic"
+          : "balanced",
     motion:
       intensity <= 0.05
         ? "still"
@@ -76,6 +90,7 @@ export function resolveThemeEffectCoverage(
       active:
         semantic && (visual.appearance.iconStyle ?? "native") !== "native",
     },
+    { id: "typography", active: semantic },
     { id: "motion", active: hasMotion },
     { id: "readability", active: semantic },
   ];
