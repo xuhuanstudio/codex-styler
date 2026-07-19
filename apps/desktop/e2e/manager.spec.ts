@@ -183,7 +183,13 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   const appearanceComparison = page.getByRole("group", {
     name: "Compare appearance",
   });
-  await page.getByRole("button", { name: "Task & composer" }).click();
+  const previewSurface = page.locator(".featured-theme__preview");
+  const previewControlsTrigger = page.getByRole("button", {
+    name: "Task & composer",
+  });
+  await previewSurface.hover();
+  await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
+  await previewControlsTrigger.click();
   await appearanceComparison.getByRole("button", { name: "Official" }).click();
   await expect(
     page.locator(".featured-theme__preview .workspace-preview"),
@@ -191,12 +197,10 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await expect(
     page.locator(".featured-theme__preview .workspace-entity"),
   ).toHaveCount(0);
-  const previewControlsTrigger = page.getByRole("button", {
-    name: "Task & composer",
-  });
+  await previewSurface.hover();
   await previewControlsTrigger.click();
   await appearanceComparison.getByRole("button", { name: "Styled" }).click();
-  await page.locator(".featured-theme__preview").hover();
+  await previewSurface.hover();
   await expect(previewControlsTrigger).toBeVisible();
   await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
   await expect(previewControlsTrigger).toHaveAttribute("aria-expanded", "false");
