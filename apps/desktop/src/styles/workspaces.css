@@ -39,8 +39,18 @@
 }
 
 .home-current__facts {
+  grid-template-columns: minmax(88px, 0.72fr) minmax(0, 1.28fr);
   margin: 15px 0;
   padding: 12px 0;
+}
+
+.home-current__facts dd {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.35;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .home-actions > button {

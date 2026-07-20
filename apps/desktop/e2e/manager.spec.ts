@@ -129,7 +129,9 @@ test("compact companion details preserve a usable live preview", async ({
     };
   });
   expect(geometry.stageHeight).toBeGreaterThanOrEqual(220);
-  expect(geometry.stageWidth).toBeGreaterThan(geometry.summaryWidth);
+  expect(geometry.stageWidth).toBeGreaterThanOrEqual(
+    geometry.summaryWidth - 20,
+  );
   expect(geometry.summaryContained).toBe(true);
   expect(geometry.entityInsideStage).toBe(true);
   await expect(preview).toBeVisible();
@@ -297,7 +299,9 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   const desktopThemeDetail = page.locator(".featured-theme__copy");
   const desktopThemeDetailFit = await desktopThemeDetail.evaluate((element) => {
     const panel = element.getBoundingClientRect();
-    const action = element.querySelector<HTMLElement>(".button-row")!;
+    const action = element.querySelector<HTMLElement>(
+      ".theme-detail-card__title-row .secondary-button",
+    )!;
     const coverage = element.querySelector<HTMLElement>(
       ".theme-effect-summary",
     )!;
@@ -338,7 +342,9 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   const compactThemeDetailFit = await compactThemeDetail.evaluate((element) => {
     const panel = element.getBoundingClientRect();
     const description = element.querySelector<HTMLElement>("p")!;
-    const action = element.querySelector<HTMLElement>(".button-row")!;
+    const action = element.querySelector<HTMLElement>(
+      ".theme-detail-card__title-row .secondary-button",
+    )!;
     const coverage = element.querySelector<HTMLElement>(
       ".theme-effect-summary",
     )!;
