@@ -1,14 +1,9 @@
 import {
   Check,
-  ChevronRight,
-  Copy,
-  Download,
   Film,
   FolderOpen,
-  Image,
   Layers3,
   Leaf,
-  LockKeyhole,
   MoreHorizontal,
   Monitor,
   Moon,
@@ -19,15 +14,11 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
-  RefreshCw,
-  Save,
   Settings,
   ShieldCheck,
   Sparkles,
   Sun,
-  Trash2,
   Upload,
-  X,
 } from "lucide-react";
 import {
   builtinCompanions,
@@ -62,6 +53,16 @@ import { Onboarding } from "./components/Onboarding";
 import { PreviewWorkspace } from "./components/PreviewWorkspace";
 import { SelectField } from "./components/ui/SelectField";
 import type { CompanionCreatorProject } from "./features/companion-creator/model";
+import {
+  DeleteCompanionDialog,
+  DeleteCompanionProjectDialog,
+  DeleteThemeDialog,
+  DiagnosticsDialog,
+  RestartCodexDialog,
+  UnsavedThemeDialog,
+  UpdateDialog,
+  type UpdateInstallStatus,
+} from "./features/app-shell/AppDialogs";
 import {
   deleteCompanionProject,
   listCompanionProjects,
@@ -143,13 +144,7 @@ import {
   type CompanionAssetMap,
 } from "./lib/companion-files";
 import { themeAssetUrl } from "./lib/assets";
-import {
-  collectDiagnostics,
-  diagnosticsSummary,
-  exportDiagnostics,
-  openWindowsCompatibilityIssue,
-  type DiagnosticsReport,
-} from "./lib/diagnostics";
+import { collectDiagnostics, type DiagnosticsReport } from "./lib/diagnostics";
 import {
   appSessionReducer,
   createInitialAppSession,
@@ -164,6 +159,10 @@ import { SettingsView } from "./features/settings/SettingsView";
 import { HomeView } from "./features/home/HomeView";
 import { ThemesView, type ThemeCollection } from "./features/themes/ThemesView";
 import {
+  NewThemeDialog,
+  type NewThemeStep,
+} from "./features/themes/NewThemeDialog";
+import {
   CompanionsView,
   type CompanionCollection,
 } from "./features/companions/CompanionsView";
@@ -175,9 +174,7 @@ import {
 
 type View =
   "home" | "themes" | "companions" | "settings" | "editor" | "companion-editor";
-type NewThemeStep = "choose" | "existing";
 type UpdateStatus = "idle" | "checking" | "current" | "error";
-type UpdateInstallStatus = "idle" | "downloading" | "installing" | "restarting";
 type ApplySuccessMessage =
   | "configurationApplied"
   | "themeApplied"
@@ -2243,368 +2240,82 @@ export function App() {
       )}
 
       {pendingDelete && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-theme-title"
-          >
-            <span className="confirm-dialog__icon">
-              <Trash2 size={18} />
-            </span>
-            <h2 id="delete-theme-title">{t("deleteThemeTitle")}</h2>
-            <p>{t("deleteThemeBody")}</p>
-            <strong>
-              {pendingDelete.locales[locale]?.name ??
-                pendingDelete.metadata.name}
-            </strong>
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                onClick={() => setPendingDelete(null)}
-              >
-                {t("cancel")}
-              </button>
-              <button className="danger-button" onClick={handleDeleteTheme}>
-                <Trash2 size={14} />
-                {t("deleteTheme")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <DeleteThemeDialog
+          theme={pendingDelete}
+          locale={locale}
+          t={t}
+          onCancel={() => setPendingDelete(null)}
+          onDelete={handleDeleteTheme}
+        />
       )}
 
       {pendingNavigation && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog confirm-dialog--unsaved"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="unsaved-theme-title"
-            aria-describedby="unsaved-theme-description"
-          >
-            <span className="confirm-dialog__icon confirm-dialog__icon--draft">
-              <Save size={18} />
-            </span>
-            <h2 id="unsaved-theme-title">{t("unsavedThemeTitle")}</h2>
-            <p id="unsaved-theme-description">{t("unsavedThemeBody")}</p>
-            <strong>
-              {draftTheme.locales[locale]?.name ?? draftTheme.metadata.name}
-            </strong>
-            <div className="button-row button-row--unsaved">
-              <button
-                className="secondary-button"
-                onClick={cancelPendingNavigation}
-                disabled={busy}
-                autoFocus
-              >
-                {t("keepEditing")}
-              </button>
-              <button
-                className="danger-button danger-button--quiet"
-                onClick={discardAndNavigate}
-                disabled={busy}
-              >
-                {t("discardChanges")}
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => void saveAndNavigate()}
-                disabled={busy}
-              >
-                <Save size={14} />
-                {busy ? t("saving") : t("saveAndLeave")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <UnsavedThemeDialog
+          theme={draftTheme}
+          locale={locale}
+          t={t}
+          busy={busy}
+          onCancel={cancelPendingNavigation}
+          onDiscard={discardAndNavigate}
+          onSave={() => void saveAndNavigate()}
+        />
       )}
 
       {pendingCompanionDelete && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-companion-title"
-          >
-            <span className="confirm-dialog__icon">
-              <Trash2 size={18} />
-            </span>
-            <h2 id="delete-companion-title">{t("deleteCompanionTitle")}</h2>
-            <p>{t("deleteCompanionBody")}</p>
-            <strong>
-              {pendingCompanionDelete.locales[locale]?.name ??
-                pendingCompanionDelete.name}
-            </strong>
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                onClick={() => setPendingCompanionDelete(null)}
-              >
-                {t("cancel")}
-              </button>
-              <button
-                className="danger-button"
-                onClick={() => void handleDeleteCompanion()}
-              >
-                <Trash2 size={14} />
-                {t("deleteCompanion")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <DeleteCompanionDialog
+          companion={pendingCompanionDelete}
+          locale={locale}
+          t={t}
+          onCancel={() => setPendingCompanionDelete(null)}
+          onDelete={() => void handleDeleteCompanion()}
+        />
       )}
 
       {pendingCompanionProjectDelete && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="delete-companion-project-title"
-          >
-            <span className="confirm-dialog__icon">
-              <Trash2 size={18} />
-            </span>
-            <h2 id="delete-companion-project-title">{t("deleteDraftTitle")}</h2>
-            <p>{t("deleteDraftBody")}</p>
-            <strong>{pendingCompanionProjectDelete.name}</strong>
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                onClick={() => setPendingCompanionProjectDelete(null)}
-              >
-                {t("cancel")}
-              </button>
-              <button
-                className="danger-button"
-                onClick={() => void handleDeleteCompanionProject()}
-              >
-                <Trash2 size={14} />
-                {t("deleteDraft")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <DeleteCompanionProjectDialog
+          project={pendingCompanionProjectDelete}
+          t={t}
+          onCancel={() => setPendingCompanionProjectDelete(null)}
+          onDelete={() => void handleDeleteCompanionProject()}
+        />
       )}
 
       {pendingApplication && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog confirm-dialog--restart"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="restart-codex-title"
-          >
-            <span className="confirm-dialog__icon">
-              <RefreshCw size={18} />
-            </span>
-            <h2 id="restart-codex-title">{t("quitCodexTitle")}</h2>
-            <p>{t("quitCodexBody")}</p>
-            {restartError && (
-              <p className="confirm-dialog__error" role="alert">
-                {t("restartFailedDetail")}: {restartError}
-              </p>
-            )}
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setPendingApplication(null);
-                  setRestartError(null);
-                }}
-                disabled={busy}
-              >
-                {t("cancel")}
-              </button>
-              <button
-                className="primary-button"
-                onClick={handleQuitAndApply}
-                disabled={busy}
-              >
-                <RefreshCw size={14} className={busy ? "is-spinning" : ""} />
-                {busy
-                  ? t("restartingCodex")
-                  : restartError
-                    ? t("retryRestart")
-                    : t("quitAndContinue")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <RestartCodexDialog
+          t={t}
+          busy={busy}
+          error={restartError}
+          onCancel={() => {
+            setPendingApplication(null);
+            setRestartError(null);
+          }}
+          onConfirm={handleQuitAndApply}
+        />
       )}
 
       {diagnosticsReport && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="diagnostics-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="diagnostics-title"
-            data-scroll-surface="panel"
-          >
-            <header>
-              <span className="confirm-dialog__icon">
-                <ShieldCheck size={18} />
-              </span>
-              <div>
-                <span className="page-kicker">LOCAL REDACTED REPORT</span>
-                <h2 id="diagnostics-title">{t("diagnosticsTitle")}</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setDiagnosticsReport(null)}
-                aria-label={t("cancel")}
-              >
-                <X size={15} />
-              </button>
-            </header>
-            <p>{t("diagnosticsPrivacy")}</p>
-            <div className="diagnostics-checks">
-              {diagnosticsReport.checks.map((check) => (
-                <div key={check.id} data-status={check.status}>
-                  <span>{check.status}</span>
-                  <strong>{check.id}</strong>
-                  <small>{check.detail}</small>
-                </div>
-              ))}
-            </div>
-            <details>
-              <summary>{t("previewDiagnosticText")}</summary>
-              <pre data-scroll-surface="canvas">
-                {diagnosticsSummary(diagnosticsReport)}
-              </pre>
-            </details>
-            <div className="button-row">
-              <button
-                className="secondary-button"
-                onClick={openWindowsCompatibilityIssue}
-              >
-                <ChevronRight size={14} />
-                {t("openCompatibilityIssue")}
-              </button>
-              <button
-                className="primary-button"
-                onClick={() => void exportDiagnostics(diagnosticsReport)}
-              >
-                <Download size={14} />
-                {t("exportDiagnostics")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <DiagnosticsDialog
+          report={diagnosticsReport}
+          t={t}
+          onClose={() => setDiagnosticsReport(null)}
+        />
       )}
 
       {availableUpdate && (
-        <div className="confirm-backdrop" role="presentation">
-          <section
-            className="confirm-dialog update-dialog"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="update-dialog-title"
-          >
-            <span className="confirm-dialog__icon update-dialog__icon">
-              <Download size={18} />
-            </span>
-            <div className="update-dialog__heading">
-              <span>{t("updateAvailable")}</span>
-              <h2 id="update-dialog-title">
-                Codex Styler {availableUpdate.version}
-              </h2>
-              {availableUpdate.prerelease && <small>{t("prerelease")}</small>}
-            </div>
-            <p>{t("updateAvailableBody")}</p>
-            {availableUpdate.releaseNotes ? (
-              <div className="update-dialog__notes" data-scroll-surface="panel">
-                <strong>{t("releaseNotes")}</strong>
-                <p className="update-dialog__summary">
-                  {availableUpdate.releaseNotes.summary}
-                </p>
-                {availableUpdate.releaseNotes.highlights.length > 0 && (
-                  <section>
-                    <h3>{t("releaseHighlights")}</h3>
-                    <ul>
-                      {availableUpdate.releaseNotes.highlights.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-                {availableUpdate.releaseNotes.fixes.length > 0 && (
-                  <section>
-                    <h3>{t("releaseFixes")}</h3>
-                    <ul>
-                      {availableUpdate.releaseNotes.fixes.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  </section>
-                )}
-              </div>
-            ) : availableUpdate.notes ? (
-              <div className="update-dialog__notes" data-scroll-surface="panel">
-                <strong>{t("releaseNotes")}</strong>
-                <p>{availableUpdate.notes}</p>
-              </div>
-            ) : null}
-            {updateInstallStatus !== "idle" && (
-              <div className="update-dialog__progress" aria-live="polite">
-                <div>
-                  <span>
-                    {updateInstallStatus === "downloading"
-                      ? t("downloadingUpdate")
-                      : updateInstallStatus === "installing"
-                        ? t("installingUpdate")
-                        : t("restartingAfterUpdate")}
-                  </span>
-                  {updateProgress !== null &&
-                    updateInstallStatus === "downloading" && (
-                      <strong>{updateProgress}%</strong>
-                    )}
-                </div>
-                <span className="update-dialog__progress-track">
-                  <span
-                    style={{
-                      width:
-                        updateProgress === null ? "34%" : `${updateProgress}%`,
-                    }}
-                  />
-                </span>
-              </div>
-            )}
-            <div className="update-dialog__secondary-actions">
-              <button
-                className="text-button"
-                disabled={updateInstallStatus !== "idle"}
-                onClick={() => {
-                  updateSettings({
-                    skippedUpdateVersion: availableUpdate.version,
-                  });
-                  setAvailableUpdate(null);
-                }}
-              >
-                {t("skipThisVersion")}
-              </button>
-              <button
-                className="secondary-button"
-                disabled={updateInstallStatus !== "idle"}
-                onClick={() => setAvailableUpdate(null)}
-              >
-                {t("remindMeLater")}
-              </button>
-              <button
-                className="primary-button"
-                disabled={updateInstallStatus !== "idle"}
-                onClick={() => void handleDownloadAndInstallUpdate()}
-              >
-                <Download size={14} />
-                {t("downloadAndInstall")}
-              </button>
-            </div>
-          </section>
-        </div>
+        <UpdateDialog
+          update={availableUpdate}
+          installStatus={updateInstallStatus}
+          progress={updateProgress}
+          t={t}
+          onSkip={() => {
+            updateSettings({
+              skippedUpdateVersion: availableUpdate.version,
+            });
+            setAvailableUpdate(null);
+          }}
+          onLater={() => setAvailableUpdate(null)}
+          onInstall={() => void handleDownloadAndInstallUpdate()}
+        />
       )}
 
       {toast && (
@@ -2613,144 +2324,6 @@ export function App() {
           {toast}
         </div>
       )}
-    </div>
-  );
-}
-
-interface SharedViewProps {
-  locale: Locale;
-  t: (key: MessageKey) => string;
-  resolveAsset: (theme: ThemeDefinition, path: string) => string;
-}
-
-function NewThemeDialog({
-  step,
-  themes,
-  locale,
-  t,
-  onClose,
-  onChooseStep,
-  onBlank,
-  onImage,
-  onExisting,
-  resolveAsset,
-}: SharedViewProps & {
-  step: NewThemeStep;
-  themes: ThemeDefinition[];
-  onClose: () => void;
-  onChooseStep: (step: NewThemeStep) => void;
-  onBlank: () => void;
-  onImage: () => void;
-  onExisting: (theme: ThemeDefinition) => void;
-}) {
-  return (
-    <div className="confirm-backdrop" role="presentation">
-      <section
-        className="new-theme-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="new-theme-title"
-      >
-        <header className="new-theme-dialog__header">
-          <div>
-            {step === "existing" && (
-              <button
-                className="new-theme-dialog__back"
-                onClick={() => onChooseStep("choose")}
-                aria-label={t("back")}
-              >
-                <ChevronRight size={15} />
-              </button>
-            )}
-            <span>{t("createTheme")}</span>
-            <h2 id="new-theme-title">
-              {step === "existing"
-                ? t("chooseStartingTheme")
-                : t("startYourTheme")}
-            </h2>
-          </div>
-          <button
-            className="icon-button"
-            onClick={onClose}
-            aria-label={t("cancel")}
-          >
-            <X size={16} />
-          </button>
-        </header>
-
-        {step === "choose" ? (
-          <div className="new-theme-options" data-scroll-surface="panel">
-            <button
-              className="new-theme-option new-theme-option--image"
-              onClick={onImage}
-            >
-              <span className="new-theme-option__icon">
-                <Image size={21} />
-              </span>
-              <span>
-                <small>{t("recommended")}</small>
-                <strong>{t("createFromImage")}</strong>
-                <p>{t("createFromImageLong")}</p>
-              </span>
-              <ChevronRight size={16} />
-            </button>
-            <button className="new-theme-option" onClick={onBlank}>
-              <span className="new-theme-option__icon">
-                <Plus size={21} />
-              </span>
-              <span>
-                <small>{t("cleanStart")}</small>
-                <strong>{t("startBlank")}</strong>
-                <p>{t("startBlankDetail")}</p>
-              </span>
-              <ChevronRight size={16} />
-            </button>
-            <button
-              className="new-theme-option"
-              onClick={() => onChooseStep("existing")}
-            >
-              <span className="new-theme-option__icon">
-                <Copy size={21} />
-              </span>
-              <span>
-                <small>{t("optionalStartingPoint")}</small>
-                <strong>{t("useExistingTheme")}</strong>
-                <p>{t("useExistingThemeDetail")}</p>
-              </span>
-              <ChevronRight size={16} />
-            </button>
-          </div>
-        ) : (
-          <div className="new-theme-existing-list" data-scroll-surface="panel">
-            {themes.map((theme) => {
-              const copy = theme.locales[locale] ?? theme.locales.en;
-              const preview = theme.metadata.preview
-                ? resolveAsset(theme, theme.metadata.preview)
-                : undefined;
-              return (
-                <button key={theme.id} onClick={() => onExisting(theme)}>
-                  <span
-                    className="new-theme-existing-list__preview"
-                    style={{
-                      backgroundColor: theme.variants.dark.background.color,
-                      backgroundImage: preview ? `url(${preview})` : undefined,
-                    }}
-                  />
-                  <span>
-                    <strong>{copy.name}</strong>
-                    <small>{copy.description}</small>
-                  </span>
-                  <ChevronRight size={15} />
-                </button>
-              );
-            })}
-          </div>
-        )}
-        <footer className="new-theme-dialog__footer">
-          <LockKeyhole size={13} />
-          {t("newThemePrivacy")}
-        </footer>
-      </section>
     </div>
   );
 }
