@@ -39,6 +39,7 @@ export interface UserSettings {
   companionSizes: Record<string, number>;
   companionAttachments: Record<string, EntityAttachment | null>;
   reduceMotion: boolean;
+  composerMomentsEnabled: boolean;
   automaticUpdateChecks: boolean;
   skippedUpdateVersion: string | null;
   lastUpdateCheckAt: string | null;
@@ -133,6 +134,10 @@ export function loadSettings(): UserSettings {
           typeof parsed.reduceMotion === "boolean"
             ? parsed.reduceMotion
             : false,
+        composerMomentsEnabled:
+          typeof parsed.composerMomentsEnabled === "boolean"
+            ? parsed.composerMomentsEnabled
+            : true,
         automaticUpdateChecks,
         skippedUpdateVersion:
           typeof parsed.skippedUpdateVersion === "string" ||
@@ -170,6 +175,7 @@ function defaultSettings(): UserSettings {
     companionSizes: {},
     companionAttachments: {},
     reduceMotion: false,
+    composerMomentsEnabled: true,
     automaticUpdateChecks: true,
     skippedUpdateVersion: null,
     lastUpdateCheckAt: null,

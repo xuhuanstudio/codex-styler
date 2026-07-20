@@ -798,6 +798,7 @@ export function App() {
           variant: variantSnapshot,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
           reduceMotion: settingsSnapshot.reduceMotion,
+          composerMomentsEnabled: settingsSnapshot.composerMomentsEnabled,
           revision,
         },
         resolveAsset,
@@ -852,6 +853,7 @@ export function App() {
           variant: settingsSnapshot.themeVariant,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
           reduceMotion: settingsSnapshot.reduceMotion,
+          composerMomentsEnabled: settingsSnapshot.composerMomentsEnabled,
           revision,
         },
         resolveAsset,
@@ -1034,7 +1036,8 @@ export function App() {
     const next = updateSettings(patch);
     const affectsRuntime =
       Object.prototype.hasOwnProperty.call(patch, "runtimeStrategy") ||
-      Object.prototype.hasOwnProperty.call(patch, "reduceMotion");
+      Object.prototype.hasOwnProperty.call(patch, "reduceMotion") ||
+      Object.prototype.hasOwnProperty.call(patch, "composerMomentsEnabled");
     if (isLive && affectsRuntime) {
       void performApply(
         appliedTheme,

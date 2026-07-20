@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeRefined, type SceneEntity } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
+import composerMomentsSource from "../src-tauri/src/composer-moments.js?raw";
 import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
 import { assignThemeColorHarmony } from "./lib/theme-color-harmony";
@@ -14,6 +15,10 @@ interface InjectedRuntime {
     variant: "light" | "dark",
     mode: "auto" | "compatibility" | "developer",
     revision?: number,
+    experience?: {
+      composerMomentsEnabled: boolean;
+      reduceMotion: boolean;
+    },
   ) => Promise<{
     resolvedMode: string;
     reason: string | null;
@@ -110,7 +115,7 @@ describe("injected compatibility runtime", () => {
       return 1;
     });
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    Function(runtimeSource)();
+    Function(`${composerMomentsSource}\n${runtimeSource}`)();
   });
 
   afterEach(() => {
@@ -142,10 +147,214 @@ describe("injected compatibility runtime", () => {
       }
     ).__CODEX_STYLER_RUNTIME__ = { version: 20, restore };
 
-    Function(runtimeSource)();
+    Function(`${composerMomentsSource}\n${runtimeSource}`)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(36);
+    expect(runtime().version).toBe(37);
+  });
+
+  it("adds theme-adaptive composer moments without touching prompt content", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    const originalPrompt = composer.textContent;
+    vi.spyOn(composer, "getBoundingClientRect").mockReturnValue({
+      x: 180,
+      y: 540,
+      left: 180,
+      top: 540,
+      right: 820,
+      bottom: 650,
+      width: 640,
+      height: 110,
+      toJSON: () => ({}),
+    });
+
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerMomentsEnabled: true,
+      reduceMotion: true,
+    });
+
+    const root = document.getElementById("codex-styler-composer-moments");
+    const trigger = root?.querySelector<HTMLButtonElement>(".csm-trigger");
+    expect(root).not.toBeNull();
+    expect(root?.style.getPropertyValue("--csm-accent")).toBe(
+      nativeRefined.variants.dark.appearance.accent,
+    );
+    expect(root?.style.getPropertyValue("--csm-surface-opacity")).toBe(
+      `${Math.round(
+        nativeRefined.variants.dark.appearance.surfaceOpacity * 100,
+      )}%`,
+    );
+    expect(root?.style.getPropertyValue("--csm-blur")).toBe(
+      `${nativeRefined.variants.dark.appearance.focusBlur}px`,
+    );
+    expect(getComputedStyle(root as HTMLElement).zIndex).toBe("10");
+    expect(trigger).toHaveAccessibleName("Open composer moments");
+
+    trigger?.click();
+    const menu = root?.querySelector<HTMLElement>("[role='menu']");
+    expect(menu).not.toHaveAttribute("hidden");
+    expect(root?.querySelectorAll("[role='menuitem']")).toHaveLength(3);
+
+    root?.querySelector<HTMLButtonElement>("[data-game='toss']")?.click();
+    expect(root?.querySelector("[role='application']")).toHaveAccessibleName(
+      "Lucky Toss",
+    );
+    expect(root?.querySelector(".csm-static-result")).not.toBeNull();
+    expect(composer.textContent).toBe(originalPrompt);
+
+    runtime().restore();
+    expect(document.getElementById("codex-styler-composer-moments")).toBeNull();
+  });
+
+  it("keeps composer moments absent when the user turns them off", async () => {
+    document.body.innerHTML = codexFixture("task");
+
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerMomentsEnabled: false,
+      reduceMotion: false,
+    });
+
+    expect(document.getElementById("codex-styler-composer-moments")).toBeNull();
+  });
+
+  it("keeps composer moments idempotent across theme updates and restores focus", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    vi.spyOn(composer, "getBoundingClientRect").mockReturnValue({
+      x: 180,
+      y: 540,
+      left: 180,
+      top: 540,
+      right: 820,
+      bottom: 650,
+      width: 640,
+      height: 110,
+      toJSON: () => ({}),
+    });
+
+    const experience = {
+      composerMomentsEnabled: true,
+      reduceMotion: true,
+    };
+    await runtime().apply(
+      nativeRefined,
+      "dark",
+      "compatibility",
+      1,
+      experience,
+    );
+    await runtime().apply(
+      nativeRefined,
+      "light",
+      "compatibility",
+      2,
+      experience,
+    );
+
+    expect(
+      document.querySelectorAll("#codex-styler-composer-moments"),
+    ).toHaveLength(1);
+    expect(
+      document.querySelectorAll("#codex-styler-composer-moments-style"),
+    ).toHaveLength(1);
+
+    const trigger = document.querySelector<HTMLButtonElement>(".csm-trigger");
+    trigger?.focus();
+    trigger?.click();
+    const menuItems = document.querySelectorAll<HTMLButtonElement>(
+      ".csm-menu [role='menuitem']",
+    );
+    expect(menuItems[0]).toHaveFocus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    expect(menuItems[1]).toHaveFocus();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(trigger).toHaveFocus();
+    expect(document.querySelector<HTMLElement>(".csm-menu")).toHaveAttribute(
+      "hidden",
+    );
+  });
+
+  it("opens every animated composer moment and renders its first frame", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    vi.spyOn(composer, "getBoundingClientRect").mockReturnValue({
+      x: 180,
+      y: 540,
+      left: 180,
+      top: 540,
+      right: 820,
+      bottom: 650,
+      width: 640,
+      height: 110,
+      toJSON: () => ({}),
+    });
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerMomentsEnabled: true,
+      reduceMotion: false,
+    });
+
+    const gradient = { addColorStop: vi.fn() };
+    const context = {
+      arc: vi.fn(),
+      arcTo: vi.fn(),
+      beginPath: vi.fn(),
+      clearRect: vi.fn(),
+      closePath: vi.fn(),
+      createLinearGradient: vi.fn(() => gradient),
+      createRadialGradient: vi.fn(() => gradient),
+      ellipse: vi.fn(),
+      fill: vi.fn(),
+      fillText: vi.fn(),
+      lineTo: vi.fn(),
+      moveTo: vi.fn(),
+      quadraticCurveTo: vi.fn(),
+      restore: vi.fn(),
+      rotate: vi.fn(),
+      save: vi.fn(),
+      setLineDash: vi.fn(),
+      setTransform: vi.fn(),
+      stroke: vi.fn(),
+      translate: vi.fn(),
+    };
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context as unknown as CanvasRenderingContext2D,
+    );
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const animationFrames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    });
+
+    for (const game of ["marbles", "claw", "toss"]) {
+      animationFrames.length = 0;
+      context.clearRect.mockClear();
+      document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
+      document
+        .querySelector<HTMLButtonElement>(`[data-game='${game}']`)
+        ?.click();
+      const stage = document.querySelector<HTMLElement>(".csm-stage");
+      expect(stage).toHaveFocus();
+      expect(stage?.querySelector("canvas")).not.toBeNull();
+      const keyboardAction = new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      });
+      stage?.dispatchEvent(keyboardAction);
+      expect(keyboardAction.defaultPrevented).toBe(true);
+      animationFrames.shift()?.(performance.now() + 16);
+      expect(context.clearRect).toHaveBeenCalled();
+      document.querySelector<HTMLButtonElement>(".csm-close")?.click();
+      expect(document.querySelector(".csm-stage")).toBeNull();
+    }
   });
 
   it.each([

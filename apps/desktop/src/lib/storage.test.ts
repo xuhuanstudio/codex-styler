@@ -49,6 +49,23 @@ describe("v0.1 settings migration", () => {
       themeVariant: "light",
     });
   });
+
+  it("enables composer moments for existing users and preserves opt-out", () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ reduceMotion: true }),
+    );
+    expect(loadSettings()).toMatchObject({
+      composerMomentsEnabled: true,
+      reduceMotion: true,
+    });
+
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ composerMomentsEnabled: false }),
+    );
+    expect(loadSettings().composerMomentsEnabled).toBe(false);
+  });
 });
 
 describe("workspace UI preferences", () => {

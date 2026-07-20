@@ -1,11 +1,12 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 36) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 37) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
   const ENTITY_ID = "codex-styler-entity-root";
   const STYLE_ID = "codex-styler-runtime-style";
   const CONTRAST_REPAIR_STYLE_ID = "codex-styler-contrast-repair-style";
+  const COMPOSER_MOMENTS_ROOT_ID = "codex-styler-composer-moments";
   const APP_ROOT_ATTRIBUTE = "data-codex-styler-app-root";
   const OVERLAY_ROOT_ATTRIBUTE = "data-codex-styler-overlay-root";
   const UNLAYERED_ROOT_ATTRIBUTE = "data-codex-styler-unlayered-root";
@@ -45,6 +46,7 @@
   let activeState = null;
   let entityCleanup = null;
   let entityPositioner = null;
+  let composerMoments = null;
   let latestRevision = 0;
 
   const finiteBetween = (value, minimum, maximum) =>
@@ -502,6 +504,8 @@
   };
 
   const remove = () => {
+    composerMoments?.destroy?.();
+    composerMoments = null;
     if (scenePointerHandler)
       window.removeEventListener("pointermove", scenePointerHandler);
     if (sceneResetHandler) {
@@ -559,7 +563,9 @@
   };
 
   const injectedRoot = (element) =>
-    element?.id === BACKDROP_ID || element?.id === ENTITY_ID;
+    element?.id === BACKDROP_ID ||
+    element?.id === ENTITY_ID ||
+    element?.id === COMPOSER_MOMENTS_ROOT_ID;
 
   const appRootFallback = () => {
     const conventionalRoot = document.querySelector("body > #root");
@@ -2961,7 +2967,14 @@
   const nextFrame = () =>
     new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
-  const render = (theme, variant, safeMode, requestedMode, resolvedMode) => {
+  const render = (
+    theme,
+    variant,
+    safeMode,
+    requestedMode,
+    resolvedMode,
+    experience = {},
+  ) => {
     assertSafeTheme(theme, variant);
     remove();
     document.documentElement.setAttribute("data-codex-styler", theme.id);
@@ -2969,7 +2982,8 @@
       "data-codex-styler-mode",
       safeMode ? "compatibility" : "semantic",
     );
-    const appearance = theme.variants[variant].appearance;
+    const visual = theme.variants[variant];
+    const appearance = visual.appearance;
     const contrastSystem = resolveContrastSystem(theme, variant);
     document.documentElement.setAttribute("data-codex-styler-variant", variant);
     document.documentElement.setAttribute(
@@ -3115,6 +3129,30 @@
     entityRoot.setAttribute("aria-hidden", "true");
     document.body.appendChild(entityRoot);
     installEntity(entityRoot, theme, variant);
+    const momentsFactory = window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__;
+    if (typeof momentsFactory === "function") {
+      composerMoments = momentsFactory({
+        resolveComposer: () => entityTarget("composer"),
+      });
+      composerMoments.configure({
+        enabled: experience.composerMomentsEnabled === true,
+        reduceMotion: experience.reduceMotion === true,
+        palette: {
+          accent: appearance.accent,
+          surface: appearance.surface,
+          text: appearance.text,
+          mutedText: appearance.mutedText,
+          border: appearance.border,
+          radius: appearance.radius,
+          surfaceOpacity: appearance.surfaceOpacity,
+          focusBlur: appearance.focusBlur,
+          warning: appearance.palette?.warning || appearance.accent,
+          success: appearance.palette?.success || appearance.accent,
+        },
+        motionIntensity: visual.motion.intensity,
+        targetFps: visual.motion.targetFps,
+      });
+    }
     layoutResizeHandler = () => updateResponsiveLayout();
     window.addEventListener("resize", layoutResizeHandler, { passive: true });
 
@@ -3124,12 +3162,14 @@
       safeMode: Boolean(safeMode),
       requestedMode,
       resolvedMode,
+      experience,
     };
     mutationObserver = new MutationObserver(() => {
       updateStackingRoots();
       updatePageKind();
       updateResponsiveLayout();
       entityPositioner?.();
+      composerMoments?.refresh?.();
       if (
         activeState &&
         (!document.getElementById(BACKDROP_ID) ||
@@ -3143,6 +3183,7 @@
           state.safeMode,
           state.requestedMode,
           state.resolvedMode,
+          state.experience,
         );
         return;
       }
@@ -3176,6 +3217,7 @@
                     true,
                     state.requestedMode,
                     "compatibility",
+                    state.experience,
                   );
                   document.documentElement.setAttribute(
                     "data-codex-styler-fallback",
@@ -3192,6 +3234,7 @@
               true,
               state.requestedMode,
               "compatibility",
+              state.experience,
             );
             document.documentElement.setAttribute(
               "data-codex-styler-fallback",
@@ -3238,6 +3281,7 @@
     variant,
     compatibilityMode = "auto",
     revision = latestRevision + 1,
+    experience = {},
   ) => {
     assertSafeTheme(theme, variant);
     if (!Number.isInteger(revision) || revision < 0) {
@@ -3267,7 +3311,14 @@
       compatibilityMode === "compatibility" ||
       (compatibilityMode === "auto" && !themeRequestsSemantic)
     ) {
-      render(theme, variant, true, compatibilityMode, "compatibility");
+      render(
+        theme,
+        variant,
+        true,
+        compatibilityMode,
+        "compatibility",
+        experience,
+      );
       return {
         ok: true,
         themeId: theme.id,
@@ -3281,7 +3332,7 @@
 
     const resolvedMode =
       compatibilityMode === "developer" ? "developer" : "semantic";
-    render(theme, variant, false, compatibilityMode, resolvedMode);
+    render(theme, variant, false, compatibilityMode, resolvedMode, experience);
     if (compatibilityMode === "developer") {
       return {
         ok: true,
@@ -3325,7 +3376,14 @@
       contrastRepairApplied = verification.ok;
     }
     if (!verification.ok) {
-      render(theme, variant, true, compatibilityMode, "compatibility");
+      render(
+        theme,
+        variant,
+        true,
+        compatibilityMode,
+        "compatibility",
+        experience,
+      );
       document.documentElement.setAttribute(
         "data-codex-styler-fallback",
         verification.reason,
@@ -3354,7 +3412,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 36,
+    version: 37,
     apply,
     updateEntity,
     pause: remove,

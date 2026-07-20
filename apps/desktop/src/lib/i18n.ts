@@ -469,6 +469,9 @@ const messages = {
     reduceMotion: "Reduce motion",
     reduceMotionDescription:
       "Freezes pointer tracking, idle animation, and non-essential parallax.",
+    composerMoments: "Composer moments",
+    composerMomentsDescription:
+      "Adds an optional play button beside the Codex composer for Marble Drift, Pocket Claw, and Lucky Toss. Moments inherit the active theme and never read or change your prompt.",
     automaticUpdateChecks: "Automatically check for updates",
     automaticUpdateChecksDescription:
       "Checks GitHub Releases after launch. Nothing is downloaded without confirmation.",
@@ -1056,6 +1059,9 @@ const messages = {
     languageDescription: "界面语言与本地主题元数据",
     reduceMotion: "减少动态",
     reduceMotionDescription: "停止光标跟随、待机动作和非必要的视差动态。",
+    composerMoments: "输入时刻",
+    composerMomentsDescription:
+      "在 Codex 输入框旁加入可选的互动按钮，提供滚珠漫游、口袋抓取和幸运投掷。玩法自动继承当前主题，不会读取或修改输入内容。",
     automaticUpdateChecks: "自动检查更新",
     automaticUpdateChecksDescription:
       "启动后检查 GitHub Releases；未经确认不会下载任何内容。",

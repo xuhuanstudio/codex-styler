@@ -739,6 +739,7 @@ async fn apply_theme(
     variant: String,
     compatibility_mode: String,
     revision: u64,
+    experience: Value,
     state: State<'_, Mutex<AppRuntime>>,
 ) -> Result<RuntimeStatus, String> {
     let started_at = Instant::now();
@@ -767,13 +768,16 @@ async fn apply_theme(
     let variant_json = serde_json::to_string(&variant).map_err(|error| error.to_string())?;
     let mode_json =
         serde_json::to_string(&compatibility_mode).map_err(|error| error.to_string())?;
+    let experience_json = serde_json::to_string(&experience).map_err(|error| error.to_string())?;
     let expression = format!(
-        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {});",
+        "{}\n{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {}, {});",
+        include_str!("composer-moments.js"),
         include_str!("runtime.js"),
         theme_json,
         variant_json,
         mode_json,
         revision,
+        experience_json,
     );
 
     let response = match cdp::evaluate(&websocket_url, &expression).await {

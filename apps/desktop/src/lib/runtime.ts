@@ -63,7 +63,13 @@ export interface AppliedConfiguration {
   variant: "light" | "dark";
   runtimeStrategy: RuntimeStrategy;
   reduceMotion: boolean;
+  composerMomentsEnabled: boolean;
   revision: number;
+}
+
+export interface RuntimeExperiencePreferences {
+  composerMomentsEnabled: boolean;
+  reduceMotion: boolean;
 }
 
 export type UpdateDownloadEvent =
@@ -205,6 +211,10 @@ export async function applyTheme(
   runtimeStrategy: RuntimeStrategy,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
   revision = 0,
+  experience: RuntimeExperiencePreferences = {
+    composerMomentsEnabled: true,
+    reduceMotion: false,
+  },
 ): Promise<RuntimeStatus> {
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
   if (!isTauri()) {
@@ -225,6 +235,7 @@ export async function applyTheme(
     compatibilityMode:
       runtimeStrategy === "enhanced" ? "auto" : "compatibility",
     revision,
+    experience,
   });
 }
 
@@ -246,6 +257,10 @@ export async function applyConfiguration(
     configuration.runtimeStrategy,
     resolveAsset,
     configuration.revision,
+    {
+      composerMomentsEnabled: configuration.composerMomentsEnabled,
+      reduceMotion: configuration.reduceMotion,
+    },
   );
 }
 
