@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 4;
+  const FACTORY_VERSION = 7;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__?.version === FACTORY_VERSION
   ) {
@@ -9,6 +9,8 @@
   const ROOT_ID = "codex-styler-composer-moments";
   const STYLE_ID = "codex-styler-composer-moments-style";
   const GAME_IDS = new Set(["marbles", "claw", "toss", "balance", "route"]);
+  const GAME_ASSET_URLS = window.__CODEX_STYLER_COMPOSER_ASSETS__ || {};
+  const gameAssetImages = new Map();
   let runtimeLocale = "en";
 
   const copy = () => {
@@ -18,32 +20,45 @@
           title: "配置玩法",
           trigger: "打开配置玩法",
           close: "关闭",
-          marbles: "轨道配方",
-          marblesDetail: "让滚珠组合一套真实配置",
-          claw: "抓取配置",
-          clawDetail: "从可用方案中抓取一个",
-          toss: "幸运配置",
-          tossDetail: "在安全候选中随机投掷",
-          balance: "深速天平",
-          balanceDetail: "在速度与思考深度间调校",
-          route: "星图路线",
-          routeDetail: "选择一条适合当前任务的路线",
+          marbles: "三段落珠",
+          marblesDetail: "依次为模型、推理强度与速度落下一颗配置珠",
+          claw: "配置胶囊机",
+          clawDetail: "瞄准并抓取一枚写明三项真实参数的胶囊",
+          toss: "三环锻造",
+          tossDetail: "分别锁定模型、推理强度与速度，再锻造成配置",
+          balance: "三轴控制台",
+          balanceDetail: "直接调节模型、推理强度与响应速度",
+          route: "任务航图",
+          routeDetail: "先选模型引擎，再选择与任务意图匹配的航线",
           modePhysics: "物理",
           modeSkill: "操作",
           modeChance: "随机",
           modeTune: "调校",
           modeChoose: "选择",
-          marbleHint: "投放滚珠，完成后生成配置方案",
-          clawHint: "移动抓钩，点击抓取配置",
-          tossHint: "点击舞台投出配置",
-          balanceHint: "左右移动选择倾向，回车确认",
-          routeHint: "选择一颗路线节点",
+          marbleHint: "第 1 / 3 段 · 选择模型落点",
+          clawHint: "移动抓钩；每枚胶囊都对应完整的三项配置",
+          tossHint: "点击转动三环；再次点击依次锁定，回车锻造",
+          balanceHint:
+            "点击上方选择模型；方向键调推理与速度，M 切换模型，回车确认",
+          routeHint: "上下方向键选择模型，左右方向键选择任务航线，回车确认",
+          stepModel: "模型落点",
+          stepReasoning: "推理落点",
+          stepSpeed: "速度落点",
+          drop: "落珠",
+          spin: "转动三环",
+          lock: "锁定",
+          forge: "锻造配置",
+          selectModel: "选择模型引擎",
+          selectedLoadout: "实时配置",
           reduced: "已按减少动态生成方案",
           caught: "已抓取配置",
           rolled: "配置结果",
           unavailable: "未识别到可安全调整的 Codex 配置",
           unavailableDetail:
-            "当前版本不会执行猜测性修改；你仍可使用原生配置菜单。",
+            "未能安全读取当前配置。玩法不会猜测性修改，你可以明确选择改用官方设置。",
+          preparing: "正在读取当前配置",
+          preparingDetail: "玩法面板已接管入口，正在校准模型、推理强度与速度。",
+          useOfficial: "改用官方设置",
           proposal: "配置结果",
           model: "模型",
           reasoning: "推理强度",
@@ -55,42 +70,62 @@
           applyFailed: "未能验证配置，已停止继续修改",
           retry: "再玩一次",
           cancel: "取消",
-          presetQuick: "快速巡航",
-          presetBalanced: "均衡推进",
-          presetDeep: "深度专注",
-          presetPrecision: "精细推演",
-          presetAdaptive: "灵活折中",
+          presetQuick: "快速检查",
+          presetBalanced: "日常处理",
+          presetDeep: "深度诊断",
+          presetPrecision: "审慎复核",
+          presetAdaptive: "代码构建",
         }
       : {
           title: "Configuration plays",
           trigger: "Open configuration plays",
           close: "Close",
-          marbles: "Orbit Recipe",
-          marblesDetail: "Combine a real Codex configuration",
-          claw: "Preset Claw",
-          clawDetail: "Catch one available configuration",
-          toss: "Lucky Setup",
-          tossDetail: "Roll within safe configuration candidates",
-          balance: "Depth Balance",
-          balanceDetail: "Tune speed against reasoning depth",
-          route: "Constellation Route",
-          routeDetail: "Choose a route for the task ahead",
+          marbles: "Triple Drop",
+          marblesDetail:
+            "Drop one configuration marble for model, reasoning, and speed",
+          claw: "Capsule Crane",
+          clawDetail: "Aim for a capsule labelled with all three real settings",
+          toss: "Loadout Forge",
+          tossDetail:
+            "Lock model, reasoning, and speed rings, then forge the result",
+          balance: "Three-axis Console",
+          balanceDetail:
+            "Directly tune model, reasoning effort, and response speed",
+          route: "Mission Map",
+          routeDetail:
+            "Choose an engine, then a reasoning-and-speed mission route",
           modePhysics: "Physics",
           modeSkill: "Skill",
           modeChance: "Chance",
           modeTune: "Tune",
           modeChoose: "Choose",
-          marbleHint: "Drop marbles to compose a configuration",
-          clawHint: "Aim, then catch a configuration",
-          tossHint: "Click the stage to roll a configuration",
-          balanceHint: "Move left or right, then press Enter",
-          routeHint: "Choose a route node",
+          marbleHint: "Stage 1 of 3 · Choose the model landing",
+          clawHint: "Move the crane; every capsule contains a complete loadout",
+          tossHint:
+            "Spin three rings; click again to lock each, then press Enter",
+          balanceHint:
+            "Choose a model above; use arrows to tune, M to cycle models, Enter to confirm",
+          routeHint:
+            "Use up/down for model, left/right for mission route, then press Enter",
+          stepModel: "Model landing",
+          stepReasoning: "Reasoning landing",
+          stepSpeed: "Speed landing",
+          drop: "Drop",
+          spin: "Spin rings",
+          lock: "Lock",
+          forge: "Forge loadout",
+          selectModel: "Choose model engine",
+          selectedLoadout: "Live loadout",
           reduced: "Configuration prepared without motion",
           caught: "Configuration caught",
           rolled: "Configuration result",
           unavailable: "No safely adjustable Codex configuration was found",
           unavailableDetail:
-            "This version will not guess at settings. The native configuration menu remains available.",
+            "The current configuration could not be read safely. Nothing was guessed or changed.",
+          preparing: "Reading current configuration",
+          preparingDetail:
+            "The play panel has taken over while model, reasoning, and speed are calibrated.",
+          useOfficial: "Use official settings",
           proposal: "Configuration result",
           model: "Model",
           reasoning: "Reasoning effort",
@@ -103,11 +138,11 @@
             "Could not verify the configuration; no further changes were made",
           retry: "Play again",
           cancel: "Cancel",
-          presetQuick: "Quick pass",
-          presetBalanced: "Balanced run",
-          presetDeep: "Deep focus",
-          presetPrecision: "Precision pass",
-          presetAdaptive: "Adaptive middle",
+          presetQuick: "Quick check",
+          presetBalanced: "Everyday task",
+          presetDeep: "Deep diagnosis",
+          presetPrecision: "Careful review",
+          presetAdaptive: "Code build",
         };
   };
 
@@ -139,6 +174,59 @@
     return (
       "rgba(" + value.r + ", " + value.g + ", " + value.b + ", " + alpha + ")"
     );
+  };
+
+  const colorHue = (color) => {
+    const { r, g, b } = parseHex(color);
+    const red = r / 255;
+    const green = g / 255;
+    const blue = b / 255;
+    const maximum = Math.max(red, green, blue);
+    const minimum = Math.min(red, green, blue);
+    const delta = maximum - minimum;
+    if (delta === 0) return 210;
+    const hue =
+      maximum === red
+        ? ((green - blue) / delta) % 6
+        : maximum === green
+          ? (blue - red) / delta + 2
+          : (red - green) / delta + 4;
+    return (hue * 60 + 360) % 360;
+  };
+
+  const gameAsset = (name) => {
+    if (!GAME_ASSET_URLS[name] || typeof Image === "undefined") return null;
+    if (!gameAssetImages.has(name)) {
+      const image = new Image();
+      image.decoding = "async";
+      image.src = GAME_ASSET_URLS[name];
+      gameAssetImages.set(name, image);
+    }
+    const image = gameAssetImages.get(name);
+    return image?.complete && image.naturalWidth > 0 ? image : null;
+  };
+
+  const drawGameAsset = (
+    context,
+    name,
+    x,
+    y,
+    width,
+    height,
+    tint,
+    alpha = 1,
+  ) => {
+    const image = gameAsset(name);
+    if (!image) return false;
+    const rotation = Math.round(colorHue(tint) - 210);
+    context.save();
+    context.globalAlpha = alpha;
+    context.filter = `hue-rotate(${rotation}deg) saturate(.82)`;
+    context.shadowColor = rgba(tint, 0.24 * alpha);
+    context.shadowBlur = Math.min(width, height) * 0.22;
+    context.drawImage(image, x, y, width, height);
+    context.restore();
+    return true;
   };
 
   const roundedRect = (context, x, y, width, height, radius) => {
@@ -204,6 +292,90 @@
         width: 100%;
         height: 100%;
       }
+      #@@{ROOT_ID} .csm-stage-state {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-content: center;
+        align-items: center;
+        gap: 14px;
+        padding: 22px 48px 20px 22px;
+        background:
+          radial-gradient(circle at 18% 50%, color-mix(in srgb, var(--csm-accent) 18%, transparent), transparent 34%),
+          linear-gradient(135deg, color-mix(in srgb, var(--csm-surface) 96%, transparent), color-mix(in srgb, var(--csm-accent) 7%, var(--csm-surface)));
+      }
+      #@@{ROOT_ID} .csm-stage-state-mark {
+        position: relative;
+        width: 38px;
+        height: 38px;
+        border: 1px solid color-mix(in srgb, var(--csm-accent) 52%, var(--csm-border));
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--csm-accent) 12%, var(--csm-surface));
+        box-shadow: inset 0 1px color-mix(in srgb, white 12%, transparent);
+      }
+      #@@{ROOT_ID} .csm-stage-state-mark::before,
+      #@@{ROOT_ID} .csm-stage-state-mark::after {
+        position: absolute;
+        content: "";
+      }
+      #@@{ROOT_ID} .csm-stage-state-mark::before {
+        inset: 7px;
+        border: 2px solid color-mix(in srgb, var(--csm-accent) 24%, transparent);
+        border-top-color: color-mix(in srgb, var(--csm-accent) 90%, white);
+        border-radius: 50%;
+        animation: csm-calibrate 900ms linear infinite;
+      }
+      #@@{ROOT_ID} .csm-stage-state-mark::after {
+        inset: 16px;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--csm-accent) 78%, white);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--csm-accent) 64%, transparent);
+      }
+      #@@{ROOT_ID} .csm-stage-state-copy { min-width: 0; }
+      #@@{ROOT_ID} .csm-stage-state h3,
+      #@@{ROOT_ID} .csm-stage-state p { margin: 0; }
+      #@@{ROOT_ID} .csm-stage-state h3 {
+        color: var(--csm-text);
+        font-size: 14px;
+        font-weight: 680;
+        letter-spacing: -.01em;
+      }
+      #@@{ROOT_ID} .csm-stage-state p {
+        max-width: 48ch;
+        margin-top: 5px;
+        color: var(--csm-muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+      #@@{ROOT_ID} .csm-stage-state-actions {
+        grid-column: 2;
+        display: flex;
+        gap: 7px;
+        margin-top: 3px;
+      }
+      #@@{ROOT_ID} .csm-stage-state-actions button {
+        min-height: 30px;
+        padding: 0 11px;
+        border: 1px solid color-mix(in srgb, var(--csm-border) 76%, transparent);
+        border-radius: max(9px, calc(var(--csm-radius) - 6px));
+        color: var(--csm-text);
+        background: color-mix(in srgb, var(--csm-text) 5%, transparent);
+        cursor: pointer;
+      }
+      #@@{ROOT_ID} .csm-stage--unavailable .csm-stage-state-mark::before {
+        inset: 13px 8px;
+        border: 0;
+        border-top: 2px solid var(--csm-muted);
+        border-bottom: 2px solid var(--csm-muted);
+        border-radius: 0;
+        animation: none;
+        transform: rotate(45deg);
+      }
+      #@@{ROOT_ID} .csm-stage--unavailable .csm-stage-state-mark::after {
+        display: none;
+      }
+      @keyframes csm-calibrate { to { transform: rotate(360deg); } }
       #@@{ROOT_ID} .csm-stage-label {
         position: absolute;
         left: 12px;
@@ -350,6 +522,9 @@
         }
         #@@{ROOT_ID} .csm-config-diff dd { margin-top: 0; }
       }
+      @media (prefers-reduced-motion: reduce) {
+        #@@{ROOT_ID} .csm-stage-state-mark::before { animation: none; }
+      }
     `.replaceAll("@@{ROOT_ID}", ROOT_ID);
     document.head.appendChild(style);
   };
@@ -405,58 +580,89 @@
     const optionAt = (options, progress) =>
       options[Math.round((options.length - 1) * clamp(progress, 0, 1))] || null;
 
-    const speedOption = (options, kind) => {
-      if (!options?.length) return null;
-      const matcher =
-        kind === "fast"
-          ? /(fast|quick|turbo|快速|极速)/i
-          : /(standard|normal|balanced|标准|普通|均衡)/i;
-      return (
-        options.find((option) => matcher.test(option.label)) ||
-        (kind === "fast" ? options.at(-1) : options[0])
-      );
+    const fieldOptions = (snapshot, field) => {
+      const options = snapshot?.[field]?.options || [];
+      if (options.length) return options;
+      return [snapshot?.[field]?.current].filter(Boolean);
+    };
+
+    const currentOptionIndex = (snapshot, field) => {
+      const options = fieldOptions(snapshot, field);
+      const label = snapshot?.[field]?.current?.label;
+      const index = options.findIndex((option) => option.label === label);
+      return Math.max(0, index);
+    };
+
+    const outcomeFromIndices = (indices, name = null, source = "direct") => {
+      const modelOptions = fieldOptions(currentSnapshot, "model");
+      const reasoningOptions = fieldOptions(currentSnapshot, "reasoning");
+      const speedOptions = fieldOptions(currentSnapshot, "speed");
+      const model =
+        modelOptions[clamp(indices.model, 0, modelOptions.length - 1)];
+      const reasoning =
+        reasoningOptions[
+          clamp(indices.reasoning, 0, reasoningOptions.length - 1)
+        ];
+      const speed =
+        speedOptions[clamp(indices.speed, 0, speedOptions.length - 1)];
+      if (!model || !reasoning || !speed) return null;
+      return {
+        id: source,
+        name:
+          name ||
+          [model.label, reasoning.label, speed.label]
+            .filter(Boolean)
+            .join(" · "),
+        source,
+        configuration: { model, reasoning, speed },
+      };
     };
 
     const buildPresets = (snapshot) => {
-      const reasoning = snapshot?.reasoning?.options || [];
-      if (reasoning.length < 2) return [];
-      const speeds = snapshot?.speed?.options || [];
+      const models = fieldOptions(snapshot, "model");
+      const reasoning = fieldOptions(snapshot, "reasoning");
+      const speeds = fieldOptions(snapshot, "speed");
+      if (!models.length || !reasoning.length || !speeds.length) return [];
+      const currentModel = currentOptionIndex(snapshot, "model");
       const definitions = [
-        { id: "quick", effort: 0.12, speed: "fast" },
-        { id: "balanced", effort: 0.5, speed: "standard" },
-        { id: "adaptive", effort: 0.66, speed: "fast" },
-        { id: "precision", effort: 0.82, speed: "standard" },
-        { id: "deep", effort: 1, speed: "standard" },
+        { id: "quick", effort: 0, speed: 1 },
+        { id: "balanced", effort: 0.34, speed: 0 },
+        { id: "adaptive", effort: 0.58, speed: 1 },
+        { id: "precision", effort: 0.78, speed: 0 },
+        { id: "deep", effort: 1, speed: 0 },
       ];
       const seen = new Set();
       return definitions
-        .map((definition) => {
+        .map((definition, index) => {
+          const model = models[(currentModel + index) % models.length];
           const targetReasoning = optionAt(reasoning, definition.effort);
-          const targetSpeed = speedOption(speeds, definition.speed);
-          const signature = [targetReasoning?.label, targetSpeed?.label].join(
-            "|",
-          );
-          if (!targetReasoning || seen.has(signature)) return null;
+          const targetSpeed = optionAt(speeds, definition.speed);
+          const signature = [
+            model?.label,
+            targetReasoning?.label,
+            targetSpeed?.label,
+          ].join("|");
+          if (
+            !model ||
+            !targetReasoning ||
+            !targetSpeed ||
+            seen.has(signature)
+          ) {
+            return null;
+          }
           seen.add(signature);
           return {
             id: definition.id,
             name: presetName(definition.id),
+            source: "profile",
             configuration: {
+              model,
               reasoning: targetReasoning,
               speed: targetSpeed,
             },
           };
         })
-        .filter(Boolean)
-        .filter((preset) => {
-          const reasoningChanged =
-            preset.configuration.reasoning?.label !==
-            snapshot.reasoning?.current?.label;
-          const speedChanged =
-            preset.configuration.speed?.label &&
-            preset.configuration.speed.label !== snapshot.speed?.current?.label;
-          return reasoningChanged || speedChanged;
-        });
+        .filter(Boolean);
     };
 
     const selectPreset = (index) =>
@@ -532,12 +738,18 @@
       if (stage) {
         const resultHeight = stage.classList.contains("csm-stage--result")
           ? window.innerWidth <= 520
-            ? 226
-            : 166
+            ? 286
+            : 222
           : 0;
+        const stateHeight =
+          stage.classList.contains("csm-stage--loading") ||
+          stage.classList.contains("csm-stage--unavailable")
+            ? 148
+            : 0;
         const minimumHeight = Math.max(
           resultHeight,
-          Math.min(132, Math.max(96, window.innerHeight * 0.16)),
+          stateHeight,
+          Math.min(292, Math.max(236, window.innerHeight * 0.31)),
         );
         const height = Math.max(bounds.height, minimumHeight);
         const top = clamp(
@@ -594,6 +806,11 @@
         passive: true,
       });
       document.addEventListener("keydown", onKeyDown, true);
+      document.addEventListener(
+        "pointerdown",
+        onNativeTriggerPointerDown,
+        true,
+      );
       document.addEventListener("click", onNativeTriggerClick, true);
       document.addEventListener("visibilitychange", onVisibilityChange);
       resizeObserver =
@@ -605,6 +822,92 @@
 
     const setStageLabel = (text) => {
       if (stageLabel) stageLabel.textContent = text;
+    };
+
+    const gameName = (gameId) => {
+      const labels = copy();
+      return {
+        marbles: labels.marbles,
+        claw: labels.claw,
+        toss: labels.toss,
+        balance: labels.balance,
+        route: labels.route,
+      }[gameId];
+    };
+
+    const gameHint = (gameId) => {
+      const labels = copy();
+      return {
+        marbles: labels.marbleHint,
+        claw: labels.clawHint,
+        toss: labels.tossHint,
+        balance: labels.balanceHint,
+        route: labels.routeHint,
+      }[gameId];
+    };
+
+    const mountStage = (gameId) => {
+      if (!root) return null;
+      const labels = copy();
+      stage = document.createElement("section");
+      stage.className = "csm-stage csm-stage--loading";
+      stage.setAttribute("role", "application");
+      stage.tabIndex = 0;
+      stage.setAttribute("aria-label", gameName(gameId));
+      const state = document.createElement("div");
+      state.className = "csm-stage-state";
+      state.setAttribute("role", "status");
+      const mark = document.createElement("span");
+      mark.className = "csm-stage-state-mark";
+      mark.setAttribute("aria-hidden", "true");
+      const stateCopy = document.createElement("div");
+      stateCopy.className = "csm-stage-state-copy";
+      const title = document.createElement("h3");
+      title.textContent = labels.preparing;
+      const detail = document.createElement("p");
+      detail.textContent = labels.preparingDetail;
+      stateCopy.append(title, detail);
+      state.append(mark, stateCopy);
+      const close = document.createElement("button");
+      close.type = "button";
+      close.className = "csm-close";
+      close.setAttribute("aria-label", labels.close);
+      close.textContent = "×";
+      close.addEventListener("click", () => closeStage());
+      stage.append(state, close);
+      root.appendChild(stage);
+      position();
+      stage.focus({ preventScroll: true });
+      return stage;
+    };
+
+    const showUnavailable = () => {
+      if (!stage) return;
+      const labels = copy();
+      stage.classList.remove("csm-stage--loading");
+      stage.classList.add("csm-stage--unavailable");
+      const state = stage.querySelector(".csm-stage-state");
+      const title = state?.querySelector("h3");
+      const detail = state?.querySelector("p");
+      if (title) title.textContent = labels.unavailable;
+      if (detail) detail.textContent = labels.unavailableDetail;
+      const actions = document.createElement("div");
+      actions.className = "csm-stage-state-actions";
+      const official = document.createElement("button");
+      official.type = "button";
+      official.textContent = labels.useOfficial;
+      official.addEventListener("click", async () => {
+        closeStage(false, false);
+        await settingsAdapter?.openOfficialMenu?.();
+      });
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = labels.cancel;
+      cancel.addEventListener("click", () => closeStage());
+      actions.append(official, cancel);
+      state?.append(actions);
+      position();
+      official.focus({ preventScroll: true });
     };
 
     const prepareCanvas = () => {
@@ -623,13 +926,180 @@
       return { context, width, height, dpr };
     };
 
+    const drawPlayfield = (context, width, height, emphasis = 0.5) => {
+      const colors = palette();
+      const background = context.createLinearGradient(0, 0, width, height);
+      background.addColorStop(0, mix(colors.surface, colors.accent, 0.035));
+      background.addColorStop(
+        0.58,
+        mix(colors.surface, colors.accent, 0.075 + emphasis * 0.035),
+      );
+      background.addColorStop(1, mix(colors.surface, "#000000", 0.14));
+      context.beginPath();
+      context.rect?.(0, 0, width, height);
+      if (!context.rect) roundedRect(context, 0, 0, width, height, 0);
+      context.fillStyle = background;
+      context.fill();
+
+      const spacing = Math.max(28, Math.min(48, width / 12));
+      context.save();
+      context.strokeStyle = rgba(colors.text, 0.025 + emphasis * 0.016);
+      context.lineWidth = 1;
+      for (let x = spacing; x < width; x += spacing) {
+        context.beginPath();
+        context.moveTo(x, 0);
+        context.lineTo(x, height);
+        context.stroke();
+      }
+      for (let y = spacing; y < height; y += spacing) {
+        context.beginPath();
+        context.moveTo(0, y);
+        context.lineTo(width, y);
+        context.stroke();
+      }
+      context.restore();
+
+      const secondaryGlow = context.createRadialGradient(
+        width * 0.14,
+        height * 0.9,
+        4,
+        width * 0.14,
+        height * 0.9,
+        Math.max(width, height) * 0.42,
+      );
+      secondaryGlow.addColorStop(0, rgba(colors.success, 0.08));
+      secondaryGlow.addColorStop(1, rgba(colors.success, 0));
+      context.fillStyle = secondaryGlow;
+      context.beginPath();
+      context.rect?.(0, 0, width, height);
+      if (!context.rect) roundedRect(context, 0, 0, width, height, 0);
+      context.fill();
+
+      const glow = context.createRadialGradient(
+        width * 0.78,
+        height * 0.18,
+        2,
+        width * 0.78,
+        height * 0.18,
+        Math.max(width, height) * 0.52,
+      );
+      glow.addColorStop(0, rgba(colors.accent, 0.14 + emphasis * 0.05));
+      glow.addColorStop(1, rgba(colors.accent, 0));
+      context.beginPath();
+      context.arc(
+        width * 0.78,
+        height * 0.18,
+        Math.max(width, height) * 0.52,
+        0,
+        Math.PI * 2,
+      );
+      context.fillStyle = glow;
+      context.fill();
+
+      roundedRect(context, 6.5, 6.5, width - 13, height - 13, 14);
+      context.strokeStyle = rgba(colors.text, 0.075);
+      context.lineWidth = 1;
+      context.stroke();
+
+      context.save();
+      context.globalAlpha = 0.18;
+      context.fillStyle = colors.accent;
+      for (let x = 18; x < width - 16; x += 36) {
+        context.beginPath();
+        context.arc(x, height - 9, 0.7, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.restore();
+    };
+
+    const defaultIndices = () => ({
+      model: currentOptionIndex(currentSnapshot, "model"),
+      reasoning: currentOptionIndex(currentSnapshot, "reasoning"),
+      speed: currentOptionIndex(currentSnapshot, "speed"),
+    });
+
+    const indicesForConfiguration = (configuration = {}) => {
+      const indices = {};
+      ["model", "reasoning", "speed"].forEach((field) => {
+        const options = fieldOptions(currentSnapshot, field);
+        const target = configuration[field]?.label;
+        indices[field] = Math.max(
+          0,
+          options.findIndex((option) => option.label === target),
+        );
+      });
+      return indices;
+    };
+
+    const drawLoadoutStrip = (
+      context,
+      width,
+      indices,
+      activeField = null,
+      top = 43,
+    ) => {
+      const colors = palette();
+      const labels = copy();
+      const fields = ["model", "reasoning", "speed"];
+      const names = {
+        model: labels.model,
+        reasoning: labels.reasoning,
+        speed: labels.speed,
+      };
+      const gap = 7;
+      const left = 14;
+      const available = Math.max(120, width - left * 2);
+      const cellWidth = (available - gap * 2) / 3;
+      fields.forEach((field, index) => {
+        const options = fieldOptions(currentSnapshot, field);
+        const selected =
+          options[clamp(indices[field], 0, Math.max(0, options.length - 1))];
+        const x = left + index * (cellWidth + gap);
+        const active = field === activeField;
+        roundedRect(context, x, top, cellWidth, 38, 10);
+        context.fillStyle = active
+          ? mix(colors.accent, colors.surface, 0.72)
+          : rgba(colors.text, 0.045);
+        context.fill();
+        context.strokeStyle = active
+          ? rgba(colors.accent, 0.84)
+          : rgba(colors.border, 0.56);
+        context.lineWidth = active ? 1.4 : 1;
+        context.stroke();
+        context.fillStyle = rgba(colors.mutedText, 0.9);
+        context.font = "600 8px ui-sans-serif, system-ui, sans-serif";
+        context.textAlign = "left";
+        context.textBaseline = "alphabetic";
+        context.fillText(names[field], x + 9, top + 13, cellWidth - 18);
+        context.fillStyle = rgba(colors.text, active ? 0.98 : 0.88);
+        context.font = active
+          ? "700 10px ui-sans-serif, system-ui, sans-serif"
+          : "620 10px ui-sans-serif, system-ui, sans-serif";
+        context.fillText(
+          selected?.label || "—",
+          x + 9,
+          top + 29,
+          cellWidth - 18,
+        );
+      });
+    };
+
+    const nearestOptionIndex = (options, progress) =>
+      clamp(
+        Math.round(clamp(progress, 0, 1) * Math.max(0, options.length - 1)),
+        0,
+        Math.max(0, options.length - 1),
+      );
+
     const fieldDiff = (term, current, target) => {
       const wrapper = document.createElement("div");
       const name = document.createElement("dt");
       name.textContent = term;
       const value = document.createElement("dd");
       if (!target?.label || target.label === current?.label) {
-        value.textContent = current?.label || copy().unchanged;
+        value.textContent = current?.label
+          ? `${copy().unchanged} · ${current.label}`
+          : copy().unchanged;
       } else {
         const before = document.createElement("s");
         before.textContent = current?.label || "—";
@@ -666,7 +1136,7 @@
         fieldDiff(
           labels.model,
           currentSnapshot?.model?.current,
-          currentSnapshot?.model?.current,
+          preset.configuration.model,
         ),
         fieldDiff(
           labels.reasoning,
@@ -728,13 +1198,32 @@
       if (!stage) return;
       canvas.hidden = true;
       setStageLabel(copy().reduced);
+      const indices = defaultIndices();
+      ["model", "reasoning", "speed"].forEach((field) => {
+        const options = fieldOptions(currentSnapshot, field);
+        if (options.length > 1)
+          indices[field] = (indices[field] + 1) % options.length;
+      });
       showProposal(
-        selectPreset(Math.floor(Math.random() * currentPresets.length)),
+        outcomeFromIndices(indices, copy().selectedLoadout, "reduced-motion"),
       );
     };
 
     const drawBall = (context, ball) => {
       const colors = palette();
+      if (
+        drawGameAsset(
+          context,
+          "marble",
+          ball.x - ball.radius * 1.18,
+          ball.y - ball.radius * 1.18,
+          ball.radius * 2.36,
+          ball.radius * 2.36,
+          ball.color,
+        )
+      ) {
+        return;
+      }
       const gradient = context.createRadialGradient(
         ball.x - ball.radius * 0.32,
         ball.y - ball.radius * 0.38,
@@ -763,49 +1252,110 @@
       const colors = palette();
       const scale = motionScale();
       const nextFrame = createFrameScheduler();
-      const balls = [];
+      const fields = ["model", "reasoning", "speed"];
+      const selected = defaultIndices();
+      let activeStep = 0;
+      let ball = null;
+      let aimProgress =
+        (selected.model + 0.5) /
+        Math.max(1, fieldOptions(currentSnapshot, "model").length);
       let lastTime = performance.now();
-      const ballColors = [
-        colors.accent,
-        mix(colors.accent, colors.warning, 0.62),
-        mix(colors.accent, colors.success, 0.58),
-        mix(colors.accent, "#ffffff", 0.44),
-      ];
-      const addBall = (x) => {
-        if (!viewport || balls.length >= 12) return;
-        const radius = 8 + Math.random() * 5;
-        balls.push({
-          x: clamp(
-            x ?? viewport.width * (0.2 + Math.random() * 0.6),
-            radius,
-            viewport.width - radius,
-          ),
-          y: 28,
-          radius,
-          vx: (Math.random() - 0.5) * 105 * scale,
-          vy: (24 + Math.random() * 42) * scale,
-          color: ballColors[balls.length % ballColors.length],
-        });
-      };
-      addBall();
-      addBall();
-      addBall();
+      let settled = false;
 
+      const activeField = () => fields[activeStep];
+      const activeOptions = () => fieldOptions(currentSnapshot, activeField());
+      const stepLabel = () => {
+        const labels = copy();
+        return [labels.stepModel, labels.stepReasoning, labels.stepSpeed][
+          activeStep
+        ];
+      };
+      const updateHint = () => {
+        setStageLabel(`${activeStep + 1} / 3 · ${stepLabel()}`);
+      };
+      updateHint();
+
+      const drop = (progress) => {
+        if (!viewport || ball) return;
+        const options = activeOptions();
+        aimProgress = clamp(progress, 0.035, 0.965);
+        ball = {
+          x: viewport.width * aimProgress,
+          y: 101,
+          radius: 11,
+          vx: (aimProgress - 0.5) * 18 * scale,
+          vy: 26 * scale,
+          color:
+            activeStep === 0
+              ? colors.accent
+              : activeStep === 1
+                ? colors.warning
+                : colors.success,
+        };
+        settled = false;
+      };
+      const completeStep = () => {
+        if (settled) return;
+        settled = true;
+        const options = activeOptions();
+        selected[activeField()] = nearestOptionIndex(
+          options,
+          ball.x / Math.max(1, viewport.width),
+        );
+        if (activeStep < 2) {
+          schedule(() => {
+            activeStep += 1;
+            ball = null;
+            aimProgress =
+              (selected[activeField()] + 0.5) /
+              Math.max(1, activeOptions().length);
+            settled = false;
+            updateHint();
+          }, 220);
+          return;
+        }
+        const outcome = outcomeFromIndices(
+          selected,
+          copy().selectedLoadout,
+          "triple-drop",
+        );
+        schedule(() => showProposal(outcome), 300);
+      };
       const resize = () => {
         viewport = prepareCanvas();
       };
+      const pointerMove = (event) => {
+        if (!viewport || ball) return;
+        const bounds = canvas.getBoundingClientRect();
+        const options = activeOptions();
+        aimProgress = clamp(
+          (event.clientX - bounds.left) / Math.max(1, bounds.width),
+          0.035,
+          0.965,
+        );
+        selected[activeField()] = nearestOptionIndex(options, aimProgress);
+      };
       const pointer = (event) => {
         const bounds = canvas.getBoundingClientRect();
-        addBall(event.clientX - bounds.left);
+        drop((event.clientX - bounds.left) / Math.max(1, bounds.width));
       };
       const keyboard = (key) => {
-        if (key !== "Enter" && key !== " ") return false;
-        addBall(
-          viewport?.width
-            ? viewport.width * (0.38 + Math.random() * 0.24)
-            : undefined,
-        );
-        return true;
+        const field = activeField();
+        const options = activeOptions();
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+          selected[field] = clamp(
+            selected[field] + (key === "ArrowLeft" ? -1 : 1),
+            0,
+            options.length - 1,
+          );
+          aimProgress = (selected[field] + 0.5) / Math.max(1, options.length);
+          return true;
+        }
+        if (key === "Enter" || key === " ") {
+          drop(selected[field] / Math.max(1, options.length - 1));
+          return true;
+        }
+        return false;
       };
       const frame = (time) => {
         if (!viewport || !stage) return;
@@ -813,40 +1363,127 @@
         lastTime = time;
         const { context, width, height } = viewport;
         context.clearRect(0, 0, width, height);
-        const floor = height - 14;
-        context.strokeStyle = rgba(colors.border, 0.55);
-        context.lineWidth = 2;
-        context.beginPath();
-        context.moveTo(10, floor);
-        context.quadraticCurveTo(width * 0.5, floor + 7, width - 10, floor - 1);
-        context.stroke();
-        balls.forEach((ball) => {
-          ball.vy += 510 * scale * delta;
+        drawPlayfield(context, width, height, 0.72);
+        drawLoadoutStrip(context, width, selected, activeField());
+        const options = activeOptions();
+        const top = 94;
+        const floor = height - 30;
+        const laneWidth = width / Math.max(1, options.length);
+        const boardTop = top + 34;
+        const boardHeight = Math.max(36, floor - boardTop - 12);
+        const pegRows = Math.max(2, Math.min(4, Math.floor(boardHeight / 31)));
+        const pegs = [];
+        for (let row = 0; row < pegRows; row += 1) {
+          const offset = row % 2 === 0 ? 0.5 : 1;
+          const columns = row % 2 === 0 ? options.length : options.length - 1;
+          for (let column = 0; column < columns; column += 1) {
+            pegs.push({
+              x: laneWidth * (column + offset),
+              y: boardTop + ((row + 1) / (pegRows + 1)) * boardHeight,
+              row,
+              column,
+            });
+          }
+        }
+        options.forEach((option, index) => {
+          const x = index * laneWidth;
+          const active = selected[activeField()] === index;
+          roundedRect(
+            context,
+            x + 5,
+            boardTop - 6,
+            Math.max(8, laneWidth - 10),
+            Math.max(28, floor - boardTop + 6),
+            11,
+          );
+          context.fillStyle = active
+            ? rgba(colors.accent, 0.14)
+            : rgba(colors.text, 0.025);
+          context.fill();
+          context.strokeStyle = active
+            ? rgba(colors.accent, 0.68)
+            : rgba(colors.border, 0.38);
+          context.stroke();
+          context.fillStyle = rgba(colors.text, active ? 0.94 : 0.62);
+          context.font = active
+            ? "700 9px ui-sans-serif, system-ui, sans-serif"
+            : "560 8px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "alphabetic";
+          context.fillText(
+            option.label,
+            x + laneWidth / 2,
+            height - 11,
+            Math.max(28, laneWidth - 16),
+          );
+        });
+        pegs.forEach((peg) => {
+          context.beginPath();
+          context.arc(peg.x, peg.y, 3.2, 0, Math.PI * 2);
+          context.fillStyle = rgba(colors.text, 0.36);
+          context.shadowColor = rgba(colors.accent, 0.3);
+          context.shadowBlur = 5;
+          context.fill();
+          context.shadowBlur = 0;
+          context.strokeStyle = rgba(colors.border, 0.72);
+          context.stroke();
+        });
+        if (ball) {
+          ball.vy += 620 * scale * delta;
           ball.x += ball.vx * delta;
           ball.y += ball.vy * delta;
-          if (ball.x < ball.radius + 6 || ball.x > width - ball.radius - 6) {
-            ball.x = clamp(ball.x, ball.radius + 6, width - ball.radius - 6);
-            ball.vx *= -0.74;
+          pegs.forEach((peg) => {
+            const dx = ball.x - peg.x;
+            const dy = ball.y - peg.y;
+            const distance = Math.hypot(dx, dy);
+            const minimum = ball.radius + 3.2;
+            if (distance >= minimum || distance === 0 || ball.vy <= 0) return;
+            const nx = dx / distance;
+            const ny = dy / distance;
+            ball.x = peg.x + nx * minimum;
+            ball.y = peg.y + ny * minimum;
+            const direction = (peg.row + peg.column + activeStep) % 2 ? 1 : -1;
+            ball.vx = ball.vx * 0.72 + (nx * 92 + direction * 18) * scale;
+            ball.vy = Math.max(42, Math.abs(ball.vy) * 0.54);
+          });
+          if (ball.x <= ball.radius || ball.x >= width - ball.radius) {
+            ball.x = clamp(ball.x, ball.radius, width - ball.radius);
+            ball.vx *= -0.58;
           }
-          if (ball.y > floor - ball.radius) {
+          if (ball.y >= floor - ball.radius) {
             ball.y = floor - ball.radius;
-            ball.vy *= -0.62;
-            ball.vx *= 0.985;
-            if (Math.abs(ball.vy) < 18) ball.vy = 0;
+            ball.vy *= -0.34;
+            if (Math.abs(ball.vy) < 30) {
+              ball.vy = 0;
+              completeStep();
+            }
           }
           drawBall(context, ball);
-        });
+        } else {
+          const preview = {
+            x: width * aimProgress,
+            y: 105,
+            radius: 10,
+            color:
+              activeStep === 0
+                ? colors.accent
+                : activeStep === 1
+                  ? colors.warning
+                  : colors.success,
+          };
+          drawBall(context, preview);
+          context.beginPath();
+          context.moveTo(preview.x, preview.y + preview.radius + 4);
+          context.lineTo(preview.x, boardTop - 7);
+          context.strokeStyle = rgba(preview.color, 0.48);
+          context.setLineDash([3, 4]);
+          context.stroke();
+          context.setLineDash([]);
+        }
         nextFrame(frame);
       };
       nextFrame(frame);
-      schedule(() => {
-        const energy = balls.reduce(
-          (total, ball) => total + Math.abs(ball.vx) + Math.abs(ball.vy),
-          0,
-        );
-        showProposal(selectPreset(Math.round(energy) % currentPresets.length));
-      }, 3600);
-      return { resize, pointer, keyboard, destroy: () => {} };
+      return { resize, pointer, pointerMove, keyboard, destroy: () => {} };
     };
 
     const createClaw = () => {
@@ -854,9 +1491,10 @@
       const colors = palette();
       const scale = motionScale();
       const nextFrame = createFrameScheduler();
-      const prizes = Array.from({ length: 6 }, (_, index) => ({
-        x: 0.13 + index * 0.145,
-        y: 0.79 + (index % 2) * 0.05,
+      const prizes = currentPresets.map((preset, index) => ({
+        preset,
+        x: (index + 1) / (currentPresets.length + 1),
+        y: 0.67 + (index % 2) * 0.055,
         color:
           index % 3 === 0
             ? colors.warning
@@ -869,7 +1507,6 @@
       let drop = 0;
       let phase = "aim";
       let captured = null;
-      let startedAt = performance.now();
 
       const resize = () => {
         viewport = prepareCanvas();
@@ -902,30 +1539,87 @@
         }
         return false;
       };
-      const drawPrize = (context, x, y, color, selected) => {
-        const radius = selected ? 11 : 9;
+      const drawPrize = (context, x, y, color, selected, preset) => {
+        const width = selected ? 76 : 68;
+        const height = selected ? 36 : 32;
         context.save();
         context.translate(x, y);
-        context.rotate(Math.PI / 4);
-        roundedRect(context, -radius, -radius, radius * 2, radius * 2, 4);
-        context.fillStyle = mix(color, colors.surface, 0.18);
-        context.shadowColor = rgba(color, selected ? 0.54 : 0.2);
-        context.shadowBlur = selected ? 14 : 6;
-        context.fill();
-        context.shadowBlur = 0;
-        context.strokeStyle = rgba(colors.text, 0.24);
-        context.stroke();
+        const assetSize = selected ? 58 : 50;
+        const renderedAsset = drawGameAsset(
+          context,
+          "capsule",
+          -assetSize / 2,
+          -assetSize / 2 - 7,
+          assetSize,
+          assetSize,
+          color,
+          selected ? 1 : 0.9,
+        );
+        if (!renderedAsset) {
+          roundedRect(
+            context,
+            -width / 2,
+            -height / 2,
+            width,
+            height,
+            height / 2,
+          );
+          const capsule = context.createLinearGradient(
+            -width / 2,
+            0,
+            width / 2,
+            0,
+          );
+          capsule.addColorStop(0, mix(color, colors.surface, 0.1));
+          capsule.addColorStop(0.5, mix(color, "#ffffff", 0.18));
+          capsule.addColorStop(0.501, mix(color, colors.surface, 0.32));
+          capsule.addColorStop(1, mix(color, "#000000", 0.18));
+          context.fillStyle = capsule;
+          context.shadowColor = rgba(color, selected ? 0.54 : 0.2);
+          context.shadowBlur = selected ? 14 : 6;
+          context.fill();
+          context.shadowBlur = 0;
+          context.strokeStyle = rgba(colors.text, 0.24);
+          context.stroke();
+        }
+        context.fillStyle = rgba(colors.text, 0.9);
+        context.font = "700 8px ui-sans-serif, system-ui, sans-serif";
+        context.textAlign = "center";
+        context.textBaseline = "middle";
+        context.fillText(preset.name, 0, renderedAsset ? 26 : -5, width + 8);
+        context.fillStyle = rgba(colors.text, 0.68);
+        context.font = "560 7px ui-sans-serif, system-ui, sans-serif";
+        context.fillText(
+          [
+            preset.configuration.model?.label,
+            preset.configuration.reasoning?.label,
+            preset.configuration.speed?.label,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          0,
+          renderedAsset ? 37 : 7,
+          width + 14,
+        );
         context.restore();
       };
       const frame = (time) => {
         if (!viewport || !stage) return;
         const { context, width, height } = viewport;
         context.clearRect(0, 0, width, height);
+        drawPlayfield(context, width, height, 0.58);
+        const nearest = prizes.reduce((best, item) =>
+          Math.abs(item.x - clawX) < Math.abs(best.x - clawX) ? item : best,
+        );
+        drawLoadoutStrip(
+          context,
+          width,
+          indicesForConfiguration(nearest.preset.configuration),
+          null,
+          42,
+        );
         if (phase === "aim") {
           clawX += (targetX - clawX) * clamp(0.1 + scale * 0.06, 0.12, 0.19);
-          if (Math.abs(targetX - clawX) < 0.004) {
-            targetX = 0.13 + Math.random() * 0.74;
-          }
         } else if (phase === "down") {
           drop = Math.min(1, drop + 0.035 * scale);
           if (drop >= 1) {
@@ -943,9 +1637,9 @@
             schedule(() => showProposal(selectPreset(capturedIndex)), 420);
           }
         }
-        const railY = 26;
+        const railY = 94;
         const clawTop = railY + 10;
-        const clawBottom = clawTop + (height - 70) * drop;
+        const clawBottom = clawTop + Math.max(48, height - railY - 58) * drop;
         context.strokeStyle = rgba(colors.border, 0.62);
         context.lineWidth = 2;
         context.beginPath();
@@ -956,12 +1650,24 @@
         context.lineWidth = 2.4;
         context.beginPath();
         context.moveTo(width * clawX, railY);
-        context.lineTo(width * clawX, clawBottom);
+        context.lineTo(width * clawX, clawBottom - 11);
         context.stroke();
-        context.beginPath();
-        context.arc(width * clawX - 7, clawBottom + 6, 8, -0.3, 1.3);
-        context.arc(width * clawX + 7, clawBottom + 6, 8, 1.84, 3.45);
-        context.stroke();
+        if (
+          !drawGameAsset(
+            context,
+            "claw",
+            width * clawX - 29,
+            clawBottom - 15,
+            58,
+            58,
+            colors.accent,
+          )
+        ) {
+          context.beginPath();
+          context.arc(width * clawX - 7, clawBottom + 6, 8, -0.3, 1.3);
+          context.arc(width * clawX + 7, clawBottom + 6, 8, 1.84, 3.45);
+          context.stroke();
+        }
         prizes.forEach((item) => {
           if (item === captured && phase !== "down") return;
           drawPrize(
@@ -970,135 +1676,154 @@
             height * item.y,
             item.color,
             false,
+            item.preset,
           );
         });
         if (captured) {
           drawPrize(
             context,
             width * clawX,
-            clawBottom + 17,
+            Math.min(height - 48, clawBottom + 34),
             captured.color,
             true,
+            captured.preset,
           );
         }
         if (phase !== "done") nextFrame(frame);
       };
       nextFrame(frame);
-      schedule(() => {
-        if (phase === "aim") phase = "down";
-      }, 4600);
       return { resize, pointer, pointerMove, keyboard, destroy: () => {} };
     };
 
     const createToss = () => {
       let viewport = prepareCanvas();
       const colors = palette();
-      const scale = motionScale();
       const nextFrame = createFrameScheduler();
-      let token = null;
-      let result = 1 + Math.floor(Math.random() * 6);
-      let lastTime = performance.now();
-      let settledAt = null;
+      const fields = ["model", "reasoning", "speed"];
+      const selected = defaultIndices();
+      const locked = { model: false, reasoning: false, speed: false };
+      let spinning = false;
+      let phase = 0;
+
       const resize = () => {
         viewport = prepareCanvas();
       };
-      const launch = (x) => {
-        if (!viewport || token) return;
-        const originX = clamp(x, 34, viewport.width - 34);
-        token = {
-          x: originX,
-          y: viewport.height - 22,
-          vx: (viewport.width * 0.5 - originX) * 1.1 * scale,
-          vy: (-270 - Math.random() * 80) * scale,
-          angle: 0,
-          spin:
-            (Math.random() > 0.5 ? 1 : -1) * (5 + Math.random() * 4) * scale,
-        };
+      const finish = () => {
+        const outcome = outcomeFromIndices(
+          selected,
+          copy().selectedLoadout,
+          "loadout-forge",
+        );
+        setStageLabel(copy().forge);
+        schedule(() => showProposal(outcome), 320);
       };
-      const pointer = (event) => {
-        const bounds = canvas.getBoundingClientRect();
-        launch(event.clientX - bounds.left);
+      const advance = () => {
+        if (!spinning) {
+          spinning = true;
+          setStageLabel(copy().tossHint);
+          return;
+        }
+        const field = fields.find((candidate) => !locked[candidate]);
+        if (!field) return;
+        locked[field] = true;
+        const next = fields.find((candidate) => !locked[candidate]);
+        setStageLabel(next ? `${copy().lock} · ${copy()[next]}` : copy().forge);
+        if (!next) {
+          spinning = false;
+          finish();
+        }
       };
+      const pointer = () => advance();
       const keyboard = (key) => {
-        if (key !== "Enter" && key !== " ") return false;
-        launch(viewport?.width ? viewport.width * 0.5 : 0);
-        return true;
-      };
-      const drawToken = (context, value) => {
-        context.save();
-        context.translate(token.x, token.y);
-        context.rotate(token.angle);
-        const size = 17;
-        const gradient = context.createLinearGradient(-size, -size, size, size);
-        gradient.addColorStop(0, mix(colors.accent, "#ffffff", 0.6));
-        gradient.addColorStop(0.5, mix(colors.accent, colors.warning, 0.35));
-        gradient.addColorStop(1, mix(colors.accent, "#000000", 0.28));
-        roundedRect(context, -size, -size, size * 2, size * 2, 8);
-        context.fillStyle = gradient;
-        context.shadowColor = rgba(colors.accent, 0.42);
-        context.shadowBlur = 14;
-        context.fill();
-        context.shadowBlur = 0;
-        context.strokeStyle = rgba(colors.text, 0.38);
-        context.stroke();
-        context.fillStyle = mix(colors.text, colors.accent, 0.18);
-        context.font = "700 13px ui-sans-serif, system-ui, sans-serif";
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(String(value), 0, 1);
-        context.restore();
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+          const field =
+            fields.find((candidate) => !locked[candidate]) || "model";
+          const options = fieldOptions(currentSnapshot, field);
+          selected[field] =
+            (selected[field] +
+              (key === "ArrowLeft" ? -1 : 1) +
+              options.length) %
+            options.length;
+          return true;
+        }
+        if (key === "Enter" || key === " ") {
+          advance();
+          return true;
+        }
+        return false;
       };
       const frame = (time) => {
         if (!viewport || !stage) return;
-        const delta = Math.min(0.032, (time - lastTime) / 1000);
-        lastTime = time;
         const { context, width, height } = viewport;
         context.clearRect(0, 0, width, height);
-        const targetY = height - 18;
-        context.strokeStyle = rgba(colors.border, 0.46);
-        context.setLineDash([3, 5]);
-        context.beginPath();
-        context.ellipse(width / 2, targetY, 34, 7, 0, 0, Math.PI * 2);
-        context.stroke();
-        context.setLineDash([]);
-        if (token) {
-          token.vy += 520 * scale * delta;
-          token.x += token.vx * delta;
-          token.y += token.vy * delta;
-          token.angle += token.spin * delta;
-          if (token.y > targetY - 17) {
-            token.y = targetY - 17;
-            token.vy *= -0.48;
-            token.vx *= 0.72;
-            token.spin *= 0.7;
-            if (Math.abs(token.vy) < 34 && !settledAt) {
-              settledAt = time;
-              token.vy = 0;
-              token.vx = 0;
-              token.spin = 0;
-              token.angle =
-                Math.round(token.angle / (Math.PI / 2)) * (Math.PI / 2);
-              setStageLabel(copy().rolled + ": " + result);
-              schedule(() => showProposal(selectPreset(result - 1)), 520);
+        drawPlayfield(context, width, height, 0.8);
+        if (spinning) {
+          phase += 1;
+          fields.forEach((field, index) => {
+            if (locked[field]) return;
+            const options = fieldOptions(currentSnapshot, field);
+            const cadence = [4, 6, 8][index];
+            if (phase % cadence === 0) {
+              selected[field] = (selected[field] + 1) % options.length;
             }
-          }
-          if (token.x < 20 || token.x > width - 20) {
-            token.x = clamp(token.x, 20, width - 20);
-            token.vx *= -0.66;
-          }
-          drawToken(context, result);
-        } else {
-          context.fillStyle = rgba(colors.accent, 0.7);
-          context.font = "600 11px ui-sans-serif, system-ui, sans-serif";
-          context.textAlign = "center";
-          context.fillText(copy().tossHint, width / 2, height / 2 + 10);
+          });
         }
-        if (!settledAt) nextFrame(frame);
+        drawLoadoutStrip(
+          context,
+          width,
+          selected,
+          fields.find((field) => !locked[field]) || null,
+        );
+        const labels = copy();
+        const names = {
+          model: labels.model,
+          reasoning: labels.reasoning,
+          speed: labels.speed,
+        };
+        const top = 98;
+        const gap = 8;
+        const rowHeight = Math.max(34, (height - top - 18 - gap * 2) / 3);
+        fields.forEach((field, index) => {
+          const options = fieldOptions(currentSnapshot, field);
+          const option = options[selected[field]];
+          const y = top + index * (rowHeight + gap);
+          const isLocked = locked[field];
+          roundedRect(context, 18, y, width - 36, rowHeight, 12);
+          const reel = context.createLinearGradient(18, y, width - 18, y);
+          reel.addColorStop(0, rgba(colors.text, 0.035));
+          reel.addColorStop(0.5, rgba(colors.accent, isLocked ? 0.2 : 0.1));
+          reel.addColorStop(1, rgba(colors.text, 0.035));
+          context.fillStyle = reel;
+          context.fill();
+          context.strokeStyle = isLocked
+            ? rgba(colors.success, 0.78)
+            : rgba(colors.border, 0.56);
+          context.lineWidth = isLocked ? 1.5 : 1;
+          context.stroke();
+          context.fillStyle = rgba(colors.mutedText, 0.84);
+          context.font = "620 9px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "left";
+          context.textBaseline = "middle";
+          context.fillText(names[field], 30, y + rowHeight / 2, 72);
+          context.fillStyle = rgba(colors.text, 0.96);
+          context.font = "720 12px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.fillText(option?.label || "—", width / 2, y + rowHeight / 2);
+          context.fillStyle = isLocked
+            ? rgba(colors.success, 0.96)
+            : rgba(colors.accent, 0.9);
+          context.font = "680 8px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "right";
+          context.fillText(
+            isLocked ? labels.lock : spinning ? "•••" : labels.spin,
+            width - 30,
+            y + rowHeight / 2,
+            78,
+          );
+        });
+        nextFrame(frame);
       };
       nextFrame(frame);
-      schedule(() => {
-        if (!token) launch(viewport?.width ? viewport.width * 0.5 : 0);
-      }, 4200);
       return { resize, pointer, keyboard, destroy: () => {} };
     };
 
@@ -1106,84 +1831,208 @@
       let viewport = prepareCanvas();
       const colors = palette();
       const nextFrame = createFrameScheduler();
-      let selected = Math.floor((currentPresets.length - 1) / 2);
-      let display = selected;
+      const modelOptions = fieldOptions(currentSnapshot, "model");
+      const reasoningOptions = fieldOptions(currentSnapshot, "reasoning");
+      const speedOptions = fieldOptions(currentSnapshot, "speed");
+      let reasoningIndex = Math.max(
+        0,
+        reasoningOptions.findIndex(
+          (option) =>
+            option.label === currentSnapshot?.reasoning?.current?.label,
+        ),
+      );
+      let speedIndex = Math.max(
+        0,
+        speedOptions.findIndex(
+          (option) => option.label === currentSnapshot?.speed?.current?.label,
+        ),
+      );
+      let modelIndex = currentOptionIndex(currentSnapshot, "model");
       const resize = () => {
         viewport = prepareCanvas();
       };
-      const chooseFromX = (clientX) => {
+      const choose = (clientX, clientY) => {
         if (!viewport) return;
         const bounds = canvas.getBoundingClientRect();
-        selected = clamp(
+        const localY = clientY - bounds.top;
+        if (localY >= 91 && localY <= 132) {
+          modelIndex = nearestOptionIndex(
+            modelOptions,
+            (clientX - bounds.left - 18) / Math.max(1, bounds.width - 36),
+          );
+          return;
+        }
+        const insetX = 56;
+        const gridRight = 22;
+        reasoningIndex = clamp(
           Math.round(
-            ((clientX - bounds.left) / Math.max(1, bounds.width)) *
-              (currentPresets.length - 1),
+            clamp(
+              (clientX - bounds.left - insetX) /
+                Math.max(1, bounds.width - insetX - gridRight),
+              0,
+              1,
+            ) *
+              (reasoningOptions.length - 1),
           ),
           0,
-          currentPresets.length - 1,
+          reasoningOptions.length - 1,
+        );
+        speedIndex = clamp(
+          Math.round(
+            clamp((localY - 145) / Math.max(1, bounds.height - 175), 0, 1) *
+              (speedOptions.length - 1),
+          ),
+          0,
+          speedOptions.length - 1,
         );
       };
-      const pointerMove = (event) => chooseFromX(event.clientX);
+      const tunedPreset = () => {
+        const reasoning = reasoningOptions[reasoningIndex];
+        const speed =
+          speedOptions[speedIndex] || currentSnapshot?.speed?.current;
+        return {
+          id: "tuned",
+          name: copy().selectedLoadout,
+          source: "three-axis-console",
+          configuration: { model: modelOptions[modelIndex], reasoning, speed },
+        };
+      };
+      const pointerMove = (event) => choose(event.clientX, event.clientY);
       const pointer = (event) => {
-        chooseFromX(event.clientX);
-        showProposal(selectPreset(selected));
+        choose(event.clientX, event.clientY);
+        const bounds = canvas.getBoundingClientRect();
+        if (event.clientY - bounds.top > 132) showProposal(tunedPreset());
       };
       const keyboard = (key) => {
         if (key === "ArrowLeft" || key === "ArrowRight") {
-          selected = clamp(
-            selected + (key === "ArrowLeft" ? -1 : 1),
+          reasoningIndex = clamp(
+            reasoningIndex + (key === "ArrowLeft" ? -1 : 1),
             0,
-            currentPresets.length - 1,
+            reasoningOptions.length - 1,
           );
           return true;
         }
+        if (key === "ArrowUp" || key === "ArrowDown") {
+          speedIndex = clamp(
+            speedIndex + (key === "ArrowUp" ? -1 : 1),
+            0,
+            speedOptions.length - 1,
+          );
+          return true;
+        }
+        if (key === "m" || key === "M") {
+          modelIndex = (modelIndex + 1) % modelOptions.length;
+          return true;
+        }
         if (key === "Enter" || key === " ") {
-          showProposal(selectPreset(selected));
+          showProposal(tunedPreset());
           return true;
         }
         return false;
       };
       const frame = () => {
         if (!viewport || !stage) return;
-        display += (selected - display) * 0.16;
         const { context, width, height } = viewport;
         context.clearRect(0, 0, width, height);
-        const centerX = width / 2;
-        const centerY = height * 0.58;
-        const progress =
-          currentPresets.length > 1
-            ? display / (currentPresets.length - 1)
-            : 0.5;
-        const angle = (progress - 0.5) * 0.34;
-        context.save();
-        context.translate(centerX, centerY);
-        context.rotate(angle);
-        context.strokeStyle = colors.accent;
-        context.lineWidth = 4;
-        context.lineCap = "round";
-        context.beginPath();
-        context.moveTo(-width * 0.3, 0);
-        context.lineTo(width * 0.3, 0);
-        context.stroke();
-        context.fillStyle = mix(colors.accent, colors.surface, 0.22);
-        [-1, 1].forEach((side) => {
-          context.beginPath();
-          context.arc(side * width * 0.27, 0, 11, 0, Math.PI * 2);
-          context.fill();
-        });
-        context.restore();
-        context.fillStyle = rgba(colors.text, 0.76);
-        context.font = "650 11px ui-sans-serif, system-ui, sans-serif";
-        context.textAlign = "center";
-        context.fillText(
-          selectPreset(selected)?.name || "",
-          centerX,
-          centerY - 30,
+        drawPlayfield(context, width, height, 0.44);
+        drawLoadoutStrip(
+          context,
+          width,
+          { model: modelIndex, reasoning: reasoningIndex, speed: speedIndex },
+          null,
         );
+        const modelLeft = 18;
+        const modelTop = 94;
+        const modelGap = 6;
+        const modelWidth =
+          (width - modelLeft * 2 - modelGap * (modelOptions.length - 1)) /
+          Math.max(1, modelOptions.length);
+        modelOptions.forEach((model, index) => {
+          const x = modelLeft + index * (modelWidth + modelGap);
+          const active = index === modelIndex;
+          roundedRect(context, x, modelTop, modelWidth, 32, 10);
+          context.fillStyle = active
+            ? rgba(colors.accent, 0.2)
+            : rgba(colors.text, 0.035);
+          context.fill();
+          context.strokeStyle = active
+            ? rgba(colors.accent, 0.82)
+            : rgba(colors.border, 0.48);
+          context.stroke();
+          context.fillStyle = rgba(colors.text, active ? 0.96 : 0.64);
+          context.font = active
+            ? "700 9px ui-sans-serif, system-ui, sans-serif"
+            : "560 8px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(
+            model.label,
+            x + modelWidth / 2,
+            modelTop + 16,
+            modelWidth - 10,
+          );
+        });
+        const insetX = 56;
+        const top = 145;
+        const gridWidth = Math.max(80, width - insetX - 22);
+        const gridHeight = Math.max(46, height - top - 34);
+        const columnWidth = gridWidth / Math.max(1, reasoningOptions.length);
+        const rowHeight = gridHeight / Math.max(1, speedOptions.length);
+        speedOptions.forEach((speed, row) => {
+          reasoningOptions.forEach((reasoning, column) => {
+            const x = insetX + column * columnWidth + 3;
+            const y = top + row * rowHeight + 3;
+            const active = row === speedIndex && column === reasoningIndex;
+            roundedRect(
+              context,
+              x,
+              y,
+              Math.max(8, columnWidth - 6),
+              Math.max(8, rowHeight - 6),
+              9,
+            );
+            context.fillStyle = active
+              ? mix(colors.accent, colors.surface, 0.18)
+              : rgba(colors.text, 0.045);
+            context.shadowColor = rgba(colors.accent, active ? 0.46 : 0);
+            context.shadowBlur = active ? 16 : 0;
+            context.fill();
+            context.shadowBlur = 0;
+            context.strokeStyle = active
+              ? rgba(colors.accent, 0.86)
+              : rgba(colors.border, 0.5);
+            context.stroke();
+          });
+          context.fillStyle = rgba(colors.mutedText, 0.88);
+          context.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "right";
+          context.textBaseline = "middle";
+          context.fillText(
+            speed.label,
+            insetX - 9,
+            top + row * rowHeight + rowHeight / 2,
+            insetX - 14,
+          );
+        });
+        reasoningOptions.forEach((reasoning, column) => {
+          context.fillStyle = rgba(colors.mutedText, 0.88);
+          context.font = "600 9px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "alphabetic";
+          context.fillText(
+            reasoning.label,
+            insetX + column * columnWidth + columnWidth / 2,
+            height - 16,
+            Math.max(28, columnWidth - 8),
+          );
+        });
         context.fillStyle = rgba(colors.mutedText, 0.82);
-        context.font = "500 9px ui-sans-serif, system-ui, sans-serif";
-        context.fillText("SPEED", width * 0.2, height - 16);
-        context.fillText("DEPTH", width * 0.8, height - 16);
+        context.font = "650 9px ui-sans-serif, system-ui, sans-serif";
+        context.textBaseline = "alphabetic";
+        context.textAlign = "left";
+        context.fillText(copy().speed, 18, top - 13, insetX - 18);
+        context.textAlign = "right";
+        context.fillText(copy().reasoning, width - 22, top - 13, width / 2);
         nextFrame(frame);
       };
       nextFrame(frame);
@@ -1194,6 +2043,10 @@
       let viewport = prepareCanvas();
       const colors = palette();
       const nextFrame = createFrameScheduler();
+      const modelOptions = fieldOptions(currentSnapshot, "model");
+      const reasoningOptions = fieldOptions(currentSnapshot, "reasoning");
+      const speedOptions = fieldOptions(currentSnapshot, "speed");
+      let modelIndex = currentOptionIndex(currentSnapshot, "model");
       let selected = Math.min(1, currentPresets.length - 1);
       const resize = () => {
         viewport = prepareCanvas();
@@ -1202,14 +2055,42 @@
         currentPresets.map((_, index) => ({
           x: ((index + 1) / (currentPresets.length + 1)) * viewport.width,
           y:
-            viewport.height *
-            (index % 2 === 0 ? 0.58 : index % 3 === 0 ? 0.7 : 0.42),
+            166 +
+            Math.max(36, viewport.height - 190) *
+              (index % 2 === 0 ? 0.62 : index % 3 === 0 ? 0.82 : 0.28),
         }));
+      const routeOutcome = () => {
+        const preset = selectPreset(selected);
+        const reasoningIndex = Math.max(
+          0,
+          reasoningOptions.findIndex(
+            (option) => option.label === preset?.configuration.reasoning?.label,
+          ),
+        );
+        const speedIndex = Math.max(
+          0,
+          speedOptions.findIndex(
+            (option) => option.label === preset?.configuration.speed?.label,
+          ),
+        );
+        return outcomeFromIndices(
+          { model: modelIndex, reasoning: reasoningIndex, speed: speedIndex },
+          preset?.name || copy().selectedLoadout,
+          "mission-map",
+        );
+      };
       const choose = (clientX, clientY) => {
         if (!viewport) return;
         const bounds = canvas.getBoundingClientRect();
         const x = clientX - bounds.left;
         const y = clientY - bounds.top;
+        if (y >= 91 && y <= 132) {
+          modelIndex = nearestOptionIndex(
+            modelOptions,
+            (x - 18) / Math.max(1, bounds.width - 36),
+          );
+          return;
+        }
         const nodes = nodePositions();
         selected = nodes.reduce(
           (best, node, index) =>
@@ -1222,7 +2103,8 @@
       const pointerMove = (event) => choose(event.clientX, event.clientY);
       const pointer = (event) => {
         choose(event.clientX, event.clientY);
-        showProposal(selectPreset(selected));
+        const bounds = canvas.getBoundingClientRect();
+        if (event.clientY - bounds.top > 132) showProposal(routeOutcome());
       };
       const keyboard = (key) => {
         if (key === "ArrowLeft" || key === "ArrowRight") {
@@ -1233,8 +2115,14 @@
             currentPresets.length;
           return true;
         }
+        if (key === "ArrowUp" || key === "ArrowDown") {
+          modelIndex =
+            (modelIndex + (key === "ArrowUp" ? -1 : 1) + modelOptions.length) %
+            modelOptions.length;
+          return true;
+        }
         if (key === "Enter" || key === " ") {
-          showProposal(selectPreset(selected));
+          showProposal(routeOutcome());
           return true;
         }
         return false;
@@ -1243,6 +2131,45 @@
         if (!viewport || !stage) return;
         const { context, width, height } = viewport;
         context.clearRect(0, 0, width, height);
+        drawPlayfield(context, width, height, 0.62);
+        const activeOutcome = routeOutcome();
+        drawLoadoutStrip(
+          context,
+          width,
+          indicesForConfiguration(activeOutcome?.configuration),
+          null,
+        );
+        const modelLeft = 18;
+        const modelTop = 94;
+        const modelGap = 6;
+        const modelWidth =
+          (width - modelLeft * 2 - modelGap * (modelOptions.length - 1)) /
+          Math.max(1, modelOptions.length);
+        modelOptions.forEach((model, index) => {
+          const x = modelLeft + index * (modelWidth + modelGap);
+          const active = modelIndex === index;
+          roundedRect(context, x, modelTop, modelWidth, 31, 10);
+          context.fillStyle = active
+            ? rgba(colors.accent, 0.19)
+            : rgba(colors.text, 0.035);
+          context.fill();
+          context.strokeStyle = active
+            ? rgba(colors.accent, 0.78)
+            : rgba(colors.border, 0.46);
+          context.stroke();
+          context.fillStyle = rgba(colors.text, active ? 0.96 : 0.65);
+          context.font = active
+            ? "700 8px ui-sans-serif, system-ui, sans-serif"
+            : "560 8px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(
+            model.label,
+            x + modelWidth / 2,
+            modelTop + 15.5,
+            modelWidth - 10,
+          );
+        });
         const nodes = nodePositions();
         context.strokeStyle = rgba(colors.border, 0.7);
         context.lineWidth = 1.5;
@@ -1255,30 +2182,47 @@
         nodes.forEach((node, index) => {
           const active = index === selected;
           const pulse = active ? 1 + Math.sin(time / 220) * 0.08 : 1;
-          context.beginPath();
-          context.arc(
+          const assetSize = (active ? 34 : 23) * pulse;
+          if (
+            !drawGameAsset(
+              context,
+              "beacon",
+              node.x - assetSize / 2,
+              node.y - assetSize / 2,
+              assetSize,
+              assetSize,
+              colors.accent,
+              active ? 1 : 0.74,
+            )
+          ) {
+            context.beginPath();
+            context.arc(
+              node.x,
+              node.y,
+              (active ? 11 : 7) * pulse,
+              0,
+              Math.PI * 2,
+            );
+            context.fillStyle = active
+              ? mix(colors.accent, "#ffffff", 0.16)
+              : mix(colors.accent, colors.surface, 0.42);
+            context.shadowColor = rgba(colors.accent, active ? 0.55 : 0.14);
+            context.shadowBlur = active ? 14 : 5;
+            context.fill();
+            context.shadowBlur = 0;
+          }
+          context.fillStyle = rgba(colors.text, active ? 0.92 : 0.62);
+          context.font = active
+            ? "670 9px ui-sans-serif, system-ui, sans-serif"
+            : "560 8px ui-sans-serif, system-ui, sans-serif";
+          context.textAlign = "center";
+          context.fillText(
+            currentPresets[index]?.name || "",
             node.x,
-            node.y,
-            (active ? 11 : 7) * pulse,
-            0,
-            Math.PI * 2,
+            node.y + 24,
+            Math.max(52, width / Math.max(4, currentPresets.length) - 8),
           );
-          context.fillStyle = active
-            ? mix(colors.accent, "#ffffff", 0.16)
-            : mix(colors.accent, colors.surface, 0.42);
-          context.shadowColor = rgba(colors.accent, active ? 0.55 : 0.14);
-          context.shadowBlur = active ? 14 : 5;
-          context.fill();
-          context.shadowBlur = 0;
         });
-        context.fillStyle = rgba(colors.text, 0.82);
-        context.font = "650 11px ui-sans-serif, system-ui, sans-serif";
-        context.textAlign = "center";
-        context.fillText(
-          selectPreset(selected)?.name || "",
-          width / 2,
-          height - 16,
-        );
         nextFrame(frame);
       };
       nextFrame(frame);
@@ -1288,8 +2232,10 @@
     const start = async (gameId) => {
       if (!GAME_IDS.has(gameId) || !root || !composer?.isConnected) return;
       closeStage(false, false);
-      await settingsAdapter?.close?.();
+      currentGameId = gameId;
+      mountStage(gameId);
       const requestedRevision = ++launchRevision;
+      await settingsAdapter?.close?.();
       const snapshot = await settingsAdapter?.inspect?.();
       if (
         requestedRevision !== launchRevision ||
@@ -1300,51 +2246,19 @@
       }
       currentSnapshot = snapshot || null;
       currentPresets = buildPresets(currentSnapshot);
-      currentGameId = gameId;
       if (!currentSnapshot?.available || currentPresets.length === 0) {
-        closeStage(false);
-        await settingsAdapter?.openOfficialMenu?.();
+        showUnavailable();
         return;
       }
-      const labels = copy();
-      stage = document.createElement("section");
-      stage.className = "csm-stage";
-      stage.setAttribute("role", "application");
-      stage.tabIndex = 0;
-      stage.setAttribute(
-        "aria-label",
-        gameId === "marbles"
-          ? labels.marbles
-          : gameId === "claw"
-            ? labels.claw
-            : gameId === "toss"
-              ? labels.toss
-              : gameId === "balance"
-                ? labels.balance
-                : labels.route,
-      );
+      if (!stage) return;
+      stage.classList.remove("csm-stage--loading");
+      stage.querySelector(".csm-stage-state")?.remove();
       stageLabel = document.createElement("span");
       stageLabel.className = "csm-stage-label";
-      stageLabel.textContent =
-        gameId === "marbles"
-          ? labels.marbleHint
-          : gameId === "claw"
-            ? labels.clawHint
-            : gameId === "toss"
-              ? labels.tossHint
-              : gameId === "balance"
-                ? labels.balanceHint
-                : labels.routeHint;
-      const close = document.createElement("button");
-      close.type = "button";
-      close.className = "csm-close";
-      close.setAttribute("aria-label", labels.close);
-      close.textContent = "×";
-      close.addEventListener("click", () => closeStage());
+      stageLabel.textContent = gameHint(gameId);
       canvas = document.createElement("canvas");
       canvas.setAttribute("aria-hidden", "true");
-      stage.append(canvas, stageLabel, close);
-      root.appendChild(stage);
+      stage.prepend(canvas, stageLabel);
       position();
       stage.focus({ preventScroll: true });
       if (
@@ -1377,6 +2291,17 @@
     };
 
     function onKeyDown(event) {
+      if (
+        document.documentElement.hasAttribute(
+          "data-codex-styler-adapter-keyboard",
+        )
+      ) {
+        return;
+      }
+      if (event.key === "Enter" || event.key === " ") {
+        onNativeTriggerKeyDown(event);
+        if (event.defaultPrevented) return;
+      }
       if (event.key === "Escape" && stage) {
         event.preventDefault();
         closeStage();
@@ -1387,27 +2312,49 @@
       if (document.visibilityState !== "visible") closeStage(false);
     }
 
-    function onNativeTriggerClick(event) {
+    const interceptedTrigger = (event) => {
       if (
         preferences.mode === "disabled" ||
         !settingsAdapter?.isTriggerTarget?.(event.target)
       ) {
-        return;
+        return null;
       }
       const nativeTrigger = settingsAdapter.resolveTrigger?.();
       if (
         nativeTrigger?.dataset?.codexStylerAdapterBypass === "true" ||
         !(nativeTrigger instanceof HTMLElement)
       ) {
-        return;
+        return null;
       }
+      return nativeTrigger;
+    };
+
+    function onNativeTriggerPointerDown(event) {
+      const nativeTrigger = interceptedTrigger(event);
+      if (!nativeTrigger) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       trigger = nativeTrigger;
-      /* Inspecting the same native control inside its active click dispatch can
-         be suppressed by Chromium's re-entrant click guard. Start after the
-         original event completes so the adapter can safely open the real menu. */
-      queueMicrotask(() => void start(preferences.mode));
+      if (!stage) void start(preferences.mode);
+    }
+
+    function onNativeTriggerClick(event) {
+      const nativeTrigger = interceptedTrigger(event);
+      if (!nativeTrigger) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      trigger = nativeTrigger;
+      if (!stage) void start(preferences.mode);
+    }
+
+    function onNativeTriggerKeyDown(event) {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const nativeTrigger = interceptedTrigger(event);
+      if (!nativeTrigger) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      trigger = nativeTrigger;
+      if (!stage) void start(preferences.mode);
     }
 
     const configure = (next = {}) => {
@@ -1469,6 +2416,11 @@
       window.removeEventListener("resize", position);
       document.removeEventListener("scroll", position, true);
       document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener(
+        "pointerdown",
+        onNativeTriggerPointerDown,
+        true,
+      );
       document.removeEventListener("click", onNativeTriggerClick, true);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       root?.remove();

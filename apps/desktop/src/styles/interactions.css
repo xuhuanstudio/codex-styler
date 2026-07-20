@@ -113,7 +113,7 @@
 .interaction-detail {
   display: grid;
   align-content: start;
-  grid-template-rows: auto auto auto;
+  grid-template-rows: auto auto auto auto;
   overflow: hidden;
 }
 
@@ -193,6 +193,65 @@
   line-height: 1.5;
 }
 
+.interaction-binding {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 1.15fr);
+  align-items: center;
+  gap: 18px;
+  margin: 0 26px 20px;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-subtle));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-soft) 44%, var(--surface-subtle));
+}
+
+.interaction-binding > div {
+  display: grid;
+  gap: 4px;
+}
+
+.interaction-binding strong {
+  font-size: var(--type-label);
+}
+
+.interaction-binding > div > span {
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  line-height: 1.45;
+}
+
+.interaction-binding ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.interaction-binding li {
+  display: grid;
+  min-width: 0;
+  min-height: 48px;
+  place-content: center;
+  place-items: center;
+  gap: 5px;
+  padding: 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--accent-ink);
+  text-align: center;
+  background: var(--surface-base);
+}
+
+.interaction-binding li span {
+  overflow: hidden;
+  font-size: 10px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .interaction-assurances {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -242,5 +301,9 @@
   .interaction-placement__composer {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .interaction-binding {
+    grid-template-columns: 1fr;
   }
 }

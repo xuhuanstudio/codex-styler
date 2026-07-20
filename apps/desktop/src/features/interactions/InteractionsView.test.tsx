@@ -23,6 +23,26 @@ describe("InteractionsView", () => {
     fireEvent.keyDown(official, { key: "ArrowDown" });
 
     expect(onChange).toHaveBeenCalledWith("marbles");
-    expect(screen.getByRole("option", { name: /Orbit Recipe/ })).toHaveFocus();
+    expect(screen.getByRole("option", { name: /Triple Drop/ })).toHaveFocus();
+  });
+
+  it("explains that every game result controls the complete Codex loadout", () => {
+    render(
+      <InteractionsView
+        mode="toss"
+        t={(key) => translate("en", key)}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const binding = screen.getByRole("region", {
+      name: "Every play returns one complete loadout",
+    });
+    expect(binding).toHaveTextContent("Model engine");
+    expect(binding).toHaveTextContent("Reasoning effort");
+    expect(binding).toHaveTextContent("Response speed");
+    expect(binding).toHaveTextContent(
+      "The action itself selects all three real settings",
+    );
   });
 });

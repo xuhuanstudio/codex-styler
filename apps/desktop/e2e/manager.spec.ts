@@ -657,7 +657,7 @@ test("composer interactions use one dedicated, keyboard-safe selection", async (
   await official.focus();
   await page.keyboard.press("ArrowDown");
 
-  const orbit = page.getByRole("option", { name: /Orbit Recipe/ });
+  const orbit = page.getByRole("option", { name: /Triple Drop/ });
   await expect(orbit).toBeFocused();
   await expect(orbit).toHaveAttribute("aria-selected", "true");
   await expect(

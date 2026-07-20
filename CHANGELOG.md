@@ -4,6 +4,54 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.8] - 2026-07-20
+
+### Added
+
+- Five Composer Interactions that replace Codex's native configuration control
+  in place: Triple Drop, Capsule Crane, Loadout Forge, Three-axis Console, and
+  Mission Map.
+- Complete real-setting proposals covering model, reasoning effort, and
+  response speed, with a field-by-field confirmation step and post-write
+  verification against the live Codex state.
+- Original transparent claw, capsule, marble, and beacon artwork embedded as
+  local WebP data URLs and adapted to the active theme's palette, material,
+  motion intensity, frame-rate budget, and reduced-motion preference.
+- A bilingual Composer Interactions guide, current English manager and live
+  interaction screenshots, release documentation, and regression coverage for
+  every interaction mode.
+
+### Changed
+
+- Interaction outcomes are now determined by the visible play action rather
+  than an unrelated preset roll. Unchanged fields are explicitly labelled
+  Keep current.
+- Native Refined uses a clearer porcelain, graphite, and restrained mineral-blue
+  palette instead of the previous muddy warm-gray and green cast.
+- Compact resource libraries share a keyboard-complete list-to-detail flow,
+  while Home gives large windows more useful preview space.
+- Desktop orchestration, dialogs, theme creation, and companion-creator helpers
+  are split into smaller feature boundaries without changing their public data
+  formats.
+
+### Fixed
+
+- The current localized Radix configuration menu is opened, read, concealed,
+  written, and closed without briefly flashing the official panel before an
+  interaction appears.
+- Model changes are applied and verified alongside reasoning effort and speed;
+  a play result can no longer report a field that has no effect on Codex.
+- First managed launch waits for a stable, ready Codex renderer and verifies
+  that the injected runtime survived Electron's bootstrap handoff, retrying in
+  the same controlled session instead of requiring repeated restarts.
+- Interaction preferences resynchronize after reconnecting without rebuilding
+  the active theme, background, or companion.
+- Preview containers use complete four-corner clipping, and themed native
+  switches retain Codex-owned geometry, thumb motion, and interaction states.
+- Theme and companion details reflow by usable container width and height,
+  avoiding clipped controls, split radii, and fixed-dock overlap in compact
+  windows.
+
 ## [0.2.0-beta.7] - 2026-07-20
 
 ### Added

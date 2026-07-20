@@ -30,7 +30,11 @@ body {
   margin: 0;
   color: var(--ink);
   background:
-    radial-gradient(circle at 14% 0%, rgba(255, 255, 255, 0.7), transparent 26%),
+    radial-gradient(
+      circle at 14% 0%,
+      rgba(255, 255, 255, 0.7),
+      transparent 26%
+    ),
     var(--paper);
 }
 
@@ -162,9 +166,17 @@ img {
   background: rgba(235, 241, 234, 0.14);
 }
 
-.gallery-native-preview i:nth-child(1) { top: 106px; }
-.gallery-native-preview i:nth-child(2) { top: 140px; width: 61%; }
-.gallery-native-preview i:nth-child(3) { top: 174px; width: 38%; }
+.gallery-native-preview i:nth-child(1) {
+  top: 106px;
+}
+.gallery-native-preview i:nth-child(2) {
+  top: 140px;
+  width: 61%;
+}
+.gallery-native-preview i:nth-child(3) {
+  top: 174px;
+  width: 38%;
+}
 
 .gallery-native-preview b {
   position: absolute;
@@ -668,7 +680,11 @@ img {
   padding: 38px;
   color: #eef2ec;
   background:
-    radial-gradient(circle at 100% 0%, rgba(161, 189, 169, 0.14), transparent 40%),
+    radial-gradient(
+      circle at 100% 0%,
+      rgba(161, 189, 169, 0.14),
+      transparent 40%
+    ),
     #172019;
 }
 
@@ -714,7 +730,11 @@ img {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(circle at 72% 28%, rgba(126, 151, 134, 0.28), transparent 25%),
+    radial-gradient(
+      circle at 72% 28%,
+      rgba(126, 151, 134, 0.28),
+      transparent 25%
+    ),
     linear-gradient(145deg, #d6d9d1, #edefe9);
 }
 
@@ -908,6 +928,25 @@ img {
   line-height: 1.75;
 }
 
+.doc-media {
+  margin: -36px 0 62px;
+}
+
+.doc-media img {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 22px 70px rgba(31, 43, 34, 0.12);
+}
+
+.doc-media figcaption {
+  margin-top: 12px;
+  color: var(--faint);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
 .doc-content > section {
   position: relative;
   padding: 36px 0 46px 55px;
@@ -946,7 +985,11 @@ img {
   border-radius: 3px 18px 18px 3px;
   color: #edf3ee;
   background:
-    radial-gradient(circle at 86% 12%, rgba(159, 193, 169, 0.2), transparent 40%),
+    radial-gradient(
+      circle at 86% 12%,
+      rgba(159, 193, 169, 0.2),
+      transparent 40%
+    ),
     #172019;
 }
 

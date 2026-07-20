@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 9;
+  const FACTORY_VERSION = 11;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_SETTINGS_ADAPTER__?.version ===
     FACTORY_VERSION
@@ -12,8 +12,7 @@
     /* `\b` only understands ASCII word boundaries. Keep the English boundary,
        but match CJK labels with an explicit whitespace/end boundary. */
     model: /^(?:model\b|模型(?:\s|$))/i,
-    reasoning:
-      /^(?:effort\b|reasoning(?: effort)?\b|推理(?:强度)?(?:\s|$))/i,
+    reasoning: /^(?:effort\b|reasoning(?: effort)?\b|推理(?:强度)?(?:\s|$))/i,
     speed: /^(?:speed\b|速度(?:\s|$))/i,
   };
 
@@ -23,6 +22,9 @@
       .trim();
 
   const CONCEALED_ATTRIBUTE = "data-codex-styler-adapter-concealed";
+  const PROBE_ATTRIBUTE = "data-codex-styler-settings-probe";
+  const PROBE_STYLE_ID = "codex-styler-settings-probe-style";
+  const KEYBOARD_ATTRIBUTE = "data-codex-styler-adapter-keyboard";
 
   const isVisible = (element) => {
     if (!(element instanceof HTMLElement) || !element.isConnected) return false;
@@ -60,17 +62,25 @@
       check();
     });
 
-  const dispatchEscape = () =>
-    document.dispatchEvent(
-      new KeyboardEvent("keydown", {
-        key: "Escape",
-        bubbles: true,
-        cancelable: true,
-      }),
-    );
+  const dispatchEscape = () => {
+    document.documentElement.setAttribute(KEYBOARD_ATTRIBUTE, "true");
+    try {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    } finally {
+      document.documentElement.removeAttribute(KEYBOARD_ATTRIBUTE);
+    }
+  };
 
   const createFactory = ({ resolveComposer }) => {
     let revision = 0;
+    let probeDepth = 0;
+    let probeObserver = null;
 
     const clickNative = (element) => {
       if (!(element instanceof HTMLElement)) return;
@@ -84,23 +94,28 @@
 
     const openWithKeyboard = (element) => {
       if (!(element instanceof HTMLElement)) return;
-      element.focus({ preventScroll: true });
-      element.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: "Enter",
-          code: "Enter",
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
-      element.dispatchEvent(
-        new KeyboardEvent("keyup", {
-          key: "Enter",
-          code: "Enter",
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+      element.dataset.codexStylerAdapterBypass = "true";
+      try {
+        element.focus({ preventScroll: true });
+        element.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            code: "Enter",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        element.dispatchEvent(
+          new KeyboardEvent("keyup", {
+            key: "Enter",
+            code: "Enter",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      } finally {
+        delete element.dataset.codexStylerAdapterBypass;
+      }
     };
 
     const resolveTrigger = () => {
@@ -129,19 +144,66 @@
       menu.setAttribute(CONCEALED_ATTRIBUTE, "true");
       menu.style.setProperty("opacity", "0", "important");
       menu.style.setProperty("pointer-events", "none", "important");
+      menu.style.setProperty("transition", "none", "important");
+      menu.style.setProperty("animation", "none", "important");
       return menu;
     };
 
-    const revealMenus = () => {
+    const concealDiscoveredMenus = () => {
       document
-        .querySelectorAll(`[${CONCEALED_ATTRIBUTE}]`)
+        .querySelectorAll("[role='menu'], [role='listbox']")
         .forEach((menu) => {
-          menu.removeAttribute(CONCEALED_ATTRIBUTE);
-          if (menu instanceof HTMLElement) {
-            menu.style.removeProperty("opacity");
-            menu.style.removeProperty("pointer-events");
-          }
+          if (!menu.closest(`#${ROOT_ID}`)) concealMenu(menu);
         });
+    };
+
+    const beginSilentProbe = () => {
+      probeDepth += 1;
+      if (probeDepth > 1) return;
+      if (!document.getElementById(PROBE_STYLE_ID)) {
+        const style = document.createElement("style");
+        style.id = PROBE_STYLE_ID;
+        style.textContent = `
+          html[${PROBE_ATTRIBUTE}="true"] [role="menu"],
+          html[${PROBE_ATTRIBUTE}="true"] [role="listbox"],
+          html[${PROBE_ATTRIBUTE}="true"] [data-radix-popper-content-wrapper] {
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transition: none !important;
+            animation: none !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+      document.documentElement.setAttribute(PROBE_ATTRIBUTE, "true");
+      concealDiscoveredMenus();
+      probeObserver = new MutationObserver(concealDiscoveredMenus);
+      probeObserver.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["hidden", "data-state", "aria-hidden"],
+      });
+    };
+
+    const endSilentProbe = () => {
+      probeDepth = Math.max(0, probeDepth - 1);
+      if (probeDepth > 0) return;
+      probeObserver?.disconnect();
+      probeObserver = null;
+      document.documentElement.removeAttribute(PROBE_ATTRIBUTE);
+    };
+
+    const revealMenus = () => {
+      document.querySelectorAll(`[${CONCEALED_ATTRIBUTE}]`).forEach((menu) => {
+        menu.removeAttribute(CONCEALED_ATTRIBUTE);
+        if (menu instanceof HTMLElement) {
+          menu.style.removeProperty("opacity");
+          menu.style.removeProperty("pointer-events");
+          menu.style.removeProperty("transition");
+          menu.style.removeProperty("animation");
+        }
+      });
     };
 
     const openRootMenu = async ({ conceal = true } = {}) => {
@@ -165,8 +227,7 @@
       return conceal ? concealMenu(menu) : menu;
     };
 
-    const closeMenus = async () => {
-      revealMenus();
+    const closeMenus = async ({ reveal = probeDepth === 0 } = {}) => {
       /* A submenu and its root are separate Radix layers. Close every active
          layer and wait for each state transition before reopening another row. */
       for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -174,6 +235,18 @@
         if (openCount === 0) break;
         dispatchEscape();
         await waitFor(() => visibleMenus().length < openCount, 250);
+      }
+      if (reveal && visibleMenus().length === 0) revealMenus();
+    };
+
+    const silently = async (operation) => {
+      beginSilentProbe();
+      try {
+        return await operation();
+      } finally {
+        await closeMenus({ reveal: false });
+        endSilentProbe();
+        if (visibleMenus().length === 0) revealMenus();
       }
     };
 
@@ -373,7 +446,7 @@
 
     const inspect = async () => {
       const operationRevision = ++revision;
-      return inspectSnapshot(operationRevision);
+      return silently(() => inspectSnapshot(operationRevision));
     };
 
     const selectField = async (field, target) => {
@@ -407,42 +480,49 @@
 
     const apply = async (configuration) => {
       const operationRevision = ++revision;
-      const before = await inspectSnapshot(operationRevision);
-      if (!before.available || operationRevision !== revision) {
-        return { ok: false, reason: before.reason || "unavailable" };
-      }
-      const changes = ["reasoning", "speed"].filter((field) => {
-        const target = configuration?.[field];
-        const current = before[field]?.current;
-        return target?.label && current?.label !== target.label;
-      });
-      for (const field of changes) {
-        const selected = await selectField(field, configuration[field]);
-        if (!selected)
-          return { ok: false, reason: `${field}-selection-failed` };
+      return silently(async () => {
+        const before = await inspectSnapshot(operationRevision);
+        if (!before.available || operationRevision !== revision) {
+          return { ok: false, reason: before.reason || "unavailable" };
+        }
+        const changes = ["model", "reasoning", "speed"].filter((field) => {
+          const target = configuration?.[field];
+          const current = before[field]?.current;
+          return target?.label && current?.label !== target.label;
+        });
+        for (const field of changes) {
+          const selected = await selectField(field, configuration[field]);
+          if (!selected)
+            return { ok: false, reason: `${field}-selection-failed` };
+          if (operationRevision !== revision) {
+            return { ok: false, reason: "stale" };
+          }
+        }
+        const after = await inspectSnapshot(operationRevision);
         if (operationRevision !== revision) {
           return { ok: false, reason: "stale" };
         }
-      }
-      const after = await inspectSnapshot(operationRevision);
-      if (operationRevision !== revision) {
-        return { ok: false, reason: "stale" };
-      }
-      const verified = changes.every(
-        (field) =>
-          normalize(after[field]?.current?.label).toLocaleLowerCase() ===
-          normalize(configuration[field]?.label).toLocaleLowerCase(),
-      );
-      return {
-        ok: verified,
-        reason: verified ? null : "verification-failed",
-        before,
-        after,
-      };
+        const verified = changes.every(
+          (field) =>
+            normalize(after[field]?.current?.label).toLocaleLowerCase() ===
+            normalize(configuration[field]?.label).toLocaleLowerCase(),
+        );
+        return {
+          ok: verified,
+          reason: verified ? null : "verification-failed",
+          before,
+          after,
+        };
+      });
     };
 
     const destroy = () => {
       revision += 1;
+      probeDepth = 0;
+      probeObserver?.disconnect();
+      probeObserver = null;
+      document.documentElement.removeAttribute(PROBE_ATTRIBUTE);
+      document.getElementById(PROBE_STYLE_ID)?.remove();
       void closeMenus();
     };
 

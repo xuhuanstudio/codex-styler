@@ -1,0 +1,39 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.8",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "Five polished Composer Interactions now choose, confirm, apply, and verify a complete real Codex loadout while first-launch reliability and current-menu compatibility are strengthened.",
+      "highlights": [
+        "Triple Drop, Capsule Crane, Loadout Forge, Three-axis Console, and Mission Map each bind their visible play action to model, reasoning effort, and response speed.",
+        "Every result shows a complete three-field diff, labels unchanged values, waits for confirmation, and verifies the native Codex state after writing.",
+        "Original claw, capsule, marble, and beacon artwork adapts to the active theme palette, material, motion, frame-rate, and reduced-motion preference.",
+        "The bilingual README and documentation site now include current English manager, live interaction, and complete-result screenshots."
+      ],
+      "fixes": [
+        "Prevented the official configuration panel from flashing before the selected interaction appears.",
+        "Fixed model outcomes that were previously presented without being written and verified alongside reasoning effort and speed.",
+        "Fixed first managed launch applying to Electron's transient bootstrap renderer and requiring repeated Codex restarts.",
+        "Fixed interaction preferences failing to resynchronize after the desktop manager reconnects.",
+        "Fixed incomplete preview clipping and native switches inheriting geometry-changing theme styles."
+      ]
+    },
+    "zh-CN": {
+      "summary": "五种精修后的交互玩法现在可以选择、确认、写入并验证完整的真实 Codex 配置，同时强化首次启动可靠性与当前菜单兼容性。",
+      "highlights": [
+        "三段落珠、配置胶囊机、三环锻造、三轴控制台和任务航图都会把可见操作直接绑定到模型、推理强度和响应速度。",
+        "每个结果都展示完整的三项差异，标记保持不变的字段，等待用户确认，并在写入后验证 Codex 原生状态。",
+        "原创抓钩、胶囊、滚珠和信标素材会适配当前主题的配色、材质、动态、帧率和减少动态偏好。",
+        "中英文 README 与文档站新增当前英文管理器、真实玩法和完整结果截图。"
+      ],
+      "fixes": [
+        "修复所选玩法出现前短暂闪现官方配置面板的问题。",
+        "修复模型结果只展示却没有与推理强度、速度一同写入和验证的问题。",
+        "修复首次受控启动把效果应用到 Electron 临时启动渲染器、需要重复重启 Codex 才生效的问题。",
+        "修复桌面管理器重新连接后没有同步交互玩法偏好的问题。",
+        "修复预览圆角裁切不完整，以及主题样式改变原生开关几何形态的问题。"
+      ]
+    }
+  }
+}

@@ -39,12 +39,7 @@ interface InjectedRuntime {
   updateExperience: (
     experience: {
       composerInteractionMode:
-        | "disabled"
-        | "marbles"
-        | "claw"
-        | "toss"
-        | "balance"
-        | "route";
+        "disabled" | "marbles" | "claw" | "toss" | "balance" | "route";
       locale: "en" | "zh-CN";
       reduceMotion: boolean;
     },
@@ -175,7 +170,7 @@ describe("injected compatibility runtime", () => {
     )();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(40);
+    expect(runtime().version).toBe(41);
   });
 
   it("updates composer interactions without reinjecting the active theme", async () => {
@@ -199,7 +194,9 @@ describe("injected compatibility runtime", () => {
 
     expect(outcome).toMatchObject({ ok: true, stale: false, mode: "toss" });
     expect(document.getElementById("codex-styler-scene-root")).toBe(backdrop);
-    expect(document.getElementById("codex-styler-composer-moments")).not.toBeNull();
+    expect(
+      document.getElementById("codex-styler-composer-moments"),
+    ).not.toBeNull();
   });
 
   it("adds theme-adaptive composer moments without touching prompt content", async () => {
@@ -249,10 +246,12 @@ describe("injected compatibility runtime", () => {
     trigger?.click();
     await vi.waitFor(() =>
       expect(root?.querySelector("[role='application']")).toHaveAccessibleName(
-        "Lucky Setup",
+        "Loadout Forge",
       ),
     );
-    expect(root?.querySelector(".csm-proposal")).not.toBeNull();
+    await vi.waitFor(() =>
+      expect(root?.querySelector(".csm-proposal")).not.toBeNull(),
+    );
     expect(root?.textContent).toContain("Reasoning effort");
     expect(root?.textContent).toContain("Speed");
     expect(composer.textContent).toBe(originalPrompt);
@@ -279,15 +278,27 @@ describe("injected compatibility runtime", () => {
       locale: "zh-CN",
       reduceMotion: true,
     });
-    document
-      .querySelector<HTMLButtonElement>("[data-codex-intelligence-trigger]")
-      ?.click();
+    const trigger = document.querySelector<HTMLButtonElement>(
+      "[data-codex-intelligence-trigger]",
+    );
+    const pointerDown = new PointerEvent("pointerdown", {
+      bubbles: true,
+      cancelable: true,
+    });
+    trigger?.dispatchEvent(pointerDown);
 
+    expect(pointerDown.defaultPrevented).toBe(true);
+    expect(document.querySelector(".csm-stage--loading")).not.toBeNull();
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>("[role='menu']")).some(
+        (menu) => !menu.hidden && menu.style.opacity !== "0",
+      ),
+    ).toBe(false);
     await vi.waitFor(() =>
-      expect(document.querySelector(".csm-stage")).not.toBeNull(),
+      expect(document.querySelector(".csm-proposal")).not.toBeNull(),
     );
     expect(document.querySelector(".csm-stage")).toHaveAccessibleName(
-      "幸运配置",
+      "三环锻造",
     );
     expect(
       Array.from(document.querySelectorAll<HTMLElement>("[role='menu']")).some(
@@ -430,25 +441,84 @@ describe("injected compatibility runtime", () => {
         ?.click();
       await vi.waitFor(() =>
         expect(
-          document.querySelector<HTMLElement>(".csm-stage"),
+          document.querySelector<HTMLElement>(".csm-stage canvas"),
         ).not.toBeNull(),
       );
       const stage = document.querySelector<HTMLElement>(".csm-stage");
       expect(stage).toHaveFocus();
       expect(stage?.querySelector("canvas")).not.toBeNull();
       const keyboardAction = new KeyboardEvent("keydown", {
-        key: game === "balance" || game === "route" ? "ArrowRight" : "Enter",
+        key:
+          game === "balance"
+            ? "ArrowLeft"
+            : game === "route"
+              ? "ArrowRight"
+              : "Enter",
         bubbles: true,
         cancelable: true,
       });
       stage?.dispatchEvent(keyboardAction);
       expect(keyboardAction.defaultPrevented).toBe(true);
+      if (game === "balance") {
+        stage?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "m",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        stage?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "ArrowUp",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        stage?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "Enter",
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        expect(document.querySelectorAll(".csm-config-diff s")).toHaveLength(3);
+      }
       animationFrames.shift()?.(performance.now() + 16);
       expect(context.clearRect).toHaveBeenCalled();
       document.querySelector<HTMLButtonElement>(".csm-close")?.click();
       expect(document.querySelector(".csm-stage")).toBeNull();
     }
   });
+
+  it.each(["marbles", "claw", "toss", "balance", "route"] as const)(
+    "%s always resolves to a complete model, reasoning, and speed loadout",
+    async (game) => {
+      document.body.innerHTML = codexFixture("task");
+      installCodexIntelligenceFixture();
+
+      await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+        composerInteractionMode: game,
+        locale: "en",
+        reduceMotion: true,
+      });
+      document
+        .querySelector<HTMLButtonElement>("[data-codex-intelligence-trigger]")
+        ?.click();
+
+      await vi.waitFor(() =>
+        expect(document.querySelector(".csm-proposal")).not.toBeNull(),
+      );
+      const proposal = document.querySelector(".csm-proposal") as HTMLElement;
+      const terms = Array.from(proposal.querySelectorAll("dt")).map(
+        (term) => term.textContent,
+      );
+      expect(terms).toEqual(["Model", "Reasoning effort", "Speed"]);
+      expect(proposal.querySelectorAll("s")).toHaveLength(3);
+      expect(proposal.textContent).not.toMatch(/score|points|reward/i);
+
+      document.querySelector<HTMLButtonElement>(".csm-close")?.click();
+    },
+  );
 
   it("previews an exact configuration diff and verifies the native setting update", async () => {
     document.body.innerHTML = codexFixture("task");
@@ -482,7 +552,7 @@ describe("injected compatibility runtime", () => {
     );
     const proposal = document.querySelector(".csm-proposal") as HTMLElement;
     expect(proposal.textContent).toContain("Model");
-    expect(proposal.querySelector("s")).not.toBeNull();
+    expect(proposal.querySelectorAll("s")).toHaveLength(3);
 
     const apply = Array.from(proposal.querySelectorAll("button")).find(
       (button) => button.textContent === "Apply configuration",
@@ -493,6 +563,16 @@ describe("injected compatibility runtime", () => {
         "Configuration applied and verified",
       ),
     );
+    const trigger = document.querySelector<HTMLElement>(
+      "[data-codex-intelligence-trigger]",
+    );
+    expect(
+      trigger?.querySelector("[data-model-picker-model-row]")?.textContent,
+    ).toBe("5.4");
+    expect(trigger?.dataset.selectedReasoningEffort).toBe("extra-high");
+    expect(
+      document.querySelector("[aria-label='Speed Standard']"),
+    ).not.toBeNull();
     expect(composer.textContent).toBe(originalPrompt);
   });
 
@@ -530,16 +610,27 @@ describe("injected compatibility runtime", () => {
     trigger?.click();
 
     await vi.waitFor(() =>
+      expect(document.querySelector(".csm-stage--unavailable")).not.toBeNull(),
+    );
+    expect(document.querySelector(".csm-proposal")).toBeNull();
+    expect(document.body.textContent).toContain(
+      "未识别到可安全调整的 Codex 配置",
+    );
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>("[role='menu']")).some(
+        (menu) => !menu.hidden && menu.style.opacity !== "0",
+      ),
+    ).toBe(false);
+    const official = Array.from(
+      document.querySelectorAll<HTMLButtonElement>(".csm-stage button"),
+    ).find((button) => button.textContent === "改用官方设置");
+    official?.click();
+    await vi.waitFor(() =>
       expect(
         Array.from(
           document.querySelectorAll<HTMLElement>("[role='menu']"),
-        ).some((menu) => !menu.hidden),
+        ).some((menu) => !menu.hidden && menu.style.opacity !== "0"),
       ).toBe(true),
-    );
-    expect(document.querySelector(".csm-stage")).toBeNull();
-    expect(document.querySelector(".csm-proposal")).toBeNull();
-    expect(document.body.textContent).not.toContain(
-      "未识别到可安全调整的 Codex 配置",
     );
   });
 

@@ -217,21 +217,51 @@ describe("Codex Styler shell", () => {
     expect(
       screen.getByRole("heading", { name: "Interactions", level: 1 }),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("option", { name: /Orbit Recipe/ }));
+    fireEvent.click(screen.getByRole("option", { name: /Triple Drop/ }));
 
-    expect(
-      screen.getByRole("option", { name: /Orbit Recipe/ }),
-    ).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("option", { name: /Triple Drop/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     expect(
       JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}")
         .composerInteractionMode,
     ).toBe("marbles");
   });
 
-  it("restores the selected interaction after reconnecting without reapplying the theme", async () => {
+  it("does not run an incremental interaction update before the theme runtime is active", async () => {
     vi.mocked(getRuntimeStatus).mockResolvedValue({
       ...appliedRuntime,
       state: "connected",
+      revision: 7,
+    });
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        composerInteractionMode: "toss",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(getRuntimeStatus).toHaveBeenCalled());
+    expect(updateRuntimeExperience).not.toHaveBeenCalled();
+    expect(applyConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("restores the selected interaction after reconnecting to an active runtime", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "applied",
       revision: 7,
     });
     localStorage.setItem(
@@ -691,7 +721,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.7")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.8")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();

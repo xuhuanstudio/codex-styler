@@ -1,6 +1,8 @@
 (() => {
-  const RUNTIME_VERSION = 40;
+  const RUNTIME_VERSION = 41;
   if (window.__CODEX_STYLER_RUNTIME__?.version === RUNTIME_VERSION) return;
+  window.__CODEX_STYLER_TRANSIENT_INTERACTIONS__?.destroy?.();
+  delete window.__CODEX_STYLER_TRANSIENT_INTERACTIONS__;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -2984,6 +2986,25 @@
   const nextFrame = () =>
     new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
+  const waitForApplicationSurface = async (timeout = 3600) => {
+    const startedAt = performance.now();
+    let stableSamples = 0;
+    while (performance.now() - startedAt < timeout) {
+      const root = appRootFallback();
+      const surface = document.querySelector(
+        'main.main-surface, aside.app-shell-left-panel, .composer-surface-chrome, [data-testid="composer"], [role="main"]',
+      );
+      if (root && surface) {
+        stableSamples += 1;
+        if (stableSamples >= 2) return true;
+      } else {
+        stableSamples = 0;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 60));
+    }
+    return false;
+  };
+
   const composerExperienceConfiguration = (theme, variant, experience = {}) => {
     const visual = theme.variants[variant];
     const appearance = visual.appearance;
@@ -3379,6 +3400,19 @@
       throw new Error("Codex Styler rejected an invalid runtime strategy");
     }
 
+    await waitForApplicationSurface();
+    if (revision !== latestRevision) {
+      return {
+        ok: true,
+        stale: true,
+        revision: latestRevision,
+        themeId: theme.id,
+        requestedMode: compatibilityMode,
+        resolvedMode: activeState?.resolvedMode ?? "compatibility",
+        reason: null,
+      };
+    }
+
     const themeRequestsSemantic =
       theme.compatibility?.codex?.mode === "semantic";
     if (
@@ -3487,6 +3521,7 @@
 
   window.__CODEX_STYLER_RUNTIME__ = {
     version: RUNTIME_VERSION,
+    isActive: () => Boolean(activeState),
     apply,
     updateEntity,
     updateExperience,

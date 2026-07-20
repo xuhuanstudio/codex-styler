@@ -1,6 +1,8 @@
 import {
+  BrainCircuit,
+  Blocks,
   CircleOff,
-  Dices,
+  Cpu,
   Gauge,
   Gamepad2,
   Orbit,
@@ -51,7 +53,7 @@ const modes: Array<{
     name: "interactionToss",
     description: "interactionTossDetail",
     category: "interactionCategoryChance",
-    icon: <Dices size={19} />,
+    icon: <Blocks size={19} />,
   },
   {
     id: "balance",
@@ -173,6 +175,32 @@ export function InteractionsView({ mode, t, onChange }: InteractionsViewProps) {
               <span>{t("interactionNativePlacementDetail")}</span>
             </div>
           </div>
+
+          {selected.id !== "disabled" ? (
+            <section
+              className="interaction-binding"
+              aria-label={t("interactionBindingTitle")}
+            >
+              <div>
+                <strong>{t("interactionBindingTitle")}</strong>
+                <span>{t("interactionBindingDetail")}</span>
+              </div>
+              <ol>
+                <li>
+                  <Cpu size={15} />
+                  <span>{t("interactionFieldModel")}</span>
+                </li>
+                <li>
+                  <BrainCircuit size={15} />
+                  <span>{t("interactionFieldReasoning")}</span>
+                </li>
+                <li>
+                  <Gauge size={15} />
+                  <span>{t("interactionFieldSpeed")}</span>
+                </li>
+              </ol>
+            </section>
+          ) : null}
 
           <dl className="interaction-assurances">
             <div>

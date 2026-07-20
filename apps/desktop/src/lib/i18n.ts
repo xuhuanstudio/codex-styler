@@ -24,24 +24,25 @@ const messages = {
     interactionDisabled: "Use the official control",
     interactionDisabledDetail:
       "Keep Codex's native model and reasoning menu unchanged.",
-    interactionMarbles: "Orbit Recipe",
+    interactionMarbles: "Triple Drop",
     interactionMarblesDetail:
-      "Drop orbiting marbles to compose a verified configuration.",
-    interactionClaw: "Preset Claw",
+      "Drop one configuration marble for model, reasoning, and speed; each landing becomes the exact result.",
+    interactionClaw: "Capsule Crane",
     interactionClawDetail:
-      "Catch one configuration from the choices Codex exposes.",
-    interactionToss: "Lucky Setup",
+      "Aim for a capsule that visibly contains a complete model, reasoning, and speed loadout.",
+    interactionToss: "Loadout Forge",
     interactionTossDetail:
-      "Roll among safe configurations derived from visible choices.",
-    interactionBalance: "Depth Balance",
-    interactionBalanceDetail: "Balance response speed against reasoning depth.",
-    interactionRoute: "Constellation Route",
+      "Spin and lock three independent rings, then forge their model, reasoning, and speed result.",
+    interactionBalance: "Three-axis Console",
+    interactionBalanceDetail:
+      "Directly select the model engine, reasoning effort, and response speed in one control deck.",
+    interactionRoute: "Mission Map",
     interactionRouteDetail:
-      "Choose a visual route toward an available configuration.",
+      "Choose a model engine, then a transparent reasoning-and-speed route for the task intent.",
     interactionCategoryOfficial: "Official",
     interactionCategoryPhysics: "Physics",
     interactionCategorySkill: "Skill",
-    interactionCategoryChance: "Chance",
+    interactionCategoryChance: "Forge",
     interactionCategoryTune: "Tune",
     interactionCategoryChoose: "Choose",
     interactionNativePlacement: "Replaces the native control in place",
@@ -52,9 +53,15 @@ const messages = {
     interactionSafetyTitle: "Exact, confirmable changes",
     interactionSafetyDetail:
       "Only visible model, reasoning, and speed choices are used. A configuration diff is shown before anything changes.",
-    interactionFallbackTitle: "Safe compatibility fallback",
+    interactionBindingTitle: "Every play returns one complete loadout",
+    interactionBindingDetail:
+      "The action itself selects all three real settings. Nothing is a decorative score or disconnected reward.",
+    interactionFieldModel: "Model engine",
+    interactionFieldReasoning: "Reasoning effort",
+    interactionFieldSpeed: "Response speed",
+    interactionFallbackTitle: "Explicit recovery path",
     interactionFallbackDetail:
-      "If Codex's control cannot be identified reliably, Styler leaves the official menu available instead of guessing.",
+      "If Codex's control cannot be read reliably, the play panel stays visible and offers an explicit switch to official settings—nothing flashes or changes silently.",
     companionDraftsKicker: "Autosaved creator projects",
     settingsKicker: "Local preferences",
     themeIndexKicker: "Theme index",
@@ -653,7 +660,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 7",
+    version: "Beta 8",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -676,20 +683,25 @@ const messages = {
     interactionSelected: "已选择",
     interactionDisabled: "使用官方控件",
     interactionDisabledDetail: "保持 Codex 原生模型与推理设置菜单不变。",
-    interactionMarbles: "轨道配方",
-    interactionMarblesDetail: "投放轨道滚珠，组合一套经过验证的配置。",
-    interactionClaw: "抓取配置",
-    interactionClawDetail: "从 Codex 实际提供的选项中抓取一套配置。",
-    interactionToss: "幸运配置",
-    interactionTossDetail: "在由可见选项生成的安全配置中随机投掷。",
-    interactionBalance: "深速天平",
-    interactionBalanceDetail: "在响应速度与推理深度之间进行平衡。",
-    interactionRoute: "星图路线",
-    interactionRouteDetail: "沿可视路线选择一套当前可用的配置。",
+    interactionMarbles: "三段落珠",
+    interactionMarblesDetail:
+      "依次为模型、推理强度与速度落下一颗配置珠，每次落点都直接成为结果。",
+    interactionClaw: "配置胶囊机",
+    interactionClawDetail:
+      "瞄准并抓取写明模型、推理强度与速度三项参数的完整配置胶囊。",
+    interactionToss: "三环锻造",
+    interactionTossDetail:
+      "分别转动并锁定模型、推理强度与速度三环，再锻造成最终配置。",
+    interactionBalance: "三轴控制台",
+    interactionBalanceDetail:
+      "在同一个控制台中直接选择模型引擎、推理强度与响应速度。",
+    interactionRoute: "任务航图",
+    interactionRouteDetail:
+      "先选择模型引擎，再选择透明可见的推理强度与速度任务航线。",
     interactionCategoryOfficial: "官方",
     interactionCategoryPhysics: "物理",
     interactionCategorySkill: "操作",
-    interactionCategoryChance: "随机",
+    interactionCategoryChance: "组合",
     interactionCategoryTune: "调校",
     interactionCategoryChoose: "选择",
     interactionNativePlacement: "在原生控件位置直接替换",
@@ -700,9 +712,15 @@ const messages = {
     interactionSafetyTitle: "变更明确且需确认",
     interactionSafetyDetail:
       "只使用界面可见的模型、推理强度与速度选项；实际更改前会展示配置差异。",
-    interactionFallbackTitle: "安全兼容回退",
+    interactionBindingTitle: "每次玩法都会产生一套完整配置",
+    interactionBindingDetail:
+      "操作本身直接决定三项真实设置，不再出现与结果无关的分数或装饰奖励。",
+    interactionFieldModel: "模型引擎",
+    interactionFieldReasoning: "推理强度",
+    interactionFieldSpeed: "响应速度",
+    interactionFallbackTitle: "明确的恢复路径",
     interactionFallbackDetail:
-      "无法可靠识别 Codex 控件时会保留官方菜单，不会猜测或执行不确定的设置。",
+      "无法可靠读取 Codex 控件时，玩法面板会保持可见，并明确提供改用官方设置；不会闪现原面板或静默修改。",
     companionDraftsKicker: "自动保存的创作工程",
     settingsKicker: "本地偏好设置",
     themeIndexKicker: "主题索引",
@@ -1269,7 +1287,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 7",
+    version: "Beta 8",
   },
 } as const;
 

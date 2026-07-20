@@ -384,7 +384,7 @@ export async function checkForUpdates(
   locale: "en" | "zh-CN",
 ): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.2.0-beta.7", update: null };
+    return { currentVersion: "0.2.0-beta.8", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates", { locale });
 }

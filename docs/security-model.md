@@ -11,13 +11,14 @@ Codex Styler is designed so a failed theme can be removed without repairing or r
 
 ## Trust boundaries
 
-| Boundary         | Untrusted input                         | Control                                                        |
-| ---------------- | --------------------------------------- | -------------------------------------------------------------- |
-| Theme import     | ZIP paths, manifest values, image bytes | Schema, allowlist, magic bytes, size and traversal checks      |
-| Codex connection | local CDP targets                       | random loopback port, managed process, expected page target    |
-| Injected runtime | theme data                              | JSON serialization, no script fields, one removable root       |
-| Desktop commands | webview calls                           | Tauri capability allowlist and typed command surface           |
-| Updates          | GitHub release metadata                 | opt-in checks and signed updater artifacts for stable releases |
+| Boundary          | Untrusted input                         | Control                                                            |
+| ----------------- | --------------------------------------- | ------------------------------------------------------------------ |
+| Theme import      | ZIP paths, manifest values, image bytes | Schema, allowlist, magic bytes, size and traversal checks          |
+| Codex connection  | local CDP targets                       | random loopback port, managed process, expected page target        |
+| Injected runtime  | theme data                              | JSON serialization, no script fields, one removable root           |
+| Composer settings | visible native configuration options    | semantic discovery, explicit confirmation, write-back verification |
+| Desktop commands  | webview calls                           | Tauri capability allowlist and typed command surface               |
+| Updates           | GitHub release metadata                 | opt-in checks and signed updater artifacts for stable releases     |
 
 ## Theme package controls
 
@@ -42,6 +43,8 @@ When applying a theme requires a managed restart, the desktop UI explains the co
 CDP is a powerful local debugging interface. Styler exposes it only on loopback for a process it starts, but other software running as the same OS user may still be able to probe local ports. Do not run untrusted local software alongside a managed session.
 
 Codex releases can change page structure independently of their version number. Enhanced mode applies the semantic adapter, verifies required anchors and computed surface styles, and falls back to the isolated scene layer only when a runtime health check fails or a later redraw removes the injected runtime. A version mismatch alone is informational and does not trigger fallback. Conservative mode always uses the isolated layer and does not apply semantic interface styling.
+
+Composer Interactions only inspect the model, reasoning-effort, and speed options exposed by Codex's visible native configuration control. They do not read, change, or submit prompt content. Every play produces a complete configuration diff and requires explicit confirmation. The adapter writes all three fields through the native control and accepts success only after reading the same values back. If the current control cannot be interpreted reliably, Styler does not guess a selector or silently change a setting and keeps an explicit path back to the official control.
 
 ## Reporting a vulnerability
 

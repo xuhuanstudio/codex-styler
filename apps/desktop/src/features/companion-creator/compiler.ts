@@ -301,7 +301,7 @@ export async function compileCompanion(
     const definition: CompanionPackageDefinition = {
       format: COMPANION_FORMAT,
       id,
-      version: "0.2.0-beta.7",
+      version: "0.2.0-beta.8",
       metadata: {
         name: project.name,
         description: project.description.trim(),
@@ -479,7 +479,7 @@ export async function compileCompanion(
   const definition: CompanionPackageDefinition = {
     format: COMPANION_FORMAT,
     id,
-    version: "0.2.0-beta.7",
+    version: "0.2.0-beta.8",
     metadata: {
       name: project.name,
       description: project.description.trim(),

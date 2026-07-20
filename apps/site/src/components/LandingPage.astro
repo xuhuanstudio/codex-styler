@@ -7,9 +7,9 @@ const zh = locale === "zh-CN";
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const docsBase = base + (zh ? "/zh-cn/docs/" : "/docs/");
 const repo = "https://github.com/xuhuanstudio/codex-styler";
-const releaseTag = "v0.2.0-beta.7";
-const macAsset = "Codex-Styler_0.2.0-beta.7_aarch64-unsigned.dmg";
-const windowsAsset = "Codex-Styler_0.2.0-beta.7_x64-unsigned-setup.exe";
+const releaseTag = "v0.2.0-beta.8";
+const macAsset = "Codex-Styler_0.2.0-beta.8_aarch64-unsigned.dmg";
+const windowsAsset = "Codex-Styler_0.2.0-beta.8_x64-unsigned-setup.exe";
 const macDownloadUrl = `${repo}/releases/download/${releaseTag}/${macAsset}`;
 const windowsDownloadUrl = `${repo}/releases/download/${releaseTag}/${windowsAsset}`;
 const copy = zh
@@ -144,6 +144,7 @@ const copy = zh
       <div class="docs-links">
         <a href={docsBase + "create-theme/"}><span>theme.json</span>{zh ? "创建主题" : "Create a theme"}<b>→</b></a>
         <a href={docsBase + "interactive-scenes/"}><span>scene.entities[]</span>{zh ? "互动场景" : "Interactive scenes"}<b>→</b></a>
+        <a href={docsBase + "composer-interactions/"}><span>model · effort · speed</span>{zh ? "交互玩法" : "Composer interactions"}<b>→</b></a>
         <a href={docsBase + "safety-and-restore/"}><span>127.0.0.1</span>{zh ? "安全与恢复" : "Safety & restore"}<b>→</b></a>
       </div>
     </section>
