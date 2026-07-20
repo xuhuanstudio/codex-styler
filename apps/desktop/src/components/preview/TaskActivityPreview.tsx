@@ -56,7 +56,7 @@ export function TaskActivityPreview({ isChinese }: TaskActivityPreviewProps) {
           <code>pnpm --filter @codex-styler/desktop test</code>
           <span>
             <Check size={9} />
-            {isChinese ? "182 项测试通过" : "182 tests passed"}
+            {isChinese ? "全部检查通过" : "All checks passed"}
           </span>
         </div>
       </details>

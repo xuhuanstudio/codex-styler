@@ -49,6 +49,29 @@ describe("v0.1 settings migration", () => {
       themeVariant: "light",
     });
   });
+
+  it("migrates the legacy composer toggle to an explicit interaction mode", () => {
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ composerMomentsEnabled: true, reduceMotion: true }),
+    );
+    expect(loadSettings()).toMatchObject({
+      composerInteractionMode: "marbles",
+      reduceMotion: true,
+    });
+
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ composerMomentsEnabled: false }),
+    );
+    expect(loadSettings().composerInteractionMode).toBe("disabled");
+
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ composerInteractionMode: "route" }),
+    );
+    expect(loadSettings().composerInteractionMode).toBe("route");
+  });
 });
 
 describe("workspace UI preferences", () => {

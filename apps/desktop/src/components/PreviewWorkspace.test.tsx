@@ -121,6 +121,9 @@ describe("PreviewWorkspace task views", () => {
     expect(preview).toHaveAttribute("data-material", "frosted");
     expect(preview).toHaveAttribute("data-typography", "editorial");
     expect(preview).toHaveAttribute("data-motion-character", "fluid");
+    expect(preview).toHaveStyle({
+      borderRadius: `${gildedGrandeur.variants.dark.appearance.radius}px`,
+    });
 
     rerender(
       <PreviewWorkspace
@@ -136,6 +139,9 @@ describe("PreviewWorkspace task views", () => {
     expect(preview).toHaveAttribute("data-material", "frosted");
     expect(preview).toHaveAttribute("data-typography", "cinematic");
     expect(preview).toHaveAttribute("data-motion-character", "expressive");
+    expect(preview).toHaveStyle({
+      borderRadius: `${merryBigTop.variants.dark.appearance.radius}px`,
+    });
   });
 
   it("collapses theme motion to still when reduced motion is enabled", () => {

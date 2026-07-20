@@ -84,3 +84,135 @@ export function portalFixture(kind: "dialog" | "toast" | "menu"): HTMLElement {
   }
   return portal;
 }
+
+export function installCodexIntelligenceFixture(): void {
+  const composer = document.querySelector(".composer-surface-chrome");
+  if (
+    !composer ||
+    document.querySelector("[data-codex-intelligence-trigger]")
+  ) {
+    return;
+  }
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.dataset.codexIntelligenceTrigger = "true";
+  trigger.dataset.selectedReasoningEffort = "high";
+  trigger.dataset.state = "closed";
+  trigger.setAttribute("aria-haspopup", "menu");
+  trigger.innerHTML = `
+    <span data-model-picker-model-row>5.6 Sol</span>
+    <span data-fixture-effort-label>High</span>
+  `;
+
+  const rootMenu = document.createElement("div");
+  rootMenu.setAttribute("role", "menu");
+  rootMenu.hidden = true;
+  const modelRow = document.createElement("button");
+  modelRow.type = "button";
+  modelRow.setAttribute("aria-label", "Model 5.6 Sol");
+  modelRow.innerHTML = "<span data-model-picker-model-row>5.6 Sol</span>";
+  const reasoningRow = document.createElement("button");
+  reasoningRow.type = "button";
+  reasoningRow.setAttribute("aria-label", "Effort High");
+  reasoningRow.textContent = "Effort High";
+  const speedRow = document.createElement("button");
+  speedRow.type = "button";
+  speedRow.setAttribute("aria-label", "Speed Fast");
+  speedRow.textContent = "Speed Fast";
+  rootMenu.append(modelRow, reasoningRow, speedRow);
+
+  const createOptions = (
+    field: "model" | "reasoning" | "speed",
+    labels: string[],
+    selected: string,
+  ) => {
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    menu.dataset.fixtureField = field;
+    menu.hidden = true;
+    labels.forEach((label) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.setAttribute("role", "menuitem");
+      option.textContent = label;
+      if (label === selected && field === "reasoning") {
+        option.dataset.reasoningSelected = "true";
+      }
+      option.addEventListener("click", () => {
+        if (field === "model") {
+          trigger.querySelector("[data-model-picker-model-row]")!.textContent =
+            label;
+          modelRow.querySelector("[data-model-picker-model-row]")!.textContent =
+            label;
+          modelRow.setAttribute("aria-label", `Model ${label}`);
+        } else if (field === "reasoning") {
+          const effortId = label.toLocaleLowerCase().replaceAll(" ", "-");
+          trigger.dataset.selectedReasoningEffort = effortId;
+          trigger.querySelector("[data-fixture-effort-label]")!.textContent =
+            label;
+          reasoningRow.setAttribute("aria-label", `Effort ${label}`);
+          reasoningRow.textContent = `Effort ${label}`;
+          menu
+            .querySelectorAll("[data-reasoning-selected]")
+            .forEach((item) => item.removeAttribute("data-reasoning-selected"));
+          option.dataset.reasoningSelected = "true";
+        } else {
+          speedRow.setAttribute("aria-label", `Speed ${label}`);
+          speedRow.textContent = `Speed ${label}`;
+        }
+        rootMenu.hidden = true;
+        menu.hidden = true;
+        trigger.dataset.state = "closed";
+      });
+      menu.appendChild(option);
+    });
+    return menu;
+  };
+
+  const modelMenu = createOptions("model", ["5.6 Sol", "5.4"], "5.6 Sol");
+  const reasoningMenu = createOptions(
+    "reasoning",
+    ["Low", "Medium", "High", "Extra High"],
+    "High",
+  );
+  const speedMenu = createOptions("speed", ["Standard", "Fast"], "Fast");
+  const closeAll = () => {
+    rootMenu.hidden = true;
+    modelMenu.hidden = true;
+    reasoningMenu.hidden = true;
+    speedMenu.hidden = true;
+    trigger.dataset.state = "closed";
+  };
+  trigger.addEventListener("click", () => {
+    const opening = trigger.dataset.state !== "open";
+    closeAll();
+    trigger.dataset.state = opening ? "open" : "closed";
+    rootMenu.hidden = !opening;
+  });
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    /* The real Radix trigger commits its open state after the keyboard event.
+       Keep the fixture asynchronous so adapters cannot rely on a synchronous
+       data-state mutation and then accidentally send a second toggle. */
+    window.setTimeout(() => {
+      const opening = trigger.dataset.state !== "open";
+      closeAll();
+      trigger.dataset.state = opening ? "open" : "closed";
+      rootMenu.hidden = !opening;
+    }, 0);
+  });
+  modelRow.addEventListener("click", () => {
+    modelMenu.hidden = false;
+  });
+  reasoningRow.addEventListener("click", () => {
+    reasoningMenu.hidden = false;
+  });
+  speedRow.addEventListener("click", () => {
+    speedMenu.hidden = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && trigger.isConnected) closeAll();
+  });
+  composer.parentElement?.insertBefore(trigger, composer);
+  document.body.append(rootMenu, modelMenu, reasoningMenu, speedMenu);
+}

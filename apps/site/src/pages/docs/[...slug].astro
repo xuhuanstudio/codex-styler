@@ -29,6 +29,12 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
       <span class="eyebrow">{doc.eyebrow.en}</span>
       <h1>{doc.title.en}</h1>
       <p class="doc-lead">{doc.description.en}</p>
+      {doc.media && (
+        <figure class="doc-media">
+          <img src={base + doc.media.src} alt={doc.media.alt.en} />
+          <figcaption>{doc.media.caption.en}</figcaption>
+        </figure>
+      )}
       {doc.body.en.map((section, index) => (
         <section>
           <span class="doc-index">{String(index + 1).padStart(2, "0")}</span>
@@ -44,4 +50,3 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, "");
     </article>
   </main>
 </BaseLayout>
-

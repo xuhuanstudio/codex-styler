@@ -8,7 +8,7 @@ describe("TaskActivityPreview", () => {
 
     expect(screen.getByText("Implementation plan")).toBeInTheDocument();
     expect(screen.getByText("Run checks")).toBeInTheDocument();
-    expect(screen.getByText("182 tests passed")).toBeInTheDocument();
+    expect(screen.getByText("All checks passed")).toBeInTheDocument();
     expect(screen.getByText("3 files changed")).toBeInTheDocument();
     expect(
       container.querySelector('[data-message-author-role="user"]'),

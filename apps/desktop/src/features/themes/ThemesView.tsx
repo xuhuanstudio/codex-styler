@@ -5,6 +5,7 @@ import { ResourceLibraryToolbar } from "../../components/ui/ResourceLibraryToolb
 import type { ThemeVariantName } from "../../lib/app-session";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import { matchesResourceSearch } from "../../lib/resource-search";
+import { useCompactDetailFlow } from "../../lib/use-compact-detail-flow";
 import { ThemeDetailCard } from "./ThemeDetailCard";
 import { ThemeRow } from "./ThemeRow";
 
@@ -48,26 +49,16 @@ export function ThemesView({
   resolveAsset,
   liveThemeId,
 }: ThemesViewProps) {
-  const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [browsedThemeId, setBrowsedThemeId] = useState(selectedTheme.id);
-  const workspaceRef = useRef<HTMLElement>(null);
   const themeListRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!compactDetailOpen) return;
-    const element = workspaceRef.current?.closest<HTMLElement>(
-      ".app-main__viewport",
-    );
-    if (!element) return;
-    if (typeof element.scrollTo === "function") {
-      element.scrollTo({
-        top: 0,
-        behavior: reduceMotion ? "auto" : "smooth",
-      });
-    } else {
-      element.scrollTop = 0;
-    }
-  }, [compactDetailOpen, reduceMotion]);
+  const {
+    closeDetail,
+    containerRef: workspaceRef,
+    detailOpen: compactDetailOpen,
+    onKeyDown: onWorkspaceKeyDown,
+    openDetail,
+  } = useCompactDetailFlow<HTMLElement>(reduceMotion);
   const themes = collection === "builtIn" ? builtinThemes : localThemes;
   const filteredThemes = themes.filter((theme) => {
     const localizedTheme = theme.locales[locale] ?? theme.locales.en;
@@ -137,7 +128,7 @@ export function ThemesView({
         activeTab={collection}
         onTabChange={(nextCollection) => {
           setSearchQuery("");
-          setCompactDetailOpen(false);
+          closeDetail({ restoreFocus: false });
           onCollectionChange(nextCollection);
         }}
         search={
@@ -174,6 +165,7 @@ export function ThemesView({
       ) : (
         <section
           ref={workspaceRef}
+          onKeyDown={onWorkspaceKeyDown}
           className={
             "theme-library-workspace" +
             (compactDetailOpen ? " theme-library-workspace--detail" : "")
@@ -218,10 +210,10 @@ export function ThemesView({
                   active={selectedTheme.id === theme.id}
                   live={liveThemeId === theme.id}
                   resolveAsset={resolveAsset}
-                  onSelect={() => {
+                  onSelect={(trigger) => {
                     setBrowsedThemeId(theme.id);
                     onSelect(theme);
-                    setCompactDetailOpen(true);
+                    openDetail(trigger);
                   }}
                   local={collection === "mine"}
                   onEdit={() => onEdit(theme)}
@@ -246,7 +238,7 @@ export function ThemesView({
             reduceMotion={reduceMotion}
             t={t}
             resolveAsset={resolveAsset}
-            onBack={() => setCompactDetailOpen(false)}
+            onBack={() => closeDetail()}
             onEdit={() => onEdit(browsedTheme)}
           />
         </section>

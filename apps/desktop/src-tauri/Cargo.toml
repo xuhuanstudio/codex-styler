@@ -1,6 +1,6 @@
 [package]
 name = "codex-styler"
-version = "0.2.0-beta.7"
+version = "0.2.0-beta.8"
 description = "Unofficial local-first theme and interactive scene editor for OpenAI Codex Desktop"
 authors = ["Codex Styler contributors"]
 license = "Apache-2.0"
@@ -15,6 +15,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2.6.3", features = [] }
 
 [dependencies]
+base64 = "0.22"
 futures-util = "0.3.32"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls"] }
 semver = "1.0"

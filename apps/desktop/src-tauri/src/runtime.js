@@ -1,11 +1,15 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 36) return;
+  const RUNTIME_VERSION = 41;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === RUNTIME_VERSION) return;
+  window.__CODEX_STYLER_TRANSIENT_INTERACTIONS__?.destroy?.();
+  delete window.__CODEX_STYLER_TRANSIENT_INTERACTIONS__;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
   const ENTITY_ID = "codex-styler-entity-root";
   const STYLE_ID = "codex-styler-runtime-style";
   const CONTRAST_REPAIR_STYLE_ID = "codex-styler-contrast-repair-style";
+  const COMPOSER_MOMENTS_ROOT_ID = "codex-styler-composer-moments";
   const APP_ROOT_ATTRIBUTE = "data-codex-styler-app-root";
   const OVERLAY_ROOT_ATTRIBUTE = "data-codex-styler-overlay-root";
   const UNLAYERED_ROOT_ATTRIBUTE = "data-codex-styler-unlayered-root";
@@ -45,6 +49,8 @@
   let activeState = null;
   let entityCleanup = null;
   let entityPositioner = null;
+  let composerMoments = null;
+  let composerSettingsAdapter = null;
   let latestRevision = 0;
 
   const finiteBetween = (value, minimum, maximum) =>
@@ -502,6 +508,10 @@
   };
 
   const remove = () => {
+    composerMoments?.destroy?.();
+    composerMoments = null;
+    composerSettingsAdapter?.destroy?.();
+    composerSettingsAdapter = null;
     if (scenePointerHandler)
       window.removeEventListener("pointermove", scenePointerHandler);
     if (sceneResetHandler) {
@@ -559,7 +569,9 @@
   };
 
   const injectedRoot = (element) =>
-    element?.id === BACKDROP_ID || element?.id === ENTITY_ID;
+    element?.id === BACKDROP_ID ||
+    element?.id === ENTITY_ID ||
+    element?.id === COMPOSER_MOMENTS_ROOT_ID;
 
   const appRootFallback = () => {
     const conventionalRoot = document.querySelector("body > #root");
@@ -1620,9 +1632,8 @@
           select,
           [role="button"],
           [role="tab"],
-          [role="option"],
-          [role="switch"]
-        ) {
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]) {
           transition: color var(--codex-styler-motion-duration) ease, background-color var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease, transform var(--codex-styler-motion-duration) ease !important;
         }
         @media (hover: hover) and (pointer: fine) {
@@ -1651,9 +1662,8 @@
           select,
           [role="button"],
           [role="tab"],
-          [role="option"],
-          [role="switch"]
-        ):focus-visible {
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):focus-visible {
           outline: 2px solid color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-focus)) !important;
           outline-offset: 2px !important;
           box-shadow: 0 0 0 4px color-mix(in srgb, ${appearance.accent} 14%, transparent) !important;
@@ -1686,9 +1696,28 @@
         ) {
           accent-color: ${appearance.accent} !important;
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"][aria-checked="true"] {
+        /* Switches keep Codex's native geometry and thumb mechanics. Theme
+           styling is deliberately limited to state color and the accessible
+           focus outline so imported themes cannot turn a compact toggle into
+           a generic active button. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"] {
+          accent-color: ${appearance.accent} !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:is(
+          [aria-checked="true"],
+          [data-state="checked"],
+          [data-state="on"]
+        ) {
           border-color: color-mix(in srgb, ${appearance.accent} 72%, ${appearance.border}) !important;
           background-color: color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-surface-raised)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:focus-visible {
+          outline: 2px solid color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-focus)) !important;
+          outline-offset: 2px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:is(:disabled, [aria-disabled="true"]) {
+          filter: saturate(.72);
+          opacity: .58 !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
           button,
@@ -1698,10 +1727,9 @@
           [role="button"],
           [role="tab"],
           [role="option"],
-          [role="switch"],
           [role="checkbox"],
           [role="radio"]
-        ):is(:disabled, [aria-disabled="true"]) {
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):is(:disabled, [aria-disabled="true"]) {
           color: var(--codex-styler-text-tertiary) !important;
           border-color: color-mix(in srgb, ${appearance.border} 54%, transparent) !important;
           background-color: color-mix(in srgb, var(--codex-styler-control) 48%, transparent) !important;
@@ -1712,11 +1740,8 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
           button,
           [role="button"],
-          [role="option"],
-          [role="switch"],
-          [role="checkbox"],
-          [role="radio"]
-        ):is(
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):is(
           [aria-pressed="true"],
           [aria-checked="true"],
           [data-state="active"],
@@ -1790,20 +1815,20 @@
          * stroke geometry. Destructive, invalid and branded actions keep
          * their native meaning instead of being recolored by the theme.
          */
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
           overflow: visible;
           border-radius: max(3px, calc(${appearance.radius}px * 0.28));
           color: var(--codex-styler-icon) !important;
           box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 10%, transparent);
           filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 20%, transparent));
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
           overflow: visible;
           border-radius: 999px;
           color: var(--codex-styler-icon-emphasis) !important;
@@ -2961,7 +2986,59 @@
   const nextFrame = () =>
     new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
-  const render = (theme, variant, safeMode, requestedMode, resolvedMode) => {
+  const waitForApplicationSurface = async (timeout = 3600) => {
+    const startedAt = performance.now();
+    let stableSamples = 0;
+    while (performance.now() - startedAt < timeout) {
+      const root = appRootFallback();
+      const surface = document.querySelector(
+        'main.main-surface, aside.app-shell-left-panel, .composer-surface-chrome, [data-testid="composer"], [role="main"]',
+      );
+      if (root && surface) {
+        stableSamples += 1;
+        if (stableSamples >= 2) return true;
+      } else {
+        stableSamples = 0;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 60));
+    }
+    return false;
+  };
+
+  const composerExperienceConfiguration = (theme, variant, experience = {}) => {
+    const visual = theme.variants[variant];
+    const appearance = visual.appearance;
+    return {
+      mode:
+        experience.composerInteractionMode ||
+        (experience.composerMomentsEnabled === true ? "marbles" : "disabled"),
+      locale: experience.locale === "zh-CN" ? "zh-CN" : "en",
+      reduceMotion: experience.reduceMotion === true,
+      palette: {
+        accent: appearance.accent,
+        surface: appearance.surface,
+        text: appearance.text,
+        mutedText: appearance.mutedText,
+        border: appearance.border,
+        radius: appearance.radius,
+        surfaceOpacity: appearance.surfaceOpacity,
+        focusBlur: appearance.focusBlur,
+        warning: appearance.palette?.warning || appearance.accent,
+        success: appearance.palette?.success || appearance.accent,
+      },
+      motionIntensity: visual.motion.intensity,
+      targetFps: visual.motion.targetFps,
+    };
+  };
+
+  const render = (
+    theme,
+    variant,
+    safeMode,
+    requestedMode,
+    resolvedMode,
+    experience = {},
+  ) => {
     assertSafeTheme(theme, variant);
     remove();
     document.documentElement.setAttribute("data-codex-styler", theme.id);
@@ -2969,7 +3046,8 @@
       "data-codex-styler-mode",
       safeMode ? "compatibility" : "semantic",
     );
-    const appearance = theme.variants[variant].appearance;
+    const visual = theme.variants[variant];
+    const appearance = visual.appearance;
     const contrastSystem = resolveContrastSystem(theme, variant);
     document.documentElement.setAttribute("data-codex-styler-variant", variant);
     document.documentElement.setAttribute(
@@ -3115,6 +3193,23 @@
     entityRoot.setAttribute("aria-hidden", "true");
     document.body.appendChild(entityRoot);
     installEntity(entityRoot, theme, variant);
+    const momentsFactory = window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__;
+    const settingsAdapterFactory =
+      window.__CODEX_STYLER_CREATE_COMPOSER_SETTINGS_ADAPTER__;
+    if (typeof momentsFactory === "function") {
+      if (typeof settingsAdapterFactory === "function") {
+        composerSettingsAdapter = settingsAdapterFactory({
+          resolveComposer: () => entityTarget("composer"),
+        });
+      }
+      composerMoments = momentsFactory({
+        resolveComposer: () => entityTarget("composer"),
+        settingsAdapter: composerSettingsAdapter,
+      });
+      composerMoments.configure(
+        composerExperienceConfiguration(theme, variant, experience),
+      );
+    }
     layoutResizeHandler = () => updateResponsiveLayout();
     window.addEventListener("resize", layoutResizeHandler, { passive: true });
 
@@ -3124,12 +3219,14 @@
       safeMode: Boolean(safeMode),
       requestedMode,
       resolvedMode,
+      experience,
     };
     mutationObserver = new MutationObserver(() => {
       updateStackingRoots();
       updatePageKind();
       updateResponsiveLayout();
       entityPositioner?.();
+      composerMoments?.refresh?.();
       if (
         activeState &&
         (!document.getElementById(BACKDROP_ID) ||
@@ -3143,6 +3240,7 @@
           state.safeMode,
           state.requestedMode,
           state.resolvedMode,
+          state.experience,
         );
         return;
       }
@@ -3176,6 +3274,7 @@
                     true,
                     state.requestedMode,
                     "compatibility",
+                    state.experience,
                   );
                   document.documentElement.setAttribute(
                     "data-codex-styler-fallback",
@@ -3192,6 +3291,7 @@
               true,
               state.requestedMode,
               "compatibility",
+              state.experience,
             );
             document.documentElement.setAttribute(
               "data-codex-styler-fallback",
@@ -3233,11 +3333,50 @@
     return { ok: true, stale: false, revision };
   };
 
+  const updateExperience = (experience = {}, revision = latestRevision + 1) => {
+    if (!Number.isInteger(revision) || revision < 0) {
+      throw new Error(
+        "Codex Styler rejected an invalid configuration revision",
+      );
+    }
+    if (revision < latestRevision) {
+      return { ok: true, stale: true, revision: latestRevision };
+    }
+    if (!activeState || !composerMoments) {
+      return {
+        ok: false,
+        stale: false,
+        revision: latestRevision,
+        reason: "runtime-not-active",
+      };
+    }
+    latestRevision = revision;
+    const nextExperience = {
+      ...activeState.experience,
+      ...experience,
+    };
+    composerMoments.configure(
+      composerExperienceConfiguration(
+        activeState.theme,
+        activeState.variant,
+        nextExperience,
+      ),
+    );
+    activeState.experience = nextExperience;
+    return {
+      ok: true,
+      stale: false,
+      revision,
+      mode: nextExperience.composerInteractionMode || "disabled",
+    };
+  };
+
   const apply = async (
     theme,
     variant,
     compatibilityMode = "auto",
     revision = latestRevision + 1,
+    experience = {},
   ) => {
     assertSafeTheme(theme, variant);
     if (!Number.isInteger(revision) || revision < 0) {
@@ -3261,13 +3400,33 @@
       throw new Error("Codex Styler rejected an invalid runtime strategy");
     }
 
+    await waitForApplicationSurface();
+    if (revision !== latestRevision) {
+      return {
+        ok: true,
+        stale: true,
+        revision: latestRevision,
+        themeId: theme.id,
+        requestedMode: compatibilityMode,
+        resolvedMode: activeState?.resolvedMode ?? "compatibility",
+        reason: null,
+      };
+    }
+
     const themeRequestsSemantic =
       theme.compatibility?.codex?.mode === "semantic";
     if (
       compatibilityMode === "compatibility" ||
       (compatibilityMode === "auto" && !themeRequestsSemantic)
     ) {
-      render(theme, variant, true, compatibilityMode, "compatibility");
+      render(
+        theme,
+        variant,
+        true,
+        compatibilityMode,
+        "compatibility",
+        experience,
+      );
       return {
         ok: true,
         themeId: theme.id,
@@ -3281,7 +3440,7 @@
 
     const resolvedMode =
       compatibilityMode === "developer" ? "developer" : "semantic";
-    render(theme, variant, false, compatibilityMode, resolvedMode);
+    render(theme, variant, false, compatibilityMode, resolvedMode, experience);
     if (compatibilityMode === "developer") {
       return {
         ok: true,
@@ -3325,7 +3484,14 @@
       contrastRepairApplied = verification.ok;
     }
     if (!verification.ok) {
-      render(theme, variant, true, compatibilityMode, "compatibility");
+      render(
+        theme,
+        variant,
+        true,
+        compatibilityMode,
+        "compatibility",
+        experience,
+      );
       document.documentElement.setAttribute(
         "data-codex-styler-fallback",
         verification.reason,
@@ -3354,9 +3520,11 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 36,
+    version: RUNTIME_VERSION,
+    isActive: () => Boolean(activeState),
     apply,
     updateEntity,
+    updateExperience,
     pause: remove,
     restore: remove,
   };

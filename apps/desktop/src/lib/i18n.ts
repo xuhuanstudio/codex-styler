@@ -8,6 +8,7 @@ const messages = {
     themes: "Themes",
     create: "Create",
     companions: "Companions",
+    interactions: "Interactions",
     library: "My Themes",
     settings: "Settings",
     homeKicker: "Workspace control",
@@ -15,6 +16,52 @@ const messages = {
     companionLibraryKicker: "Independent scene entities",
     companionLibraryDescription:
       "Place companions by dragging. Recommended pairings are optional, and themes and companions always stay independent.",
+    interactionKicker: "Composer configuration experiences",
+    interactionDescription:
+      "Choose how Codex's native model and reasoning control behaves. The selected interaction replaces that control in place and never reads prompt content.",
+    interactionChooseMode: "Choose a composer interaction",
+    interactionSelected: "Selected",
+    interactionDisabled: "Use the official control",
+    interactionDisabledDetail:
+      "Keep Codex's native model and reasoning menu unchanged.",
+    interactionMarbles: "Triple Drop",
+    interactionMarblesDetail:
+      "Drop one configuration marble for model, reasoning, and speed; each landing becomes the exact result.",
+    interactionClaw: "Capsule Crane",
+    interactionClawDetail:
+      "Aim for a capsule that visibly contains a complete model, reasoning, and speed loadout.",
+    interactionToss: "Loadout Forge",
+    interactionTossDetail:
+      "Spin and lock three independent rings, then forge their model, reasoning, and speed result.",
+    interactionBalance: "Three-axis Console",
+    interactionBalanceDetail:
+      "Directly select the model engine, reasoning effort, and response speed in one control deck.",
+    interactionRoute: "Mission Map",
+    interactionRouteDetail:
+      "Choose a model engine, then a transparent reasoning-and-speed route for the task intent.",
+    interactionCategoryOfficial: "Official",
+    interactionCategoryPhysics: "Physics",
+    interactionCategorySkill: "Skill",
+    interactionCategoryChance: "Forge",
+    interactionCategoryTune: "Tune",
+    interactionCategoryChoose: "Choose",
+    interactionNativePlacement: "Replaces the native control in place",
+    interactionNativePlacementDetail:
+      "Open Codex's normal configuration control to use the selected experience. No extra floating launcher is added beside the composer.",
+    interactionComposerPlaceholder: "Describe a task to Codex…",
+    interactionOfficialControl: "Official configuration",
+    interactionSafetyTitle: "Exact, confirmable changes",
+    interactionSafetyDetail:
+      "Only visible model, reasoning, and speed choices are used. A configuration diff is shown before anything changes.",
+    interactionBindingTitle: "Every play returns one complete loadout",
+    interactionBindingDetail:
+      "The action itself selects all three real settings. Nothing is a decorative score or disconnected reward.",
+    interactionFieldModel: "Model engine",
+    interactionFieldReasoning: "Reasoning effort",
+    interactionFieldSpeed: "Response speed",
+    interactionFallbackTitle: "Explicit recovery path",
+    interactionFallbackDetail:
+      "If Codex's control cannot be read reliably, the play panel stays visible and offers an explicit switch to official settings—nothing flashes or changes silently.",
     companionDraftsKicker: "Autosaved creator projects",
     settingsKicker: "Local preferences",
     themeIndexKicker: "Theme index",
@@ -469,6 +516,9 @@ const messages = {
     reduceMotion: "Reduce motion",
     reduceMotionDescription:
       "Freezes pointer tracking, idle animation, and non-essential parallax.",
+    composerMoments: "Configuration plays",
+    composerMomentsDescription:
+      "Adds optional theme-adaptive plays beside the Codex composer. Each play reads only the visible model, reasoning, and speed choices, previews an exact configuration diff, and applies it only after confirmation. Prompt content is never read or changed.",
     automaticUpdateChecks: "Automatically check for updates",
     automaticUpdateChecksDescription:
       "Checks GitHub Releases after launch. Nothing is downloaded without confirmation.",
@@ -610,7 +660,7 @@ const messages = {
     companionUpdated: "Companion updated",
     codexQuitFailed:
       "Codex did not close. Save your work, close it manually, and try again.",
-    version: "Beta 7",
+    version: "Beta 8",
   },
   "zh-CN": {
     unofficial: "非官方开源项目",
@@ -618,6 +668,7 @@ const messages = {
     themes: "主题",
     create: "创作",
     companions: "互动伙伴",
+    interactions: "交互玩法",
     library: "我的主题",
     settings: "设置",
     homeKicker: "工作区控制",
@@ -625,6 +676,51 @@ const messages = {
     companionLibraryKicker: "独立场景实体",
     companionLibraryDescription:
       "可通过拖拽调整伙伴位置；默认搭配仅供参考，主题与互动伙伴始终可以独立选择。",
+    interactionKicker: "输入区配置交互",
+    interactionDescription:
+      "选择 Codex 原生模型与推理设置控件的交互方式。所选玩法会在原控件位置直接替换，且绝不读取输入内容。",
+    interactionChooseMode: "选择输入区交互玩法",
+    interactionSelected: "已选择",
+    interactionDisabled: "使用官方控件",
+    interactionDisabledDetail: "保持 Codex 原生模型与推理设置菜单不变。",
+    interactionMarbles: "三段落珠",
+    interactionMarblesDetail:
+      "依次为模型、推理强度与速度落下一颗配置珠，每次落点都直接成为结果。",
+    interactionClaw: "配置胶囊机",
+    interactionClawDetail:
+      "瞄准并抓取写明模型、推理强度与速度三项参数的完整配置胶囊。",
+    interactionToss: "三环锻造",
+    interactionTossDetail:
+      "分别转动并锁定模型、推理强度与速度三环，再锻造成最终配置。",
+    interactionBalance: "三轴控制台",
+    interactionBalanceDetail:
+      "在同一个控制台中直接选择模型引擎、推理强度与响应速度。",
+    interactionRoute: "任务航图",
+    interactionRouteDetail:
+      "先选择模型引擎，再选择透明可见的推理强度与速度任务航线。",
+    interactionCategoryOfficial: "官方",
+    interactionCategoryPhysics: "物理",
+    interactionCategorySkill: "操作",
+    interactionCategoryChance: "组合",
+    interactionCategoryTune: "调校",
+    interactionCategoryChoose: "选择",
+    interactionNativePlacement: "在原生控件位置直接替换",
+    interactionNativePlacementDetail:
+      "点击 Codex 原有的配置控件即可进入所选玩法；输入框旁不会再出现额外的悬浮启动按钮。",
+    interactionComposerPlaceholder: "向 Codex 描述任务…",
+    interactionOfficialControl: "官方配置控件",
+    interactionSafetyTitle: "变更明确且需确认",
+    interactionSafetyDetail:
+      "只使用界面可见的模型、推理强度与速度选项；实际更改前会展示配置差异。",
+    interactionBindingTitle: "每次玩法都会产生一套完整配置",
+    interactionBindingDetail:
+      "操作本身直接决定三项真实设置，不再出现与结果无关的分数或装饰奖励。",
+    interactionFieldModel: "模型引擎",
+    interactionFieldReasoning: "推理强度",
+    interactionFieldSpeed: "响应速度",
+    interactionFallbackTitle: "明确的恢复路径",
+    interactionFallbackDetail:
+      "无法可靠读取 Codex 控件时，玩法面板会保持可见，并明确提供改用官方设置；不会闪现原面板或静默修改。",
     companionDraftsKicker: "自动保存的创作工程",
     settingsKicker: "本地偏好设置",
     themeIndexKicker: "主题索引",
@@ -1056,6 +1152,9 @@ const messages = {
     languageDescription: "界面语言与本地主题元数据",
     reduceMotion: "减少动态",
     reduceMotionDescription: "停止光标跟随、待机动作和非必要的视差动态。",
+    composerMoments: "配置玩法",
+    composerMomentsDescription:
+      "在 Codex 输入框旁加入主题自适应玩法。玩法只读取界面中可见的模型、推理强度与速度选项，先展示明确的配置差异，经确认后才应用；不会读取或修改输入内容。",
     automaticUpdateChecks: "自动检查更新",
     automaticUpdateChecksDescription:
       "启动后检查 GitHub Releases；未经确认不会下载任何内容。",
@@ -1188,7 +1287,7 @@ const messages = {
     themeDeleted: "主题已删除",
     companionUpdated: "互动伙伴已更新",
     codexQuitFailed: "Codex 未能关闭。请保存工作、手动退出后再试。",
-    version: "Beta 7",
+    version: "Beta 8",
   },
 } as const;
 

@@ -8,6 +8,8 @@ import {
 } from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
 import type { RuntimeStrategy } from "./storage";
+import type { Locale } from "./i18n";
+import type { ComposerInteractionMode } from "./composer-interactions";
 
 export interface CodexDetection {
   installed: boolean;
@@ -63,7 +65,15 @@ export interface AppliedConfiguration {
   variant: "light" | "dark";
   runtimeStrategy: RuntimeStrategy;
   reduceMotion: boolean;
+  composerInteractionMode: ComposerInteractionMode;
+  locale: Locale;
   revision: number;
+}
+
+export interface RuntimeExperiencePreferences {
+  composerInteractionMode: ComposerInteractionMode;
+  locale: Locale;
+  reduceMotion: boolean;
 }
 
 export type UpdateDownloadEvent =
@@ -205,6 +215,11 @@ export async function applyTheme(
   runtimeStrategy: RuntimeStrategy,
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
   revision = 0,
+  experience: RuntimeExperiencePreferences = {
+    composerInteractionMode: "disabled",
+    locale: "en",
+    reduceMotion: false,
+  },
 ): Promise<RuntimeStatus> {
   const payload = await prepareThemeForRuntime(theme, resolveAsset);
   if (!isTauri()) {
@@ -225,6 +240,7 @@ export async function applyTheme(
     compatibilityMode:
       runtimeStrategy === "enhanced" ? "auto" : "compatibility",
     revision,
+    experience,
   });
 }
 
@@ -246,7 +262,30 @@ export async function applyConfiguration(
     configuration.runtimeStrategy,
     resolveAsset,
     configuration.revision,
+    {
+      composerInteractionMode: configuration.composerInteractionMode,
+      locale: configuration.locale,
+      reduceMotion: configuration.reduceMotion,
+    },
   );
+}
+
+export async function updateRuntimeExperience(
+  experience: RuntimeExperiencePreferences,
+  revision: number,
+): Promise<RuntimeStatus> {
+  if (!isTauri()) {
+    browserStatus = {
+      ...browserStatus,
+      revision,
+      message: "Runtime interaction preferences updated in preview mode",
+    };
+    return { ...browserStatus };
+  }
+  return invoke<RuntimeStatus>("update_runtime_experience", {
+    experience,
+    revision,
+  });
 }
 
 export async function updateCompanion(
@@ -345,7 +384,7 @@ export async function checkForUpdates(
   locale: "en" | "zh-CN",
 ): Promise<UpdateCheckResult> {
   if (!isTauri()) {
-    return { currentVersion: "0.2.0-beta.7", update: null };
+    return { currentVersion: "0.2.0-beta.8", update: null };
   }
   return invoke<UpdateCheckResult>("check_for_updates", { locale });
 }

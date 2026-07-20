@@ -118,29 +118,72 @@ pub async fn launch_and_connect(install_path: &str) -> Result<CdpSession, Styler
         executable_from_install(Path::new(install_path)).ok_or(StylerError::CodexNotFound)?;
 
     let child_id = launch_codex_process(&executable, port)?;
+    let websocket_url = wait_for_ready_target(port, 60).await?;
 
+    Ok(CdpSession {
+        port,
+        websocket_url,
+        child_id,
+    })
+}
+
+pub async fn wait_for_ready_target(port: u16, attempts: usize) -> Result<String, StylerError> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(900))
         .build()?;
     let endpoint = format!("http://127.0.0.1:{port}/json/list");
 
-    for _ in 0..50 {
+    let mut stable_websocket = None;
+    let mut stable_samples = 0;
+    for _ in 0..attempts {
         if let Ok(response) = client.get(&endpoint).send().await
             && let Ok(targets) = response.json::<Vec<CdpTarget>>().await
             && let Some(target) = targets.into_iter().find(is_trusted_codex_target)
             && let Some(websocket_url) = target.web_socket_debugger_url
             && is_loopback_debugger_url(&websocket_url, port)
         {
-            return Ok(CdpSession {
-                port,
-                websocket_url,
-                child_id,
-            });
+            if renderer_is_ready(&websocket_url).await {
+                if stable_websocket.as_deref() == Some(websocket_url.as_str()) {
+                    stable_samples += 1;
+                } else {
+                    stable_websocket = Some(websocket_url.clone());
+                    stable_samples = 1;
+                }
+                // Electron can expose a trusted page before the React shell has
+                // finished replacing its bootstrap renderer. Requiring three
+                // consecutive ready samples prevents applying to that transient
+                // page and losing the runtime during the first launch.
+                if stable_samples >= 3 {
+                    return Ok(websocket_url);
+                }
+            } else {
+                stable_websocket = None;
+                stable_samples = 0;
+            }
         }
         sleep(Duration::from_millis(200)).await;
     }
 
     Err(StylerError::TargetTimeout)
+}
+
+async fn renderer_is_ready(websocket_url: &str) -> bool {
+    let expression = r#"(() => {
+      const root = document.querySelector('#root') || document.body?.firstElementChild;
+      const surface = document.querySelector(
+        'main.main-surface, aside.app-shell-left-panel, .composer-surface-chrome, [data-testid="composer"], [role="main"]'
+      );
+      return document.readyState !== 'loading' && Boolean(root && surface);
+    })()"#;
+    evaluate(websocket_url, expression)
+        .await
+        .ok()
+        .and_then(|response| {
+            response
+                .pointer("/result/result/value")
+                .and_then(Value::as_bool)
+        })
+        == Some(true)
 }
 
 pub async fn evaluate(websocket_url: &str, expression: &str) -> Result<Value, StylerError> {

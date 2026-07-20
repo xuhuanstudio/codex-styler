@@ -5,6 +5,11 @@ export interface DocPage {
   title: Record<SiteLocale, string>;
   description: Record<SiteLocale, string>;
   eyebrow: Record<SiteLocale, string>;
+  media?: {
+    src: string;
+    alt: Record<SiteLocale, string>;
+    caption: Record<SiteLocale, string>;
+  };
   body: Record<SiteLocale, Array<{ heading: string; paragraphs: string[] }>>;
 }
 
@@ -185,6 +190,82 @@ export const docs: DocPage[] = [
     },
   },
   {
+    slug: "composer-interactions",
+    title: {
+      en: "Playful, verifiable Codex configuration",
+      "zh-CN": "可玩且可验证的 Codex 配置交互",
+    },
+    description: {
+      en: "Turn Codex's native configuration control into a short, theme-aware interaction that selects and verifies a real model, reasoning effort, and response speed.",
+      "zh-CN":
+        "把 Codex 原生配置控件变成短时、主题自适应的交互，并真实选择、写入和验证模型、推理强度与响应速度。",
+    },
+    eyebrow: {
+      en: "COMPOSER INTERACTIONS / BETA",
+      "zh-CN": "输入区交互玩法 / BETA",
+    },
+    media: {
+      src: "/media/composer-interactions-capsule-crane.webp",
+      alt: {
+        en: "Capsule Crane showing five complete Codex configuration loadouts",
+        "zh-CN": "胶囊机展示五套完整 Codex 配置",
+      },
+      caption: {
+        en: "Capsule Crane: every visible capsule contains a complete model, reasoning, and speed loadout.",
+        "zh-CN":
+          "配置胶囊机：每枚可见胶囊都包含一套完整的模型、推理强度和速度配置。",
+      },
+    },
+    body: {
+      en: [
+        {
+          heading: "One native entry, five purposeful interactions",
+          paragraphs: [
+            "Choose Triple Drop, Capsule Crane, Loadout Forge, Three-axis Console, or Mission Map from the manager. The selected experience replaces Codex's native configuration control in place; it does not add a second launcher beside the composer.",
+            "Each interaction gives the three real settings a visible role. Triple Drop chooses one field per landing, Capsule Crane exposes complete loadouts before capture, Loadout Forge locks three independent rings, Three-axis Console tunes a model and a reasoning-speed matrix, and Mission Map pairs a model engine with a transparent task route.",
+          ],
+        },
+        {
+          heading: "The result is a real configuration, not a score",
+          paragraphs: [
+            "Every completed play returns exactly one model, one reasoning effort, and one response speed drawn from the options currently visible in Codex. Unchanged values are labelled Keep current instead of pretending that every round must change every field.",
+            "Before anything changes, Styler shows a field-by-field diff. Apply configuration writes all three fields through the native control and reads them back. The result is accepted only when the observed Codex state matches the proposal.",
+          ],
+        },
+        {
+          heading: "Local, reversible, and theme-aware",
+          paragraphs: [
+            "The interaction never reads, changes, or submits prompt content. Its language follows the Codex Styler language setting, and its color, material, radius, blur, motion intensity, and frame-rate budget follow the active theme.",
+            "If the native configuration structure cannot be read reliably, no guessed click or silent setting change occurs. The interaction keeps an explicit path back to Codex's official control. Reduce motion replaces continuous animation with a deterministic complete-loadout result.",
+          ],
+        },
+      ],
+      "zh-CN": [
+        {
+          heading: "一个原生入口，五种有实际意义的玩法",
+          paragraphs: [
+            "可在管理器中选择三段落珠、配置胶囊机、三环锻造、三轴控制台或任务航图。所选玩法会在原位置替换 Codex 原生配置控件，不会在输入框旁再增加第二个启动器。",
+            "每种玩法都让三项真实设置直接参与操作：三段落珠逐项决定配置，胶囊机在抓取前展示完整方案，三环锻造分别锁定三项参数，三轴控制台直接调校模型与推理/速度矩阵，任务航图则把模型引擎与透明的任务路线组合起来。",
+          ],
+        },
+        {
+          heading: "结果是真实配置，不是装饰分数",
+          paragraphs: [
+            "每局结束都会从 Codex 当前真实可选项中产生一个模型、一档推理强度和一档响应速度。没有变化的项目会明确显示“保持不变”，而不是假装每局都必须修改所有字段。",
+            "写入前会逐项显示配置差异；确认“应用配置”后，通过原生控件写入三项设置并重新读取。只有 Codex 中观察到的最终状态与提案一致，操作才会被判定为成功。",
+          ],
+        },
+        {
+          heading: "本地、可恢复并自动适配主题",
+          paragraphs: [
+            "玩法不会读取、修改或提交输入内容。显示语言跟随 Codex Styler 的语言设置；颜色、材质、圆角、模糊、动态强度与帧率预算则继承当前主题。",
+            "如果无法可靠识别原生配置结构，系统不会猜测点击或静默修改设置，并始终保留明确返回 Codex 官方控件的路径。减少动态模式会用确定性的完整配置结果替代持续动画。",
+          ],
+        },
+      ],
+    },
+  },
+  {
     slug: "create-companion",
     title: {
       en: "Create a calibrated Codex companion",
@@ -310,7 +391,7 @@ export const docs: DocPage[] = [
         {
           heading: "Current Beta targets",
           paragraphs: [
-            "Unsigned Beta installers are available for macOS on Apple Silicon and Windows 11 x64. macOS has the current real-device evidence; Windows Beta 7 is produced and structurally checked in CI but explicitly awaits community validation. The RC gate requires at least two complete independent device reports per platform.",
+            "Unsigned Beta installers are available for macOS on Apple Silicon and Windows 11 x64. macOS has the current real-device evidence; Windows Beta 8 is produced and structurally checked in CI but explicitly awaits community validation. The RC gate requires at least two complete independent device reports per platform.",
           ],
         },
         {
@@ -324,7 +405,7 @@ export const docs: DocPage[] = [
         {
           heading: "当前 Beta 目标",
           paragraphs: [
-            "当前提供未签名的 Apple Silicon macOS 与 Windows 11 x64 Beta 安装包。macOS 已有现阶段真实设备证据；Windows Beta 7 由 CI 构建并完成结构校验，但明确等待社区实机验证。进入 RC 前，两个平台都至少需要两份独立的完整实机报告。",
+            "当前提供未签名的 Apple Silicon macOS 与 Windows 11 x64 Beta 安装包。macOS 已有现阶段真实设备证据；Windows Beta 8 由 CI 构建并完成结构校验，但明确等待社区实机验证。进入 RC 前，两个平台都至少需要两份独立的完整实机报告。",
           ],
         },
         {

@@ -31,7 +31,7 @@ export function TerminalActivityPreview({
           <span data-kind="prompt">$</span> pnpm test
         </code>
         <samp>
-          <span>✓</span> desktop&nbsp;&nbsp;182 tests
+          <span>✓</span> desktop&nbsp;&nbsp;all checks passed
         </samp>
         <samp>
           <span>✓</span> theme-core&nbsp;&nbsp;21 tests

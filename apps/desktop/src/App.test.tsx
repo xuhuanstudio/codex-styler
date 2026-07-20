@@ -27,6 +27,7 @@ import {
   restoreOfficial,
   restartApp,
   updateCompanionConfiguration,
+  updateRuntimeExperience,
   validateCodexInstallPath,
   type RuntimeStatus,
 } from "./lib/runtime";
@@ -84,6 +85,7 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     }),
     applyConfiguration: vi.fn(),
     updateCompanionConfiguration: vi.fn(),
+    updateRuntimeExperience: vi.fn(),
     chooseCodexInstallPath: vi.fn(),
     launchCodex: vi.fn(),
     pauseTheme: vi.fn(),
@@ -124,6 +126,8 @@ describe("Codex Styler shell", () => {
     vi.mocked(applyConfiguration).mockResolvedValue(appliedRuntime);
     vi.mocked(updateCompanionConfiguration).mockReset();
     vi.mocked(updateCompanionConfiguration).mockResolvedValue(appliedRuntime);
+    vi.mocked(updateRuntimeExperience).mockReset();
+    vi.mocked(updateRuntimeExperience).mockResolvedValue(appliedRuntime);
     vi.mocked(launchCodex).mockReset();
     vi.mocked(launchCodex).mockResolvedValue({
       ...appliedRuntime,
@@ -181,6 +185,9 @@ describe("Codex Styler shell", () => {
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Themes" })).toBeInTheDocument();
     expect(
+      screen.getByRole("button", { name: "Interactions" }),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole("button", { name: "Create" }),
     ).not.toBeInTheDocument();
     expect(screen.getAllByText("Verified when applied").length).toBeGreaterThan(
@@ -201,6 +208,90 @@ describe("Codex Styler shell", () => {
     expect(viewport?.parentElement).toBe(main);
     expect(configurationDock?.parentElement).toBe(main);
     expect(configurationDock?.previousElementSibling).toBe(viewport);
+  });
+
+  it("keeps composer interactions as a dedicated, persistent selection", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Interactions" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Interactions", level: 1 }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: /Triple Drop/ }));
+
+    expect(screen.getByRole("option", { name: /Triple Drop/ })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(
+      JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}")
+        .composerInteractionMode,
+    ).toBe("marbles");
+  });
+
+  it("does not run an incremental interaction update before the theme runtime is active", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "connected",
+      revision: 7,
+    });
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        composerInteractionMode: "toss",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(getRuntimeStatus).toHaveBeenCalled());
+    expect(updateRuntimeExperience).not.toHaveBeenCalled();
+    expect(applyConfiguration).not.toHaveBeenCalled();
+  });
+
+  it("restores the selected interaction after reconnecting to an active runtime", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "applied",
+      revision: 7,
+    });
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        composerInteractionMode: "toss",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(updateRuntimeExperience).toHaveBeenCalledOnce());
+    expect(vi.mocked(updateRuntimeExperience).mock.calls[0]).toEqual([
+      {
+        composerInteractionMode: "toss",
+        locale: "en",
+        reduceMotion: false,
+      },
+      8,
+    ]);
+    expect(applyConfiguration).not.toHaveBeenCalled();
   });
 
   it("uses the persistent setup bar instead of redundant selection toasts", () => {
@@ -630,7 +721,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.7")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.8")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();

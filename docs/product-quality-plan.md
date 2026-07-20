@@ -259,6 +259,26 @@ working control behind another page, revert it.
   assignments use the same angular sectors, so interpolated poses no longer
   make a valid idle motion practically unreachable after installation.
 
+## Beta 8 — verified composer interactions
+
+- each Composer Interaction must give model, reasoning effort, and response
+  speed an observable role in the play action and produce one complete
+  configuration from the options visible in the current Codex control;
+- every result must expose a field-by-field diff, label unchanged values, wait
+  for explicit confirmation, write all three fields through the native control,
+  and read them back before reporting success;
+- the native menu must remain visually concealed while it is inspected and
+  must never flash before the selected experience appears;
+- interaction language follows the manager's resolved English or Simplified
+  Chinese locale, while palette, material, radius, blur, motion intensity,
+  reduced motion, and frame budget follow the active theme;
+- managed first launch must wait for a stable renderer and confirm that the
+  runtime survived Electron's bootstrap handoff without requiring a second or
+  third restart;
+- release evidence includes English manager, live interaction, and complete
+  result screenshots plus a real apply, verify, and restore pass on the current
+  macOS Codex session.
+
 ## RC — reliability proof
 
 - exercise the current Codex Desktop on Home, Task, Settings, Dialog, Right

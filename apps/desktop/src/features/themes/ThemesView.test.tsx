@@ -102,4 +102,37 @@ describe("ThemesView", () => {
       within(list).getByRole("button", { name: "Preview: Native Refined" }),
     ).toBeVisible();
   });
+
+  it("moves focus into compact details and restores the selected row", () => {
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true })),
+    );
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn((callback: FrameRequestCallback) => {
+        callback(0);
+        return 1;
+      }),
+    );
+    const { container } = renderThemesView();
+    const trigger = screen.getByRole("button", {
+      name: "Preview: Native Refined",
+    });
+
+    fireEvent.click(trigger);
+
+    const back = screen.getByRole("button", { name: "Back to themes" });
+    expect(back).toHaveFocus();
+    expect(container.querySelector(".theme-library-workspace")).toHaveClass(
+      "theme-library-workspace--detail",
+    );
+
+    fireEvent.keyDown(back, { key: "Escape" });
+
+    expect(trigger).toHaveFocus();
+    expect(container.querySelector(".theme-library-workspace")).not.toHaveClass(
+      "theme-library-workspace--detail",
+    );
+  });
 });

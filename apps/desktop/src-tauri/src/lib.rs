@@ -9,9 +9,10 @@ use std::{
     fs,
     path::{Component, Path, PathBuf},
     sync::Mutex,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
+use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use model::{AppRuntime, RuntimeStatus};
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -26,6 +27,28 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 const SUPPORTED_CODEX_VERSIONS: &[&str] = &["26.707.72221", "26.707.91948"];
 const RELEASES_API: &str =
     "https://api.github.com/repos/xuhuanstudio/codex-styler/releases?per_page=20";
+
+fn composer_game_assets_script() -> String {
+    let assets = serde_json::json!({
+        "claw": format!(
+            "data:image/webp;base64,{}",
+            BASE64_STANDARD.encode(include_bytes!("../assets/interactions/claw.webp"))
+        ),
+        "capsule": format!(
+            "data:image/webp;base64,{}",
+            BASE64_STANDARD.encode(include_bytes!("../assets/interactions/capsule.webp"))
+        ),
+        "marble": format!(
+            "data:image/webp;base64,{}",
+            BASE64_STANDARD.encode(include_bytes!("../assets/interactions/marble.webp"))
+        ),
+        "beacon": format!(
+            "data:image/webp;base64,{}",
+            BASE64_STANDARD.encode(include_bytes!("../assets/interactions/beacon.webp"))
+        ),
+    });
+    format!("window.__CODEX_STYLER_COMPOSER_ASSETS__ = {assets};")
+}
 
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
@@ -733,12 +756,42 @@ async fn launch_codex(
     Ok(runtime.status())
 }
 
+async fn injected_runtime_is_active(websocket_url: &str) -> bool {
+    cdp::evaluate(
+        websocket_url,
+        "window.__CODEX_STYLER_RUNTIME__?.isActive?.() === true;",
+    )
+    .await
+    .ok()
+    .and_then(|response| {
+        response
+            .pointer("/result/result/value")
+            .and_then(Value::as_bool)
+    }) == Some(true)
+}
+
+async fn evaluate_with_renderer_recovery(
+    port: u16,
+    websocket_url: &mut String,
+    expression: &str,
+) -> Result<Value, error::StylerError> {
+    match cdp::evaluate(websocket_url, expression).await {
+        Ok(response) => Ok(response),
+        Err(error) if error.is_connection_loss() => {
+            *websocket_url = cdp::wait_for_ready_target(port, 24).await?;
+            cdp::evaluate(websocket_url, expression).await
+        }
+        Err(error) => Err(error),
+    }
+}
+
 #[tauri::command]
 async fn apply_theme(
     theme: Value,
     variant: String,
     compatibility_mode: String,
     revision: u64,
+    experience: Value,
     state: State<'_, Mutex<AppRuntime>>,
 ) -> Result<RuntimeStatus, String> {
     let started_at = Instant::now();
@@ -748,7 +801,7 @@ async fn apply_theme(
     if !is_valid_compatibility_mode(&compatibility_mode) {
         return Err("The requested runtime strategy is invalid".into());
     }
-    let websocket_url = {
+    let (mut websocket_url, port) = {
         let mut runtime = state
             .lock()
             .map_err(|_| "Runtime state is unavailable".to_string())?;
@@ -757,47 +810,115 @@ async fn apply_theme(
         }
         runtime.revision = revision;
         runtime.state = model::RuntimeState::Applying;
-        runtime
+        let websocket_url = runtime
             .websocket_url
             .clone()
-            .ok_or_else(|| "Codex is not connected".to_string())?
+            .ok_or_else(|| "Codex is not connected".to_string())?;
+        let port = runtime
+            .port
+            .ok_or_else(|| "Codex debugging port is unavailable".to_string())?;
+        (websocket_url, port)
     };
 
     let theme_json = serde_json::to_string(&theme).map_err(|error| error.to_string())?;
     let variant_json = serde_json::to_string(&variant).map_err(|error| error.to_string())?;
     let mode_json =
         serde_json::to_string(&compatibility_mode).map_err(|error| error.to_string())?;
+    let experience_json = serde_json::to_string(&experience).map_err(|error| error.to_string())?;
     let expression = format!(
-        "{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {});",
+        "{}\n{}\n{}\n{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {}, {});",
+        composer_game_assets_script(),
+        include_str!("composer-settings-adapter.js"),
+        include_str!("composer-moments.js"),
         include_str!("runtime.js"),
         theme_json,
         variant_json,
         mode_json,
         revision,
+        experience_json,
     );
 
-    let response = match cdp::evaluate(&websocket_url, &expression).await {
-        Ok(response) => response,
-        Err(error) => {
-            let detail = error.to_string();
+    let mut response =
+        match evaluate_with_renderer_recovery(port, &mut websocket_url, &expression).await {
+            Ok(response) => response,
+            Err(error) => {
+                let detail = error.to_string();
+                if let Ok(mut runtime) = state.lock()
+                    && revision == runtime.revision
+                {
+                    if error.is_connection_loss() {
+                        runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+                    } else {
+                        runtime.state = model::RuntimeState::Error;
+                        runtime.message = Some(detail.clone());
+                    }
+                    runtime.record(
+                        "apply-configuration",
+                        "error",
+                        started_at.elapsed().as_millis() as u64,
+                    );
+                }
+                return Err(detail);
+            }
+        };
+    if let Ok(mut runtime) = state.lock()
+        && revision == runtime.revision
+    {
+        runtime.websocket_url = Some(websocket_url.clone());
+    }
+
+    // Electron can finish replacing its bootstrap renderer just after the
+    // first successful evaluation. Verify that the active runtime survived
+    // that handoff and retry once in the same controlled session when needed.
+    tokio::time::sleep(Duration::from_millis(320)).await;
+    if !injected_runtime_is_active(&websocket_url).await {
+        if let Ok(ready_websocket) = cdp::wait_for_ready_target(port, 24).await {
+            websocket_url = ready_websocket;
+        }
+        response = match cdp::evaluate(&websocket_url, &expression).await {
+            Ok(response) => response,
+            Err(error) => {
+                let detail = error.to_string();
+                if let Ok(mut runtime) = state.lock()
+                    && revision == runtime.revision
+                {
+                    if error.is_connection_loss() {
+                        runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+                    } else {
+                        runtime.state = model::RuntimeState::Error;
+                        runtime.message = Some(detail.clone());
+                    }
+                    runtime.record(
+                        "apply-configuration-retry",
+                        "error",
+                        started_at.elapsed().as_millis() as u64,
+                    );
+                }
+                return Err(detail);
+            }
+        };
+        if let Ok(mut runtime) = state.lock()
+            && revision == runtime.revision
+        {
+            runtime.websocket_url = Some(websocket_url.clone());
+        }
+        tokio::time::sleep(Duration::from_millis(320)).await;
+        if !injected_runtime_is_active(&websocket_url).await {
+            let detail = "The Codex renderer did not retain the injected runtime after startup";
             if let Ok(mut runtime) = state.lock()
                 && revision == runtime.revision
             {
-                if error.is_connection_loss() {
-                    runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
-                } else {
-                    runtime.state = model::RuntimeState::Error;
-                    runtime.message = Some(detail.clone());
-                }
+                runtime.state = model::RuntimeState::Error;
+                runtime.message = Some(detail.into());
                 runtime.record(
-                    "apply-configuration",
-                    "error",
+                    "apply-configuration-retry",
+                    "runtime-not-active",
                     started_at.elapsed().as_millis() as u64,
                 );
             }
-            return Err(detail);
+            return Err(detail.into());
         }
-    };
+    }
 
     let outcome = response.pointer("/result/result/value");
     let resolved_mode = outcome
@@ -906,6 +1027,89 @@ async fn update_companion(
 }
 
 #[tauri::command]
+async fn update_runtime_experience(
+    experience: Value,
+    revision: u64,
+    state: State<'_, Mutex<AppRuntime>>,
+) -> Result<RuntimeStatus, String> {
+    let started_at = Instant::now();
+    let (websocket_url, previous_state) = {
+        let mut runtime = state
+            .lock()
+            .map_err(|_| "Runtime state is unavailable".to_string())?;
+        if revision < runtime.revision {
+            return Ok(runtime.status());
+        }
+        if !matches!(
+            runtime.state,
+            model::RuntimeState::Applied | model::RuntimeState::Fallback
+        ) {
+            return Err("runtime-not-active".into());
+        }
+        runtime.revision = revision;
+        let previous_state = runtime.state;
+        let websocket_url = runtime
+            .websocket_url
+            .clone()
+            .ok_or_else(|| "Codex is not connected".to_string())?;
+        (websocket_url, previous_state)
+    };
+    let experience_json = serde_json::to_string(&experience).map_err(|error| error.to_string())?;
+    let expression = format!(
+        "window.__CODEX_STYLER_RUNTIME__?.updateExperience?.({}, {}) ?? {{ ok: false, reason: 'runtime-update-unsupported' }};",
+        experience_json, revision,
+    );
+    let response = match cdp::evaluate(&websocket_url, &expression).await {
+        Ok(response) => response,
+        Err(error) => {
+            let detail = error.to_string();
+            if let Ok(mut runtime) = state.lock()
+                && revision == runtime.revision
+            {
+                if error.is_connection_loss() {
+                    runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+                } else {
+                    runtime.state = model::RuntimeState::Error;
+                    runtime.message = Some(detail.clone());
+                }
+                runtime.record(
+                    "update-runtime-experience",
+                    "error",
+                    started_at.elapsed().as_millis() as u64,
+                );
+            }
+            return Err(detail);
+        }
+    };
+    let outcome = response.pointer("/result/result/value");
+    if outcome
+        .and_then(|value| value.get("ok"))
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Err(outcome
+            .and_then(|value| value.get("reason"))
+            .and_then(Value::as_str)
+            .unwrap_or("runtime-update-unsupported")
+            .to_string());
+    }
+    let mut runtime = state
+        .lock()
+        .map_err(|_| "Runtime state is unavailable".to_string())?;
+    if revision != runtime.revision {
+        return Ok(runtime.status());
+    }
+    runtime.state = previous_state;
+    runtime.message = Some("Interaction preferences updated without reinjecting the theme".into());
+    runtime.record(
+        "update-runtime-experience",
+        "applied",
+        started_at.elapsed().as_millis() as u64,
+    );
+    Ok(runtime.status())
+}
+
+#[tauri::command]
 async fn pause_theme(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStatus, String> {
     let websocket_url = state
         .lock()
@@ -988,6 +1192,7 @@ pub fn run() {
             launch_codex,
             apply_theme,
             update_companion,
+            update_runtime_experience,
             pause_theme,
             restore_official,
             save_theme_archive,
@@ -1013,6 +1218,18 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn composer_game_assets_are_embedded_as_local_webp_data_urls() {
+        let script = composer_game_assets_script();
+        assert!(script.starts_with("window.__CODEX_STYLER_COMPOSER_ASSETS__ = "));
+        for name in ["claw", "capsule", "marble", "beacon"] {
+            assert!(script.contains(&format!("\"{name}\"")));
+        }
+        assert_eq!(script.matches("data:image/webp;base64,").count(), 4);
+        assert!(!script.contains("http://"));
+        assert!(!script.contains("https://"));
+    }
 
     #[test]
     fn known_codex_version_uses_the_semantic_adapter() {
