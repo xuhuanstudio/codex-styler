@@ -319,10 +319,12 @@
 }
 
 .theme-library-workspace .featured-theme {
+  container-type: inline-size;
   height: 100%;
   min-height: 0;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(240px, 1fr) auto;
+  grid-template-rows: minmax(280px, 1.65fr) auto;
+  overflow: hidden;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel);
 }
@@ -331,10 +333,11 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  min-height: 240px;
+  min-height: 280px;
   grid-template-rows: minmax(0, 1fr);
   overflow: hidden;
   padding: 12px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
 }
 
 .featured-theme__preview > .theme-preview-controls {
@@ -562,41 +565,83 @@
   width: 100%;
   height: 100%;
   min-height: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
   transform: none;
 }
 
 .theme-library-workspace .featured-theme__copy {
+  container-name: theme-detail-copy;
+  container-type: inline-size;
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.68fr);
-  gap: 5px 20px;
+  grid-template-columns: minmax(0, 1.12fr) minmax(260px, 0.88fr);
+  grid-template-rows: auto auto;
+  align-items: center;
+  gap: 8px 18px;
   overflow-x: hidden;
   overflow-y: hidden;
-  padding: 14px 18px;
+  padding: 11px 16px 9px;
 }
 
-.theme-library-workspace .featured-theme__copy > span,
-.theme-library-workspace .featured-theme__copy > h2,
-.theme-library-workspace .featured-theme__copy > p {
+.theme-detail-card__identity {
+  display: grid;
+  min-width: 0;
   grid-column: 1;
+  gap: 3px;
 }
 
-.theme-library-workspace .featured-theme__copy h2 {
-  margin: 1px 0 2px;
-  font-size: 22px;
+.theme-detail-card__identity > span {
+  color: var(--text-tertiary);
+  font-size: var(--type-caption);
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 
-.theme-library-workspace .featured-theme__copy > p {
-  display: -webkit-box;
+.theme-detail-card__title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.theme-library-workspace .theme-detail-card__title-row h2 {
+  min-width: 0;
+  margin: 0;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  font-size: 22px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-detail-card__title-row .secondary-button {
+  min-height: 32px;
+  flex: none;
+  padding-inline: 10px;
+}
+
+.theme-library-workspace .theme-detail-card__identity > p {
+  display: block;
+  min-width: 0;
+  height: 20px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-library-workspace .theme-detail-card__identity {
+  grid-column: 1;
 }
 
 .theme-library-workspace .theme-facts {
   min-width: 240px;
   align-self: stretch;
-  grid-row: 1 / span 3;
+  grid-row: 1;
   grid-column: 2;
   margin: 0;
   padding: 0 0 0 18px;
@@ -627,12 +672,12 @@
 
 .theme-library-workspace .theme-effect-summary {
   display: grid;
-  min-height: 48px;
+  min-height: 32px;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-  margin-top: 7px;
-  padding: 7px 9px;
+  gap: 6px;
+  margin-top: 0;
+  padding: 4px 6px;
 }
 
 .theme-library-workspace .theme-effect-summary__copy small {
@@ -644,13 +689,6 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-}
-
-.theme-library-workspace .featured-theme__copy .button-row {
-  grid-column: 1;
-  align-self: end;
-  justify-content: flex-start;
-  margin-top: 5px;
 }
 
 .theme-effect-summary {
@@ -761,6 +799,65 @@
 .theme-effect-summary__list > button:disabled {
   cursor: default;
   opacity: 0.58;
+}
+
+@container theme-detail-copy (max-width: 620px) {
+  .theme-detail-card__title-row {
+    gap: 8px;
+  }
+
+  .theme-detail-card__title-row .secondary-button {
+    max-width: 148px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .theme-library-workspace .theme-facts {
+    padding-left: 12px;
+  }
+
+  .theme-effect-summary__copy {
+    display: none;
+  }
+
+  .theme-library-workspace .theme-effect-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .theme-effect-summary__list {
+    gap: 4px;
+    justify-content: flex-start;
+  }
+
+  .theme-effect-summary__list > button {
+    min-height: 21px;
+    padding: 2px 6px;
+  }
+}
+
+@container theme-detail-copy (max-width: 380px) {
+  .theme-detail-card__identity > span {
+    letter-spacing: 0.09em;
+  }
+
+  .theme-detail-card__title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .theme-detail-card__title-row .secondary-button {
+    width: 100%;
+    max-width: none;
+  }
+
+  .theme-personality {
+    gap: 8px 10px;
+  }
+
+  .theme-effect-summary__list > button {
+    font-size: 9px;
+  }
 }
 
 .companions-layout {
@@ -1037,7 +1134,7 @@
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1060px) {
   .resource-library-toolbar {
     gap: 8px;
   }
@@ -1068,13 +1165,13 @@
     white-space: normal;
   }
 
-  .theme-library-workspace--detail .featured-theme__copy > h2 {
+  .theme-library-workspace--detail .theme-detail-card__title-row h2 {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .theme-library-workspace--detail .featured-theme__copy > p {
+  .theme-library-workspace--detail .theme-detail-card__identity > p {
     display: block;
     height: 20px;
     overflow: hidden;
@@ -1173,31 +1270,31 @@
   }
 
   .theme-library-workspace .featured-theme {
-    grid-template-rows: minmax(180px, 1fr) auto;
+    grid-template-rows: minmax(216px, 1.65fr) auto;
   }
 
   .theme-library-workspace .featured-theme__preview {
-    min-height: 180px;
+    min-height: 216px;
   }
 
   .theme-library-workspace:not(.theme-library-workspace--detail)
     .featured-theme__copy {
-    max-height: 194px;
+    max-height: 166px;
     gap: 3px 14px;
     overflow-x: hidden;
     overflow-y: hidden;
-    padding: 10px 14px 0;
+    padding: 8px 14px 6px;
   }
 
   .theme-library-workspace:not(.theme-library-workspace--detail)
-    .featured-theme__copy
+    .theme-detail-card__title-row
     h2 {
     margin-block: 0;
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .theme-library-workspace:not(.theme-library-workspace--detail)
-    .featured-theme__copy
+    .theme-detail-card__identity
     > p {
     display: block;
     height: 20px;
@@ -1236,12 +1333,6 @@
     > button {
     min-height: 21px;
     padding: 2px 6px;
-  }
-
-  .theme-library-workspace:not(.theme-library-workspace--detail)
-    .featured-theme__copy
-    .button-row {
-    margin-top: 4px;
   }
 
   .companion-detail-summary {

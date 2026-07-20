@@ -26,6 +26,18 @@ Tauri command boundary ── theme package validator
 
 Theme packages are portable data. They cannot invoke Tauri commands, execute scripts, request remote resources, or reference arbitrary local paths.
 
+## Desktop frontend boundaries
+
+The desktop frontend follows vertical feature boundaries rather than placing product logic in page components:
+
+- **App shell** owns navigation, session wiring, global dialogs, and command dispatch. It does not render resource-specific detail experiences.
+- **Feature views** own collection selection, filtering, and the selected resource id. A view coordinates list and detail components but does not implement their visual behavior.
+- **Detail and workspace components** own only local preview or editing interaction. They receive explicit domain data and callbacks; they do not invoke Tauri or the injected runtime directly.
+- **Shared UI primitives** own repeated controls such as library tabs, search, status, dialogs, and fields. Themes and companions must not fork equivalent interaction patterns.
+- **Domain helpers and reducers** remain pure. Runtime, archive, and filesystem effects stay behind command modules so async revisions and recovery rules can be tested independently.
+
+Large modules are reduced by extracting one complete behavior boundary at a time. An extraction must preserve user-visible behavior, retain or add a boundary test, and pass the real desktop fixture before adjacent features are moved. This keeps maintenance work reviewable and avoids replacing one monolith with many state-leaking fragments.
+
 ## Managed Codex lifecycle
 
 1. Detect the installed Codex application and whether a verified Codex UI process is already running. A custom path is a validated fallback.

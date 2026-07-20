@@ -25,7 +25,7 @@ import {
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import { PreviewWorkspace } from "../../components/PreviewWorkspace";
-import { LibrarySearchField } from "../../components/ui/LibrarySearchField";
+import { ResourceLibraryToolbar } from "../../components/ui/ResourceLibraryToolbar";
 import type {
   CompanionCreatorProject,
   CreatorStep,
@@ -247,51 +247,41 @@ export function CompanionsView({
         </div>
       </section>
 
-      <div className="companions-toolbar resource-library-toolbar">
-        <div
-          className="theme-collection-tabs"
-          role="tablist"
-          aria-label={t("companions")}
-        >
-          <button
-            role="tab"
-            aria-selected={collection === "builtIn"}
-            className={collection === "builtIn" ? "is-active" : ""}
-            onClick={() => {
-              setSearchQuery("");
-              setCompactDetailOpen(false);
-              onCollectionChange("builtIn");
-            }}
-          >
-            {t("builtInCompanions")}
-            <small>{builtinCompanions.length}</small>
-          </button>
-          <button
-            role="tab"
-            aria-selected={collection === "mine"}
-            className={collection === "mine" ? "is-active" : ""}
-            onClick={() => {
-              setSearchQuery("");
-              setCompactDetailOpen(false);
-              onCollectionChange("mine");
-            }}
-          >
-            {t("myCompanions")}
-            <small>{localCompanions.length}</small>
-          </button>
-        </div>
-        {companions.length > 0 && (
-          <LibrarySearchField
-            value={searchQuery}
-            label={t("searchCompanions")}
-            placeholder={t("searchCompanions")}
-            clearLabel={t("clearSearch")}
-            resultCount={filteredCompanions.length}
-            totalCount={companions.length}
-            onChange={setSearchQuery}
-          />
-        )}
-      </div>
+      <ResourceLibraryToolbar
+        className="companions-toolbar"
+        ariaLabel={t("companions")}
+        tabs={[
+          {
+            id: "builtIn",
+            label: t("builtInCompanions"),
+            count: builtinCompanions.length,
+          },
+          {
+            id: "mine",
+            label: t("myCompanions"),
+            count: localCompanions.length,
+          },
+        ]}
+        activeTab={collection}
+        onTabChange={(nextCollection) => {
+          setSearchQuery("");
+          setCompactDetailOpen(false);
+          onCollectionChange(nextCollection);
+        }}
+        search={
+          companions.length > 0
+            ? {
+                value: searchQuery,
+                label: t("searchCompanions"),
+                placeholder: t("searchCompanions"),
+                clearLabel: t("clearSearch"),
+                resultCount: filteredCompanions.length,
+                totalCount: companions.length,
+                onChange: setSearchQuery,
+              }
+            : undefined
+        }
+      />
 
       {collection === "mine" && projects.length > 0 && (
         <section className="companion-projects">

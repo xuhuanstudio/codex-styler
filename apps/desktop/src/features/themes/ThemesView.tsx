@@ -1,28 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  ChevronRight,
-  FolderOpen,
-  Plus,
-  Search,
-  Sparkles,
-  Upload,
-} from "lucide-react";
+import { FolderOpen, Plus, Search, Upload } from "lucide-react";
 import { builtinThemes, type ThemeDefinition } from "@codex-styler/theme-core";
-import { PreviewWorkspace } from "../../components/PreviewWorkspace";
-import { LibrarySearchField } from "../../components/ui/LibrarySearchField";
+import { ResourceLibraryToolbar } from "../../components/ui/ResourceLibraryToolbar";
 import type { ThemeVariantName } from "../../lib/app-session";
 import type { Locale, MessageKey } from "../../lib/i18n";
 import { matchesResourceSearch } from "../../lib/resource-search";
-import type { PreviewScenario } from "../../lib/storage";
-import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
-import {
-  resolveThemeEffectCoverage,
-  resolveThemeVisualPersonality,
-  type ThemeEffectId,
-} from "../../lib/theme-effects";
+import { ThemeDetailCard } from "./ThemeDetailCard";
 import { ThemeRow } from "./ThemeRow";
-import { ThemePreviewControls } from "./ThemePreviewControls";
 
 export type ThemeCollection = "builtIn" | "mine";
 
@@ -67,20 +51,6 @@ export function ThemesView({
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [browsedThemeId, setBrowsedThemeId] = useState(selectedTheme.id);
-  const [previewPresentation, setPreviewPresentation] = useState<
-    "styled" | "official"
-  >("styled");
-  const [previewScenario, setPreviewScenario] =
-    useState<PreviewScenario>("task");
-  const [inspectedEffect, setInspectedEffect] = useState<ThemeEffectId | null>(
-    null,
-  );
-  const {
-    revision: motionPreviewRevision,
-    playing: motionPreviewing,
-    play: playMotionPreview,
-    stop: stopMotionPreview,
-  } = useGuidedMotionPreview();
   const workspaceRef = useRef<HTMLElement>(null);
   const themeListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -128,80 +98,8 @@ export function ThemesView({
     );
     active?.scrollIntoView?.({ block: "nearest" });
   }, [collection, filteredThemes.length, searchQuery, selectedTheme.id]);
-  const localized = browsedTheme.locales[locale] ?? browsedTheme.locales.en;
   const selectedIndex =
     themes.findIndex((theme) => theme.id === browsedTheme.id) + 1;
-  const effectLabels: Record<ThemeEffectId, MessageKey> = {
-    background: "effectBackground",
-    surfaces: "effectSurfaces",
-    controls: "effectControls",
-    icons: "effectIcons",
-    typography: "effectTypography",
-    motion: "effectMotion",
-    readability: "effectReadability",
-  };
-  const effectCoverage = resolveThemeEffectCoverage(browsedTheme, variant);
-  const motionEffectActive =
-    effectCoverage.find((effect) => effect.id === "motion")?.active ?? false;
-  const effectPreviewScenarios = {
-    background: "task",
-    surfaces: "dialog",
-    controls: "components",
-    icons: "right-panel",
-    typography: "task",
-    motion: "task",
-    readability: "settings",
-  } satisfies Record<ThemeEffectId, PreviewScenario>;
-  const personality = resolveThemeVisualPersonality(browsedTheme, variant);
-  const layoutLabels = {
-    native: "layoutNative",
-    editorial: "layoutEditorial",
-    immersive: "layoutImmersive",
-  } satisfies Record<typeof personality.layout, MessageKey>;
-  const geometryLabels = {
-    precise: "geometryPrecise",
-    balanced: "geometryBalanced",
-    soft: "geometrySoft",
-  } satisfies Record<typeof personality.geometry, MessageKey>;
-  const iconLabels = {
-    native: "iconNative",
-    contained: "iconContained",
-    themed: "iconThemed",
-  } satisfies Record<typeof personality.iconStyle, MessageKey>;
-  const decorationLabels = {
-    none: "decorationNone",
-    subtle: "decorationSubtle",
-    expressive: "decorationExpressive",
-  } satisfies Record<typeof personality.decorations, MessageKey>;
-  const materialLabels = {
-    solid: "materialSolid",
-    layered: "materialLayered",
-    frosted: "materialFrosted",
-  } satisfies Record<typeof personality.material, MessageKey>;
-  const motionLabels = {
-    still: "motionNone",
-    calm: "motionCalm",
-    fluid: "motionFluid",
-    expressive: "motionExpressive",
-  } satisfies Record<typeof personality.motion, MessageKey>;
-  const isSemanticTheme = browsedTheme.compatibility.codex.mode === "semantic";
-  const motionPreviewDisabled =
-    reduceMotion || previewPresentation === "official" || !motionEffectActive;
-  const motionPreviewHelp = reduceMotion
-    ? t("motionPreviewReduced")
-    : previewPresentation === "official"
-      ? t("motionPreviewOfficialLibrary")
-      : !motionEffectActive
-        ? t("motionPreviewDisabled")
-        : t("motionPreviewDescription");
-  useEffect(() => stopMotionPreview, [browsedTheme.id, stopMotionPreview]);
-
-  function previewMotion() {
-    if (motionPreviewDisabled) return;
-    setPreviewScenario("task");
-    setInspectedEffect("motion");
-    playMotionPreview();
-  }
   return (
     <div className="page page--themes">
       <section className="page-heading">
@@ -222,51 +120,40 @@ export function ThemesView({
         </div>
       </section>
 
-      <div className="resource-library-toolbar">
-        <div
-          className="theme-collection-tabs"
-          role="tablist"
-          aria-label={t("themes")}
-        >
-          <button
-            role="tab"
-            aria-selected={collection === "builtIn"}
-            className={collection === "builtIn" ? "is-active" : ""}
-            onClick={() => {
-              setSearchQuery("");
-              setCompactDetailOpen(false);
-              onCollectionChange("builtIn");
-            }}
-          >
-            {t("builtInThemes")}
-            <small>{builtinThemes.length}</small>
-          </button>
-          <button
-            role="tab"
-            aria-selected={collection === "mine"}
-            className={collection === "mine" ? "is-active" : ""}
-            onClick={() => {
-              setSearchQuery("");
-              setCompactDetailOpen(false);
-              onCollectionChange("mine");
-            }}
-          >
-            {t("myThemes")}
-            <small>{localThemes.length}</small>
-          </button>
-        </div>
-        {themes.length > 0 && (
-          <LibrarySearchField
-            value={searchQuery}
-            label={t("searchThemes")}
-            placeholder={t("searchThemes")}
-            clearLabel={t("clearSearch")}
-            resultCount={filteredThemes.length}
-            totalCount={themes.length}
-            onChange={setSearchQuery}
-          />
-        )}
-      </div>
+      <ResourceLibraryToolbar
+        ariaLabel={t("themes")}
+        tabs={[
+          {
+            id: "builtIn",
+            label: t("builtInThemes"),
+            count: builtinThemes.length,
+          },
+          {
+            id: "mine",
+            label: t("myThemes"),
+            count: localThemes.length,
+          },
+        ]}
+        activeTab={collection}
+        onTabChange={(nextCollection) => {
+          setSearchQuery("");
+          setCompactDetailOpen(false);
+          onCollectionChange(nextCollection);
+        }}
+        search={
+          themes.length > 0
+            ? {
+                value: searchQuery,
+                label: t("searchThemes"),
+                placeholder: t("searchThemes"),
+                clearLabel: t("clearSearch"),
+                resultCount: filteredThemes.length,
+                totalCount: themes.length,
+                onChange: setSearchQuery,
+              }
+            : undefined
+        }
+      />
 
       {themes.length === 0 ? (
         <section className="empty-state theme-empty-state">
@@ -344,146 +231,24 @@ export function ThemesView({
               ))}
             </div>
           </div>
-          <section className="featured-theme theme-detail-card">
-            <button
-              className="compact-detail-back"
-              onClick={() => setCompactDetailOpen(false)}
-            >
-              <ArrowLeft size={14} />
-              {t("backToThemes")}
-            </button>
-            <div className="featured-theme__preview">
-              <PreviewWorkspace
-                theme={previewThemeFor(browsedTheme)}
-                variant={variant}
-                locale={locale}
-                reduceMotion={reduceMotion}
-                resolveAsset={resolveAsset}
-                presentation={previewPresentation}
-                compact
-                scenario={previewScenario}
-                motionPreviewRevision={motionPreviewRevision}
-              />
-              <ThemePreviewControls
-                scenario={previewScenario}
-                presentation={previewPresentation}
-                t={t}
-                motionPreviewing={motionPreviewing}
-                motionPreviewDisabled={motionPreviewDisabled}
-                motionPreviewHelp={motionPreviewHelp}
-                onScenarioChange={(nextScenario) => {
-                  setInspectedEffect(null);
-                  setPreviewScenario(nextScenario);
-                }}
-                onPresentationChange={(presentation) => {
-                  stopMotionPreview();
-                  setPreviewPresentation(presentation);
-                }}
-                onPreviewMotion={previewMotion}
-              />
-            </div>
-            <div className="featured-theme__copy">
-              <span>
-                {t("themeLabel")}{" "}
-                {String(Math.max(1, selectedIndex)).padStart(2, "0")} ·{" "}
-                {collection === "builtIn" ? t("builtInThemes") : t("myThemes")}
-              </span>
-              <h2>{localized.name}</h2>
-              <p>{localized.description}</p>
-              <div className="theme-facts theme-personality">
-                <div>
-                  <small>{t("visualComposition")}</small>
-                  <strong>
-                    {t(layoutLabels[personality.layout])} ·{" "}
-                    {t(geometryLabels[personality.geometry])}
-                  </strong>
-                </div>
-                <div>
-                  <small>{t("iconTreatment")}</small>
-                  <strong>{t(iconLabels[personality.iconStyle])}</strong>
-                </div>
-                <div>
-                  <small>{t("surfaceMaterial")}</small>
-                  <strong>
-                    {t(materialLabels[personality.material])} ·{" "}
-                    {t(decorationLabels[personality.decorations])}
-                  </strong>
-                </div>
-                <div>
-                  <small>{t("motionStyle")}</small>
-                  <strong>{t(motionLabels[personality.motion])}</strong>
-                </div>
-              </div>
-              <div className="button-row">
-                <button
-                  className="secondary-button"
-                  onClick={() => onEdit(browsedTheme)}
-                >
-                  {collection === "builtIn"
-                    ? t("customizeCopy")
-                    : t("editTheme")}
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-              <div className="theme-effect-summary">
-                <div className="theme-effect-summary__copy">
-                  <Sparkles size={14} />
-                  <span>
-                    <strong>{t("visualCoverage")}</strong>
-                    <small>
-                      {t(
-                        isSemanticTheme
-                          ? "visualCoverageSemanticDetail"
-                          : "visualCoverageSafeDetail",
-                      )}
-                    </small>
-                  </span>
-                </div>
-                <div
-                  className="theme-effect-summary__list"
-                  aria-label={t("visualCoverage")}
-                >
-                  {effectCoverage.map((effect) => (
-                    <button
-                      type="button"
-                      key={effect.id}
-                      data-active={effect.active || undefined}
-                      data-current={
-                        effect.active && inspectedEffect === effect.id
-                          ? "true"
-                          : undefined
-                      }
-                      disabled={!effect.active}
-                      aria-pressed={
-                        effect.active && inspectedEffect === effect.id
-                      }
-                      aria-label={`${t("inspectEffect")}: ${t(
-                        effectLabels[effect.id],
-                      )}`}
-                      title={
-                        effect.active
-                          ? t("inspectEffect")
-                          : t("effectUnavailable")
-                      }
-                      onClick={() => {
-                        setInspectedEffect(effect.id);
-                        setPreviewScenario(effectPreviewScenarios[effect.id]);
-                        if (effect.id === "motion") {
-                          setPreviewPresentation("styled");
-                          if (!reduceMotion) playMotionPreview();
-                        } else {
-                          stopMotionPreview();
-                        }
-                      }}
-                    >
-                      <i aria-hidden="true" />
-                      {t(effectLabels[effect.id])}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </section>
+          <ThemeDetailCard
+            theme={browsedTheme}
+            previewTheme={previewThemeFor(browsedTheme)}
+            themeIndex={selectedIndex}
+            collectionLabel={
+              collection === "builtIn" ? t("builtInThemes") : t("myThemes")
+            }
+            editLabel={
+              collection === "builtIn" ? t("customizeCopy") : t("editTheme")
+            }
+            locale={locale}
+            variant={variant}
+            reduceMotion={reduceMotion}
+            t={t}
+            resolveAsset={resolveAsset}
+            onBack={() => setCompactDetailOpen(false)}
+            onEdit={() => onEdit(browsedTheme)}
+          />
         </section>
       )}
     </div>

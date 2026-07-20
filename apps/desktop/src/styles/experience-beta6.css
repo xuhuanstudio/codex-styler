@@ -666,7 +666,7 @@
   }
 }
 
-@media (max-width: 980px) {
+@media (max-width: 1060px) {
   .page-heading {
     gap: 18px;
   }
@@ -685,6 +685,11 @@
 
   .theme-library-workspace--detail .theme-library-master {
     display: none;
+  }
+
+  .theme-library-workspace--detail {
+    min-height: 364px;
+    flex-basis: 364px;
   }
 
   .theme-library-workspace--detail .featured-theme {
@@ -722,7 +727,7 @@
     flex: none;
   }
 
-  .theme-library-workspace--detail .featured-theme__copy > p {
+  .theme-library-workspace--detail .theme-detail-card__identity > p {
     min-height: 0;
     -webkit-line-clamp: 2;
   }
@@ -733,8 +738,14 @@
     border-left: 0;
   }
 
-  .theme-library-workspace--detail .featured-theme__copy .button-row,
-  .theme-library-workspace--detail .featured-theme__copy .button-row button {
+  .theme-library-workspace--detail .theme-detail-card__title-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .theme-library-workspace--detail
+    .theme-detail-card__title-row
+    .secondary-button {
     width: 100%;
   }
 
