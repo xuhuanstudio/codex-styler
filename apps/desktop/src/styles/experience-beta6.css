@@ -641,6 +641,31 @@
   }
 }
 
+@media (min-width: 1180px) {
+  :root {
+    --sidebar: 224px;
+  }
+
+  .app-sidebar {
+    padding-inline: 16px;
+  }
+
+  .app-nav__item {
+    height: 42px;
+    border-radius: 10px;
+  }
+
+  .home-page,
+  .page--themes,
+  .companions-page {
+    width: min(1260px, calc(100% - 36px));
+  }
+
+  .configuration-dock {
+    width: min(1080px, calc(100% - 36px));
+  }
+}
+
 @media (max-width: 980px) {
   .page-heading {
     gap: 18px;

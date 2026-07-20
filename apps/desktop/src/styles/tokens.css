@@ -71,3 +71,23 @@
   --motion-standard: 0ms;
   --motion-panel: 0ms;
 }
+
+/*
+ * Comfortable desktop density.
+ *
+ * The 960 px workspace is deliberately compact, but carrying the same scale
+ * into a full desktop window makes the manager read like a reduced mock-up.
+ * Raise only the semantic type tokens at wide widths so resource libraries,
+ * settings and both editors gain hierarchy without changing preview geometry
+ * or destabilising the compact layout.
+ */
+@media (min-width: 1180px) {
+  :root {
+    --type-caption: 11.5px;
+    --type-meta: 13px;
+    --type-body: 14.5px;
+    --type-label: 16px;
+    --type-section: 19px;
+    --type-page: 34px;
+  }
+}

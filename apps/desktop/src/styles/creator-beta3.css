@@ -866,7 +866,8 @@
 
 @media (max-width: 1080px) {
   .creator-header {
-    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-columns: 150px minmax(180px, 1fr) auto;
+    gap: 14px;
   }
 
   .creator-header p {
@@ -874,14 +875,18 @@
   }
 
   .creator-history {
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
+    grid-column: auto;
+    flex-wrap: nowrap;
   }
 
   .creator-history .button {
     width: auto;
     min-width: max-content;
     padding-inline: 10px;
+  }
+
+  .creator-header > .button:first-child {
+    min-width: 150px;
   }
 
   .creator-restore-card {

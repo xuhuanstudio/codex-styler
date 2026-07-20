@@ -1,14 +1,14 @@
 .page--themes,
 .companions-page {
-  --resource-library-min-height: 360px;
+  --resource-library-min-height: 380px;
 
   display: flex;
   width: min(1240px, calc(100% - 44px));
   min-height: 100%;
   box-sizing: border-box;
   flex-direction: column;
-  padding-top: 32px;
-  padding-bottom: 32px;
+  padding-top: 28px;
+  padding-bottom: 28px;
 }
 
 .page--themes > .page-heading,
@@ -33,7 +33,7 @@
   display: grid;
   width: 100%;
   min-height: var(--resource-library-min-height);
-  max-height: 520px;
+  max-height: 550px;
   flex: 1 1 var(--resource-library-min-height);
   grid-template-columns: minmax(360px, 0.88fr) minmax(540px, 1.35fr);
   gap: 18px;
@@ -431,11 +431,11 @@
 .theme-library-workspace .featured-theme__copy {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) minmax(210px, 0.68fr);
-  gap: 4px 18px;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.68fr);
+  gap: 5px 20px;
   overflow-x: hidden;
   overflow-y: hidden;
-  padding: 14px 16px;
+  padding: 14px 18px;
 }
 
 .theme-library-workspace .featured-theme__copy > span,
@@ -457,12 +457,12 @@
 }
 
 .theme-library-workspace .theme-facts {
-  min-width: 210px;
+  min-width: 240px;
   align-self: stretch;
   grid-row: 1 / span 3;
   grid-column: 2;
   margin: 0;
-  padding: 0 0 0 16px;
+  padding: 0 0 0 18px;
   border-top: 0;
   border-bottom: 0;
   border-left: 1px solid var(--border-subtle);
@@ -479,10 +479,8 @@
 }
 
 .theme-library-workspace .theme-personality strong {
-  overflow: hidden;
   line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .theme-library-workspace .configuration-state,
@@ -632,7 +630,7 @@
   display: grid;
   width: 100%;
   min-height: var(--resource-library-min-height);
-  max-height: 500px;
+  max-height: 540px;
   flex: 1 1 var(--resource-library-min-height);
   grid-template-areas: "master detail";
   grid-template-columns: minmax(350px, 0.82fr) minmax(520px, 1.38fr);
@@ -685,12 +683,12 @@
 
 .companion-detail-summary {
   display: flex;
-  min-height: 134px;
+  min-height: 148px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 20px;
-  padding: 17px 20px;
+  padding: 18px 20px;
   border-top: 1px solid var(--border-subtle);
 }
 
