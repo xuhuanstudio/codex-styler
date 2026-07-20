@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 2;
+  const FACTORY_VERSION = 9;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_SETTINGS_ADAPTER__?.version ===
     FACTORY_VERSION
@@ -9,9 +9,12 @@
 
   const ROOT_ID = "codex-styler-composer-moments";
   const FIELD_PATTERNS = {
-    model: /^(model|模型)\b/i,
-    reasoning: /^(effort|reasoning|reasoning effort|推理|推理强度)\b/i,
-    speed: /^(speed|速度)\b/i,
+    /* `\b` only understands ASCII word boundaries. Keep the English boundary,
+       but match CJK labels with an explicit whitespace/end boundary. */
+    model: /^(?:model\b|模型(?:\s|$))/i,
+    reasoning:
+      /^(?:effort\b|reasoning(?: effort)?\b|推理(?:强度)?(?:\s|$))/i,
+    speed: /^(?:speed\b|速度(?:\s|$))/i,
   };
 
   const normalize = (value) =>
@@ -19,8 +22,17 @@
       .replace(/\s+/g, " ")
       .trim();
 
+  const CONCEALED_ATTRIBUTE = "data-codex-styler-adapter-concealed";
+
   const isVisible = (element) => {
     if (!(element instanceof HTMLElement) || !element.isConnected) return false;
+    if (
+      (element.getAttribute("role") === "menu" ||
+        element.getAttribute("role") === "listbox") &&
+      element.getAttribute("data-state") === "closed"
+    ) {
+      return false;
+    }
     if (
       element.hidden ||
       element.closest("[hidden]") ||
@@ -41,7 +53,9 @@
           finish(value || null);
           return;
         }
-        requestAnimationFrame(check);
+        /* Menu state may settle after the keyboard event. A short task delay
+           avoids both re-entrant Radix toggles and synchronous rAF test shims. */
+        window.setTimeout(check, 16);
       };
       check();
     });
@@ -68,6 +82,27 @@
       }
     };
 
+    const openWithKeyboard = (element) => {
+      if (!(element instanceof HTMLElement)) return;
+      element.focus({ preventScroll: true });
+      element.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          code: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      element.dispatchEvent(
+        new KeyboardEvent("keyup", {
+          key: "Enter",
+          code: "Enter",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    };
+
     const resolveTrigger = () => {
       const composer = resolveComposer?.();
       const candidates = [
@@ -89,26 +124,57 @@
         (element) => !element.closest(`#${ROOT_ID}`) && isVisible(element),
       );
 
-    const openRootMenu = async () => {
+    const concealMenu = (menu) => {
+      if (!(menu instanceof HTMLElement)) return menu;
+      menu.setAttribute(CONCEALED_ATTRIBUTE, "true");
+      menu.style.setProperty("opacity", "0", "important");
+      menu.style.setProperty("pointer-events", "none", "important");
+      return menu;
+    };
+
+    const revealMenus = () => {
+      document
+        .querySelectorAll(`[${CONCEALED_ATTRIBUTE}]`)
+        .forEach((menu) => {
+          menu.removeAttribute(CONCEALED_ATTRIBUTE);
+          if (menu instanceof HTMLElement) {
+            menu.style.removeProperty("opacity");
+            menu.style.removeProperty("pointer-events");
+          }
+        });
+    };
+
+    const openRootMenu = async ({ conceal = true } = {}) => {
       const trigger = resolveTrigger();
       if (!(trigger instanceof HTMLElement)) return null;
+      let menu = visibleMenus().at(-1) || null;
       if (
         trigger.getAttribute("data-state") !== "open" &&
         trigger.getAttribute("aria-expanded") !== "true"
       ) {
-        clickNative(trigger);
+        /* Radix ignores HTMLElement.click() for the current Codex trigger,
+           while its keyboard contract remains stable and accessible. */
+        openWithKeyboard(trigger);
+        menu = await waitFor(() => visibleMenus().at(-1), 250);
+        if (!menu) {
+          clickNative(trigger);
+          menu = await waitFor(() => visibleMenus().at(-1), 400);
+        }
       }
-      return waitFor(() => visibleMenus().at(-1));
+      menu ||= await waitFor(() => visibleMenus().at(-1));
+      return conceal ? concealMenu(menu) : menu;
     };
 
-    const closeMenus = () => {
-      const trigger = resolveTrigger();
-      if (
-        trigger?.getAttribute("data-state") === "open" ||
-        trigger?.getAttribute("aria-expanded") === "true"
-      ) {
-        clickNative(trigger);
-      } else if (visibleMenus().length > 0) dispatchEscape();
+    const closeMenus = async () => {
+      revealMenus();
+      /* A submenu and its root are separate Radix layers. Close every active
+         layer and wait for each state transition before reopening another row. */
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const openCount = visibleMenus().length;
+        if (openCount === 0) break;
+        dispatchEscape();
+        await waitFor(() => visibleMenus().length < openCount, 250);
+      }
     };
 
     const buttonText = (element) => normalize(element?.textContent);
@@ -166,18 +232,24 @@
 
     const currentModel = (trigger) =>
       normalize(
-        trigger?.querySelector("[data-model-picker-model-row]")?.textContent ||
+        trigger?.querySelector("[class*='ModelPickerTriggerModelText']")
+          ?.textContent ||
+          trigger?.querySelector("[data-model-picker-model-row]")
+            ?.textContent ||
           trigger?.dataset.modelLabel ||
           "",
       );
 
     const rowValue = (field, row, trigger) => {
       if (field === "model") {
-        return (
-          normalize(
-            row?.querySelector("[data-model-picker-model-row]")?.textContent,
-          ) || currentModel(trigger)
+        const aria = normalize(row?.getAttribute("aria-label"));
+        const ariaValue = normalize(aria.replace(FIELD_PATTERNS.model, ""));
+        if (ariaValue) return ariaValue;
+        const marker = row?.querySelector("[data-model-picker-model-row]");
+        const siblingValue = normalize(
+          marker?.parentElement?.nextElementSibling?.textContent,
         );
+        return siblingValue || currentModel(trigger);
       }
       const aria = normalize(row?.getAttribute("aria-label"));
       const pattern = FIELD_PATTERNS[field];
@@ -237,6 +309,7 @@
         const menus = visibleMenus();
         return menus.length > 1 ? menus.at(-1) : null;
       });
+      concealMenu(optionsMenu);
       const options = optionsMenu
         ? collectOptions(optionsMenu, currentLabel)
         : [];
@@ -267,11 +340,11 @@
       }
       const modelLabel = currentModel(trigger);
       const model = await inspectField("model");
-      closeMenus();
+      await closeMenus();
       const reasoning = await inspectField("reasoning");
-      closeMenus();
+      await closeMenus();
       const speed = await inspectField("speed");
-      closeMenus();
+      await closeMenus();
       if (operationRevision !== revision) {
         return { available: false, reason: "stale" };
       }
@@ -328,7 +401,7 @@
       if (!(option instanceof HTMLElement)) return false;
       option.click();
       await new Promise((resolve) => window.setTimeout(resolve, 40));
-      closeMenus();
+      await closeMenus();
       return true;
     };
 
@@ -370,7 +443,7 @@
 
     const destroy = () => {
       revision += 1;
-      closeMenus();
+      void closeMenus();
     };
 
     const isTriggerTarget = (target) => {
@@ -382,15 +455,19 @@
       );
     };
 
-    const openOfficialMenu = async () => openRootMenu();
+    const showOfficialMenu = async () => {
+      await closeMenus();
+      return openRootMenu({ conceal: false });
+    };
 
     return {
       inspect,
       apply,
       destroy,
+      close: closeMenus,
       resolveTrigger,
       isTriggerTarget,
-      openOfficialMenu,
+      openOfficialMenu: showOfficialMenu,
     };
   };
 

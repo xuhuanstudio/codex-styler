@@ -270,6 +270,24 @@ export async function applyConfiguration(
   );
 }
 
+export async function updateRuntimeExperience(
+  experience: RuntimeExperiencePreferences,
+  revision: number,
+): Promise<RuntimeStatus> {
+  if (!isTauri()) {
+    browserStatus = {
+      ...browserStatus,
+      revision,
+      message: "Runtime interaction preferences updated in preview mode",
+    };
+    return { ...browserStatus };
+  }
+  return invoke<RuntimeStatus>("update_runtime_experience", {
+    experience,
+    revision,
+  });
+}
+
 export async function updateCompanion(
   theme: ThemeDefinition,
   resolveAsset: ((theme: ThemeDefinition, path: string) => string) | undefined,

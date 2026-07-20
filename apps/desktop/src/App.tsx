@@ -100,6 +100,7 @@ import {
   restartApp,
   restoreOfficial,
   updateCompanionConfiguration,
+  updateRuntimeExperience,
   validateCodexInstallPath,
   type AvailableUpdate,
   type CodexDetection,
@@ -343,6 +344,7 @@ export function App() {
     useState<AdaptiveSchemeId | null>(null);
   const startupUpdateCheckRef = useRef(false);
   const liveCompanionSyncRef = useRef<number | null>(null);
+  const runtimeExperienceSyncRef = useRef<string | null>(null);
   const applyRevisionRef = useRef(0);
 
   const locale = resolveLocale(settings.locale);
@@ -606,6 +608,63 @@ export function App() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [runtime.connected, runtime.state]);
+
+  useEffect(() => {
+    if (!runtime.connected) {
+      runtimeExperienceSyncRef.current = null;
+      return;
+    }
+    if (
+      busy ||
+      runtime.state === "applying" ||
+      runtime.state === "launching"
+    ) {
+      return;
+    }
+    const signature = [
+      runtime.port ?? "connected",
+      settings.composerInteractionMode,
+      locale,
+      settings.reduceMotion ? "reduced" : "animated",
+    ].join(":");
+    if (runtimeExperienceSyncRef.current === signature) return;
+    runtimeExperienceSyncRef.current = signature;
+    const revision = Math.max(applyRevisionRef.current, runtime.revision) + 1;
+    applyRevisionRef.current = revision;
+    let active = true;
+    void updateRuntimeExperience(
+      {
+        composerInteractionMode: settings.composerInteractionMode,
+        locale,
+        reduceMotion: settings.reduceMotion,
+      },
+      revision,
+    )
+      .then((next) => {
+        if (active && revision === applyRevisionRef.current) setRuntime(next);
+      })
+      .catch((error) => {
+        if (!active) return;
+        if (runtimeExperienceSyncRef.current === signature) {
+          runtimeExperienceSyncRef.current = null;
+        }
+        /* A runtime from an older Styler build remains safe and usable. The
+           next full apply upgrades it; do not force a theme restart here. */
+        console.warn("Could not synchronize interaction preferences", error);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    busy,
+    locale,
+    runtime.connected,
+    runtime.port,
+    runtime.revision,
+    runtime.state,
+    settings.composerInteractionMode,
+    settings.reduceMotion,
+  ]);
 
   useEffect(() => {
     void listCompanionProjects()
@@ -1043,8 +1102,7 @@ export function App() {
     const next = updateSettings(patch);
     const affectsRuntime =
       Object.prototype.hasOwnProperty.call(patch, "runtimeStrategy") ||
-      Object.prototype.hasOwnProperty.call(patch, "reduceMotion") ||
-      Object.prototype.hasOwnProperty.call(patch, "composerInteractionMode");
+      Object.prototype.hasOwnProperty.call(patch, "reduceMotion");
     if (isLive && affectsRuntime) {
       void performApply(
         appliedTheme,

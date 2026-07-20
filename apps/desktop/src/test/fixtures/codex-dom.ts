@@ -189,6 +189,18 @@ export function installCodexIntelligenceFixture(): void {
     trigger.dataset.state = opening ? "open" : "closed";
     rootMenu.hidden = !opening;
   });
+  trigger.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    /* The real Radix trigger commits its open state after the keyboard event.
+       Keep the fixture asynchronous so adapters cannot rely on a synchronous
+       data-state mutation and then accidentally send a second toggle. */
+    window.setTimeout(() => {
+      const opening = trigger.dataset.state !== "open";
+      closeAll();
+      trigger.dataset.state = opening ? "open" : "closed";
+      rootMenu.hidden = !opening;
+    }, 0);
+  });
   modelRow.addEventListener("click", () => {
     modelMenu.hidden = false;
   });

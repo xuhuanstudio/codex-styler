@@ -27,6 +27,7 @@ import {
   restoreOfficial,
   restartApp,
   updateCompanionConfiguration,
+  updateRuntimeExperience,
   validateCodexInstallPath,
   type RuntimeStatus,
 } from "./lib/runtime";
@@ -84,6 +85,7 @@ vi.mock("./lib/runtime", async (importOriginal) => {
     }),
     applyConfiguration: vi.fn(),
     updateCompanionConfiguration: vi.fn(),
+    updateRuntimeExperience: vi.fn(),
     chooseCodexInstallPath: vi.fn(),
     launchCodex: vi.fn(),
     pauseTheme: vi.fn(),
@@ -124,6 +126,8 @@ describe("Codex Styler shell", () => {
     vi.mocked(applyConfiguration).mockResolvedValue(appliedRuntime);
     vi.mocked(updateCompanionConfiguration).mockReset();
     vi.mocked(updateCompanionConfiguration).mockResolvedValue(appliedRuntime);
+    vi.mocked(updateRuntimeExperience).mockReset();
+    vi.mocked(updateRuntimeExperience).mockResolvedValue(appliedRuntime);
     vi.mocked(launchCodex).mockReset();
     vi.mocked(launchCodex).mockResolvedValue({
       ...appliedRuntime,
@@ -222,6 +226,42 @@ describe("Codex Styler shell", () => {
       JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}")
         .composerInteractionMode,
     ).toBe("marbles");
+  });
+
+  it("restores the selected interaction after reconnecting without reapplying the theme", async () => {
+    vi.mocked(getRuntimeStatus).mockResolvedValue({
+      ...appliedRuntime,
+      state: "connected",
+      revision: 7,
+    });
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({
+        locale: "en",
+        appearance: "system",
+        runtimeStrategy: "enhanced",
+        appliedThemeId: builtinThemes[0].id,
+        themeVariant: "dark",
+        companionMode: "theme-default",
+        composerInteractionMode: "toss",
+        reduceMotion: false,
+        automaticUpdateChecks: false,
+        onboardingComplete: true,
+      }),
+    );
+
+    render(<App />);
+
+    await waitFor(() => expect(updateRuntimeExperience).toHaveBeenCalledOnce());
+    expect(vi.mocked(updateRuntimeExperience).mock.calls[0]).toEqual([
+      {
+        composerInteractionMode: "toss",
+        locale: "en",
+        reduceMotion: false,
+      },
+      8,
+    ]);
+    expect(applyConfiguration).not.toHaveBeenCalled();
   });
 
   it("uses the persistent setup bar instead of redundant selection toasts", () => {

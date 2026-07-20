@@ -911,6 +911,83 @@ async fn update_companion(
 }
 
 #[tauri::command]
+async fn update_runtime_experience(
+    experience: Value,
+    revision: u64,
+    state: State<'_, Mutex<AppRuntime>>,
+) -> Result<RuntimeStatus, String> {
+    let started_at = Instant::now();
+    let (websocket_url, previous_state) = {
+        let mut runtime = state
+            .lock()
+            .map_err(|_| "Runtime state is unavailable".to_string())?;
+        if revision < runtime.revision {
+            return Ok(runtime.status());
+        }
+        runtime.revision = revision;
+        let previous_state = runtime.state;
+        let websocket_url = runtime
+            .websocket_url
+            .clone()
+            .ok_or_else(|| "Codex is not connected".to_string())?;
+        (websocket_url, previous_state)
+    };
+    let experience_json = serde_json::to_string(&experience).map_err(|error| error.to_string())?;
+    let expression = format!(
+        "window.__CODEX_STYLER_RUNTIME__?.updateExperience?.({}, {}) ?? {{ ok: false, reason: 'runtime-update-unsupported' }};",
+        experience_json, revision,
+    );
+    let response = match cdp::evaluate(&websocket_url, &expression).await {
+        Ok(response) => response,
+        Err(error) => {
+            let detail = error.to_string();
+            if let Ok(mut runtime) = state.lock()
+                && revision == runtime.revision
+            {
+                if error.is_connection_loss() {
+                    runtime.invalidate_connection(model::RuntimeState::Error, detail.clone());
+                } else {
+                    runtime.state = model::RuntimeState::Error;
+                    runtime.message = Some(detail.clone());
+                }
+                runtime.record(
+                    "update-runtime-experience",
+                    "error",
+                    started_at.elapsed().as_millis() as u64,
+                );
+            }
+            return Err(detail);
+        }
+    };
+    let outcome = response.pointer("/result/result/value");
+    if outcome
+        .and_then(|value| value.get("ok"))
+        .and_then(Value::as_bool)
+        != Some(true)
+    {
+        return Err(outcome
+            .and_then(|value| value.get("reason"))
+            .and_then(Value::as_str)
+            .unwrap_or("runtime-update-unsupported")
+            .to_string());
+    }
+    let mut runtime = state
+        .lock()
+        .map_err(|_| "Runtime state is unavailable".to_string())?;
+    if revision != runtime.revision {
+        return Ok(runtime.status());
+    }
+    runtime.state = previous_state;
+    runtime.message = Some("Interaction preferences updated without reinjecting the theme".into());
+    runtime.record(
+        "update-runtime-experience",
+        "applied",
+        started_at.elapsed().as_millis() as u64,
+    );
+    Ok(runtime.status())
+}
+
+#[tauri::command]
 async fn pause_theme(state: State<'_, Mutex<AppRuntime>>) -> Result<RuntimeStatus, String> {
     let websocket_url = state
         .lock()
@@ -993,6 +1070,7 @@ pub fn run() {
             launch_codex,
             apply_theme,
             update_companion,
+            update_runtime_experience,
             pause_theme,
             restore_official,
             save_theme_archive,

@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 3;
+  const FACTORY_VERSION = 4;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__?.version === FACTORY_VERSION
   ) {
@@ -497,7 +497,7 @@
       return queue;
     };
 
-    const closeStage = (restoreFocus = true) => {
+    const closeStage = (restoreFocus = true, closeNativeMenu = true) => {
       launchRevision += 1;
       stopFrame();
       currentGame?.destroy?.();
@@ -509,6 +509,7 @@
       currentSnapshot = null;
       currentPresets = [];
       currentGameId = null;
+      if (closeNativeMenu) void settingsAdapter?.close?.();
       if (restoreFocus) trigger?.focus({ preventScroll: true });
     };
 
@@ -1286,7 +1287,8 @@
 
     const start = async (gameId) => {
       if (!GAME_IDS.has(gameId) || !root || !composer?.isConnected) return;
-      closeStage(false);
+      closeStage(false, false);
+      await settingsAdapter?.close?.();
       const requestedRevision = ++launchRevision;
       const snapshot = await settingsAdapter?.inspect?.();
       if (

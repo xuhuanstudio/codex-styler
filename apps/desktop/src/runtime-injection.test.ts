@@ -36,6 +36,20 @@ interface InjectedRuntime {
     entity: unknown,
     revision?: number,
   ) => { ok: boolean; stale: boolean };
+  updateExperience: (
+    experience: {
+      composerInteractionMode:
+        | "disabled"
+        | "marbles"
+        | "claw"
+        | "toss"
+        | "balance"
+        | "route";
+      locale: "en" | "zh-CN";
+      reduceMotion: boolean;
+    },
+    revision?: number,
+  ) => { ok: boolean; stale: boolean; mode: string };
   restore: () => void;
 }
 
@@ -161,7 +175,31 @@ describe("injected compatibility runtime", () => {
     )();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(39);
+    expect(runtime().version).toBe(40);
+  });
+
+  it("updates composer interactions without reinjecting the active theme", async () => {
+    document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerInteractionMode: "disabled",
+      locale: "en",
+      reduceMotion: false,
+    });
+    const backdrop = document.getElementById("codex-styler-scene-root");
+
+    const outcome = runtime().updateExperience(
+      {
+        composerInteractionMode: "toss",
+        locale: "zh-CN",
+        reduceMotion: true,
+      },
+      2,
+    );
+
+    expect(outcome).toMatchObject({ ok: true, stale: false, mode: "toss" });
+    expect(document.getElementById("codex-styler-scene-root")).toBe(backdrop);
+    expect(document.getElementById("codex-styler-composer-moments")).not.toBeNull();
   });
 
   it("adds theme-adaptive composer moments without touching prompt content", async () => {
@@ -221,6 +259,41 @@ describe("injected compatibility runtime", () => {
 
     runtime().restore();
     expect(document.getElementById("codex-styler-composer-moments")).toBeNull();
+  });
+
+  it("takes over an asynchronously opened localized Codex settings menu", async () => {
+    document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
+    document
+      .querySelector("[aria-label='Model 5.6 Sol']")
+      ?.setAttribute("aria-label", "模型 5.6 Sol");
+    const reasoningRow = document.querySelector("[aria-label='Effort High']");
+    reasoningRow?.setAttribute("aria-label", "推理强度 High");
+    if (reasoningRow) reasoningRow.textContent = "推理强度 High";
+    const speedRow = document.querySelector("[aria-label='Speed Fast']");
+    speedRow?.setAttribute("aria-label", "速度 Fast");
+    if (speedRow) speedRow.textContent = "速度 Fast";
+
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerInteractionMode: "toss",
+      locale: "zh-CN",
+      reduceMotion: true,
+    });
+    document
+      .querySelector<HTMLButtonElement>("[data-codex-intelligence-trigger]")
+      ?.click();
+
+    await vi.waitFor(() =>
+      expect(document.querySelector(".csm-stage")).not.toBeNull(),
+    );
+    expect(document.querySelector(".csm-stage")).toHaveAccessibleName(
+      "幸运配置",
+    );
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>("[role='menu']")).some(
+        (menu) => !menu.hidden && menu.style.opacity !== "0",
+      ),
+    ).toBe(false);
   });
 
   it("keeps composer moments absent when the user turns them off", async () => {

@@ -1,5 +1,5 @@
 (() => {
-  const RUNTIME_VERSION = 39;
+  const RUNTIME_VERSION = 40;
   if (window.__CODEX_STYLER_RUNTIME__?.version === RUNTIME_VERSION) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
@@ -2984,6 +2984,32 @@
   const nextFrame = () =>
     new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
+  const composerExperienceConfiguration = (theme, variant, experience = {}) => {
+    const visual = theme.variants[variant];
+    const appearance = visual.appearance;
+    return {
+      mode:
+        experience.composerInteractionMode ||
+        (experience.composerMomentsEnabled === true ? "marbles" : "disabled"),
+      locale: experience.locale === "zh-CN" ? "zh-CN" : "en",
+      reduceMotion: experience.reduceMotion === true,
+      palette: {
+        accent: appearance.accent,
+        surface: appearance.surface,
+        text: appearance.text,
+        mutedText: appearance.mutedText,
+        border: appearance.border,
+        radius: appearance.radius,
+        surfaceOpacity: appearance.surfaceOpacity,
+        focusBlur: appearance.focusBlur,
+        warning: appearance.palette?.warning || appearance.accent,
+        success: appearance.palette?.success || appearance.accent,
+      },
+      motionIntensity: visual.motion.intensity,
+      targetFps: visual.motion.targetFps,
+    };
+  };
+
   const render = (
     theme,
     variant,
@@ -3159,27 +3185,9 @@
         resolveComposer: () => entityTarget("composer"),
         settingsAdapter: composerSettingsAdapter,
       });
-      composerMoments.configure({
-        mode:
-          experience.composerInteractionMode ||
-          (experience.composerMomentsEnabled === true ? "marbles" : "disabled"),
-        locale: experience.locale === "zh-CN" ? "zh-CN" : "en",
-        reduceMotion: experience.reduceMotion === true,
-        palette: {
-          accent: appearance.accent,
-          surface: appearance.surface,
-          text: appearance.text,
-          mutedText: appearance.mutedText,
-          border: appearance.border,
-          radius: appearance.radius,
-          surfaceOpacity: appearance.surfaceOpacity,
-          focusBlur: appearance.focusBlur,
-          warning: appearance.palette?.warning || appearance.accent,
-          success: appearance.palette?.success || appearance.accent,
-        },
-        motionIntensity: visual.motion.intensity,
-        targetFps: visual.motion.targetFps,
-      });
+      composerMoments.configure(
+        composerExperienceConfiguration(theme, variant, experience),
+      );
     }
     layoutResizeHandler = () => updateResponsiveLayout();
     window.addEventListener("resize", layoutResizeHandler, { passive: true });
@@ -3302,6 +3310,44 @@
     document.body.appendChild(entityRoot);
     installEntity(entityRoot, theme, activeState.variant);
     return { ok: true, stale: false, revision };
+  };
+
+  const updateExperience = (experience = {}, revision = latestRevision + 1) => {
+    if (!Number.isInteger(revision) || revision < 0) {
+      throw new Error(
+        "Codex Styler rejected an invalid configuration revision",
+      );
+    }
+    if (revision < latestRevision) {
+      return { ok: true, stale: true, revision: latestRevision };
+    }
+    if (!activeState || !composerMoments) {
+      return {
+        ok: false,
+        stale: false,
+        revision: latestRevision,
+        reason: "runtime-not-active",
+      };
+    }
+    latestRevision = revision;
+    const nextExperience = {
+      ...activeState.experience,
+      ...experience,
+    };
+    composerMoments.configure(
+      composerExperienceConfiguration(
+        activeState.theme,
+        activeState.variant,
+        nextExperience,
+      ),
+    );
+    activeState.experience = nextExperience;
+    return {
+      ok: true,
+      stale: false,
+      revision,
+      mode: nextExperience.composerInteractionMode || "disabled",
+    };
   };
 
   const apply = async (
@@ -3443,6 +3489,7 @@
     version: RUNTIME_VERSION,
     apply,
     updateEntity,
+    updateExperience,
     pause: remove,
     restore: remove,
   };
