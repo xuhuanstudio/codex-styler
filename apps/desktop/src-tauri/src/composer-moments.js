@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 2;
+  const FACTORY_VERSION = 3;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__?.version === FACTORY_VERSION
   ) {
@@ -9,11 +9,10 @@
   const ROOT_ID = "codex-styler-composer-moments";
   const STYLE_ID = "codex-styler-composer-moments-style";
   const GAME_IDS = new Set(["marbles", "claw", "toss", "balance", "route"]);
+  let runtimeLocale = "en";
 
   const copy = () => {
-    const chinese = document.documentElement.lang
-      .toLowerCase()
-      .startsWith("zh");
+    const chinese = runtimeLocale === "zh-CN";
     return chinese
       ? {
           title: "配置玩法",
@@ -179,130 +178,10 @@
         box-sizing: border-box;
         font: inherit;
       }
-      #@@{ROOT_ID} .csm-trigger {
-        position: fixed;
-        display: grid;
-        place-items: center;
-        width: 34px;
-        height: 27px;
-        padding: 0;
-        border: 1px solid color-mix(in srgb, var(--csm-accent) 42%, var(--csm-border));
-        border-radius: 999px;
-        color: color-mix(in srgb, var(--csm-accent) 76%, var(--csm-text));
-        background:
-          radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--csm-accent) 24%, transparent), transparent 38%),
-          color-mix(in srgb, var(--csm-surface) var(--csm-surface-opacity), transparent);
-        box-shadow:
-          inset 0 1px color-mix(in srgb, white 8%, transparent),
-          0 8px 22px rgb(0 0 0 / 16%);
-        backdrop-filter: blur(var(--csm-blur)) saturate(1.12);
-        pointer-events: auto;
-        cursor: pointer;
-        transform-origin: 30% 100%;
-        transition:
-          transform 150ms cubic-bezier(.22, 1, .36, 1),
-          border-color 150ms ease,
-          background-color 150ms ease;
-      }
-      #@@{ROOT_ID} .csm-trigger:hover {
-        transform: translateY(-2px);
-        border-color: color-mix(in srgb, var(--csm-accent) 68%, var(--csm-border));
-      }
-      #@@{ROOT_ID} .csm-trigger:active { transform: translateY(0) scale(.94); }
-      #@@{ROOT_ID} .csm-trigger:focus-visible,
-      #@@{ROOT_ID} .csm-menu button:focus-visible,
-      #@@{ROOT_ID} .csm-close:focus-visible {
+      #@@{ROOT_ID} .csm-close:focus-visible,
+      #@@{ROOT_ID} .csm-proposal-actions button:focus-visible {
         outline: 2px solid color-mix(in srgb, var(--csm-accent) 76%, white);
         outline-offset: 2px;
-      }
-      #@@{ROOT_ID} .csm-spark {
-        position: relative;
-        width: 13px;
-        height: 13px;
-      }
-      #@@{ROOT_ID} .csm-spark::before,
-      #@@{ROOT_ID} .csm-spark::after {
-        content: "";
-        position: absolute;
-        inset: 0;
-        margin: auto;
-        border-radius: 999px;
-        background: currentColor;
-      }
-      #@@{ROOT_ID} .csm-spark::before { width: 3px; height: 13px; }
-      #@@{ROOT_ID} .csm-spark::after { width: 13px; height: 3px; }
-      #@@{ROOT_ID} .csm-menu {
-        position: fixed;
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 7px;
-        width: min(520px, calc(100vw - 24px));
-        padding: 8px;
-        border: 1px solid color-mix(in srgb, var(--csm-border) 82%, transparent);
-        border-radius: calc(var(--csm-radius) + 2px);
-        color: var(--csm-text);
-        background:
-          linear-gradient(160deg, color-mix(in srgb, var(--csm-accent) 7%, transparent), transparent 52%),
-          color-mix(in srgb, var(--csm-surface) var(--csm-surface-opacity), transparent);
-        box-shadow:
-          inset 0 1px color-mix(in srgb, white 7%, transparent),
-          0 22px 58px rgb(0 0 0 / 24%);
-        backdrop-filter: blur(var(--csm-blur)) saturate(1.16);
-        pointer-events: auto;
-        transform-origin: 9% 100%;
-      }
-      #@@{ROOT_ID} .csm-menu button {
-        min-width: 0;
-        min-height: 62px;
-        padding: 10px;
-        border: 1px solid transparent;
-        border-radius: max(10px, calc(var(--csm-radius) - 5px));
-        color: inherit;
-        text-align: left;
-        background: color-mix(in srgb, var(--csm-text) 4%, transparent);
-        cursor: pointer;
-        transition:
-          transform 150ms cubic-bezier(.22, 1, .36, 1),
-          background-color 150ms ease,
-          border-color 150ms ease;
-      }
-      #@@{ROOT_ID} .csm-menu button:hover {
-        transform: translateY(-2px);
-        border-color: color-mix(in srgb, var(--csm-accent) 30%, var(--csm-border));
-        background: color-mix(in srgb, var(--csm-accent) 12%, transparent);
-      }
-      #@@{ROOT_ID} .csm-menu strong,
-      #@@{ROOT_ID} .csm-menu small {
-        display: block;
-      }
-      #@@{ROOT_ID} .csm-menu strong {
-        margin-top: 7px;
-        font-size: 12px;
-        line-height: 1.15;
-      }
-      #@@{ROOT_ID} .csm-menu small {
-        margin-top: 3px;
-        overflow: hidden;
-        color: var(--csm-muted);
-        font-size: 10px;
-        line-height: 1.25;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      #@@{ROOT_ID} .csm-game-mode {
-        display: inline-flex;
-        align-items: center;
-        min-height: 18px;
-        padding: 0 6px;
-        border: 1px solid color-mix(in srgb, var(--csm-accent) 30%, var(--csm-border));
-        border-radius: 999px;
-        color: var(--csm-accent);
-        background: color-mix(in srgb, var(--csm-accent) 9%, transparent);
-        font-size: 8px;
-        font-weight: 750;
-        letter-spacing: .06em;
-        line-height: 1;
-        text-transform: uppercase;
       }
       #@@{ROOT_ID} .csm-stage {
         position: fixed;
@@ -378,8 +257,7 @@
         color: var(--csm-muted);
         font-size: 11px;
       }
-      #@@{ROOT_ID} .csm-proposal,
-      #@@{ROOT_ID} .csm-unavailable {
+      #@@{ROOT_ID} .csm-proposal {
         position: absolute;
         inset: 0;
         display: grid;
@@ -389,20 +267,16 @@
         background: color-mix(in srgb, var(--csm-surface) 94%, transparent);
       }
       #@@{ROOT_ID} .csm-proposal h3,
-      #@@{ROOT_ID} .csm-unavailable h3,
-      #@@{ROOT_ID} .csm-proposal p,
-      #@@{ROOT_ID} .csm-unavailable p {
+      #@@{ROOT_ID} .csm-proposal p {
         margin: 0;
       }
-      #@@{ROOT_ID} .csm-proposal h3,
-      #@@{ROOT_ID} .csm-unavailable h3 {
+      #@@{ROOT_ID} .csm-proposal h3 {
         font-size: 14px;
         line-height: 1.25;
       }
       #@@{ROOT_ID} .csm-proposal-name {
         color: color-mix(in srgb, var(--csm-accent) 70%, var(--csm-text));
       }
-      #@@{ROOT_ID} .csm-unavailable p,
       #@@{ROOT_ID} .csm-proposal-status {
         color: var(--csm-muted);
         font-size: 11px;
@@ -467,7 +341,6 @@
         opacity: .58;
       }
       @media (max-width: 520px) {
-        #@@{ROOT_ID} .csm-menu { grid-template-columns: 1fr; }
         #@@{ROOT_ID} .csm-config-diff { grid-template-columns: 1fr; }
         #@@{ROOT_ID} .csm-config-diff div {
           display: flex;
@@ -477,23 +350,13 @@
         }
         #@@{ROOT_ID} .csm-config-diff dd { margin-top: 0; }
       }
-      @media (prefers-reduced-motion: reduce) {
-        #@@{ROOT_ID} .csm-trigger,
-        #@@{ROOT_ID} .csm-menu button {
-          transition: none;
-        }
-        #@@{ROOT_ID} .csm-trigger:hover,
-        #@@{ROOT_ID} .csm-menu button:hover {
-          transform: none;
-        }
-      }
     `.replaceAll("@@{ROOT_ID}", ROOT_ID);
     document.head.appendChild(style);
   };
 
   const createFactory = ({ resolveComposer, settingsAdapter }) => {
     let preferences = {
-      enabled: false,
+      mode: "disabled",
       reduceMotion: false,
       palette: {
         accent: "#5a84f6",
@@ -506,13 +369,12 @@
         focusBlur: 16,
         warning: "#e7ad52",
         success: "#58b88a",
-        motionIntensity: 0.5,
-        targetFps: 30,
       },
+      motionIntensity: 0.5,
+      targetFps: 30,
     };
     let root = null;
     let trigger = null;
-    let menu = null;
     let stage = null;
     let canvas = null;
     let stageLabel = null;
@@ -525,7 +387,6 @@
     const timers = new Set();
     let composer = null;
     let resizeObserver = null;
-    let lastFocused = null;
 
     const palette = () => preferences.palette;
     const motionScale = () => 0.72 + preferences.motionIntensity * 0.56;
@@ -636,13 +497,6 @@
       return queue;
     };
 
-    const closeMenu = (restoreFocus = false) => {
-      if (!menu) return;
-      menu.hidden = true;
-      trigger?.setAttribute("aria-expanded", "false");
-      if (restoreFocus) trigger?.focus({ preventScroll: true });
-    };
-
     const closeStage = (restoreFocus = true) => {
       launchRevision += 1;
       stopFrame();
@@ -659,7 +513,9 @@
     };
 
     const position = () => {
-      if (!root || !trigger) return;
+      if (!root) return;
+      const nextTrigger = settingsAdapter?.resolveTrigger?.();
+      if (nextTrigger instanceof HTMLElement) trigger = nextTrigger;
       const nextComposer = resolveComposer();
       if (nextComposer !== composer) {
         resizeObserver?.disconnect();
@@ -667,37 +523,10 @@
         if (composer) resizeObserver?.observe(composer);
       }
       if (!composer?.isConnected) {
-        trigger.hidden = true;
-        closeMenu();
         closeStage(false);
         return;
       }
-      trigger.hidden = false;
       const bounds = composer.getBoundingClientRect();
-      const triggerLeft = clamp(
-        bounds.left + Math.max(14, Math.min(28, bounds.width * 0.08)),
-        8,
-        Math.max(8, window.innerWidth - 42),
-      );
-      trigger.style.left = triggerLeft + "px";
-      trigger.style.top =
-        clamp(bounds.top - 13, 6, window.innerHeight - 35) + "px";
-
-      if (menu && !menu.hidden) {
-        const width = Math.min(520, Math.max(290, bounds.width));
-        menu.style.width = width + "px";
-        menu.style.left =
-          clamp(bounds.left, 8, Math.max(8, window.innerWidth - width - 8)) +
-          "px";
-        const menuHeight = menu.offsetHeight || 84;
-        const preferredTop = bounds.top - menuHeight - 18;
-        menu.style.top =
-          clamp(
-            preferredTop,
-            8,
-            Math.max(8, window.innerHeight - menuHeight - 8),
-          ) + "px";
-      }
 
       if (stage) {
         const resultHeight = stage.classList.contains("csm-stage--result")
@@ -750,81 +579,21 @@
       );
     };
 
-    const createMenu = () => {
-      const labels = copy();
-      const element = document.createElement("div");
-      element.className = "csm-menu";
-      element.setAttribute("role", "menu");
-      element.setAttribute("aria-label", labels.title);
-      element.hidden = true;
-      [
-        ["marbles", labels.marbles, labels.marblesDetail, labels.modePhysics],
-        ["claw", labels.claw, labels.clawDetail, labels.modeSkill],
-        ["toss", labels.toss, labels.tossDetail, labels.modeChance],
-        ["balance", labels.balance, labels.balanceDetail, labels.modeTune],
-        ["route", labels.route, labels.routeDetail, labels.modeChoose],
-      ].forEach(([id, title, detail, mode]) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.setAttribute("role", "menuitem");
-        button.dataset.game = id;
-        const category = document.createElement("span");
-        category.className = "csm-game-mode";
-        category.textContent = mode;
-        button.append(category);
-        const name = document.createElement("strong");
-        name.textContent = title;
-        const description = document.createElement("small");
-        description.textContent = detail;
-        button.append(name, description);
-        button.addEventListener("click", () => start(id));
-        element.appendChild(button);
-      });
-      return element;
-    };
-
     const ensureRoot = () => {
       if (root?.isConnected) return;
       installStyles();
       root = document.createElement("div");
       root.id = ROOT_ID;
       root.dataset.version = String(FACTORY_VERSION);
-      trigger = document.createElement("button");
-      trigger.type = "button";
-      trigger.className = "csm-trigger";
-      trigger.setAttribute("aria-haspopup", "menu");
-      trigger.setAttribute("aria-expanded", "false");
-      trigger.setAttribute("aria-label", copy().trigger);
-      trigger.title = copy().trigger;
-      const spark = document.createElement("span");
-      spark.className = "csm-spark";
-      spark.setAttribute("aria-hidden", "true");
-      trigger.appendChild(spark);
-      menu = createMenu();
-      root.append(trigger, menu);
       document.body.appendChild(root);
       updateRootPalette();
-
-      trigger.addEventListener("click", () => {
-        if (stage) {
-          closeStage();
-          return;
-        }
-        menu.hidden = !menu.hidden;
-        trigger.setAttribute("aria-expanded", String(!menu.hidden));
-        if (!menu.hidden) {
-          lastFocused = document.activeElement;
-          position();
-          menu.querySelector("button")?.focus({ preventScroll: true });
-        }
-      });
       window.addEventListener("resize", position, { passive: true });
       document.addEventListener("scroll", position, {
         capture: true,
         passive: true,
       });
       document.addEventListener("keydown", onKeyDown, true);
-      document.addEventListener("pointerdown", onDocumentPointerDown, true);
+      document.addEventListener("click", onNativeTriggerClick, true);
       document.addEventListener("visibilitychange", onVisibilityChange);
       resizeObserver =
         typeof ResizeObserver === "undefined"
@@ -867,33 +636,6 @@
       }
       wrapper.append(name, value);
       return wrapper;
-    };
-
-    const showUnavailable = () => {
-      if (!stage) return;
-      stage.classList.add("csm-stage--result");
-      position();
-      stopFrame();
-      currentGame?.destroy?.();
-      currentGame = null;
-      if (canvas) canvas.hidden = true;
-      const labels = copy();
-      const result = document.createElement("div");
-      result.className = "csm-unavailable";
-      const title = document.createElement("h3");
-      title.textContent = labels.unavailable;
-      const detail = document.createElement("p");
-      detail.textContent = labels.unavailableDetail;
-      const actions = document.createElement("div");
-      actions.className = "csm-proposal-actions";
-      const close = document.createElement("button");
-      close.type = "button";
-      close.textContent = labels.close;
-      close.addEventListener("click", () => closeStage());
-      actions.appendChild(close);
-      result.append(title, detail, actions);
-      stage.appendChild(result);
-      close.focus({ preventScroll: true });
     };
 
     const showProposal = (preset) => {
@@ -1544,7 +1286,6 @@
 
     const start = async (gameId) => {
       if (!GAME_IDS.has(gameId) || !root || !composer?.isConnected) return;
-      closeMenu();
       closeStage(false);
       const requestedRevision = ++launchRevision;
       const snapshot = await settingsAdapter?.inspect?.();
@@ -1558,6 +1299,11 @@
       currentSnapshot = snapshot || null;
       currentPresets = buildPresets(currentSnapshot);
       currentGameId = gameId;
+      if (!currentSnapshot?.available || currentPresets.length === 0) {
+        closeStage(false);
+        await settingsAdapter?.openOfficialMenu?.();
+        return;
+      }
       const labels = copy();
       stage = document.createElement("section");
       stage.className = "csm-stage";
@@ -1599,10 +1345,6 @@
       root.appendChild(stage);
       position();
       stage.focus({ preventScroll: true });
-      if (!currentSnapshot?.available || currentPresets.length === 0) {
-        showUnavailable();
-        return;
-      }
       if (
         preferences.reduceMotion ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -1633,64 +1375,48 @@
     };
 
     function onKeyDown(event) {
-      if (event.key === "Escape") {
-        if (stage) {
-          event.preventDefault();
-          closeStage();
-        } else if (menu && !menu.hidden) {
-          event.preventDefault();
-          closeMenu();
-          if (lastFocused instanceof HTMLElement) {
-            lastFocused.focus({ preventScroll: true });
-          } else {
-            trigger?.focus({ preventScroll: true });
-          }
-        }
-        return;
-      }
-      if (!menu || menu.hidden) return;
-      const buttons = [...menu.querySelectorAll("button")];
-      if (!buttons.length) return;
-      const currentIndex = Math.max(0, buttons.indexOf(document.activeElement));
-      const direction =
-        event.key === "ArrowRight" || event.key === "ArrowDown"
-          ? 1
-          : event.key === "ArrowLeft" || event.key === "ArrowUp"
-            ? -1
-            : 0;
-      if (direction) {
+      if (event.key === "Escape" && stage) {
         event.preventDefault();
-        buttons[
-          (currentIndex + direction + buttons.length) % buttons.length
-        ].focus({ preventScroll: true });
-      } else if (event.key === "Home" || event.key === "End") {
-        event.preventDefault();
-        buttons[event.key === "Home" ? 0 : buttons.length - 1].focus({
-          preventScroll: true,
-        });
+        closeStage();
       }
-    }
-
-    function onDocumentPointerDown(event) {
-      if (!menu || menu.hidden) return;
-      const target = event.target;
-      if (
-        target instanceof Node &&
-        (menu.contains(target) || trigger?.contains(target))
-      ) {
-        return;
-      }
-      closeMenu();
     }
 
     function onVisibilityChange() {
       if (document.visibilityState !== "visible") closeStage(false);
     }
 
+    function onNativeTriggerClick(event) {
+      if (
+        preferences.mode === "disabled" ||
+        !settingsAdapter?.isTriggerTarget?.(event.target)
+      ) {
+        return;
+      }
+      const nativeTrigger = settingsAdapter.resolveTrigger?.();
+      if (
+        nativeTrigger?.dataset?.codexStylerAdapterBypass === "true" ||
+        !(nativeTrigger instanceof HTMLElement)
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      trigger = nativeTrigger;
+      /* Inspecting the same native control inside its active click dispatch can
+         be suppressed by Chromium's re-entrant click guard. Start after the
+         original event completes so the adapter can safely open the real menu. */
+      queueMicrotask(() => void start(preferences.mode));
+    }
+
     const configure = (next = {}) => {
       const nextPalette = next.palette || {};
+      runtimeLocale = next.locale === "zh-CN" ? "zh-CN" : "en";
       preferences = {
-        enabled: next.enabled === true,
+        mode: GAME_IDS.has(next.mode)
+          ? next.mode
+          : next.enabled === true
+            ? "marbles"
+            : "disabled",
         reduceMotion: next.reduceMotion === true,
         palette: {
           accent: nextPalette.accent || preferences.palette.accent,
@@ -1717,7 +1443,7 @@
           ? clamp(next.targetFps, 24, 60)
           : preferences.targetFps,
       };
-      if (!preferences.enabled) {
+      if (preferences.mode === "disabled") {
         destroy();
         return;
       }
@@ -1727,7 +1453,7 @@
     };
 
     const refresh = () => {
-      if (!preferences.enabled) return;
+      if (preferences.mode === "disabled") return;
       ensureRoot();
       position();
     };
@@ -1741,13 +1467,12 @@
       window.removeEventListener("resize", position);
       document.removeEventListener("scroll", position, true);
       document.removeEventListener("keydown", onKeyDown, true);
-      document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+      document.removeEventListener("click", onNativeTriggerClick, true);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       root?.remove();
       document.getElementById(STYLE_ID)?.remove();
       root = null;
       trigger = null;
-      menu = null;
       stage = null;
       canvas = null;
       stageLabel = null;

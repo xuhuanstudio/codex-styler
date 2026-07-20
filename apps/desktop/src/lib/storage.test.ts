@@ -50,13 +50,13 @@ describe("v0.1 settings migration", () => {
     });
   });
 
-  it("enables composer moments for existing users and preserves opt-out", () => {
+  it("migrates the legacy composer toggle to an explicit interaction mode", () => {
     localStorage.setItem(
       "codex-styler.settings.v1",
-      JSON.stringify({ reduceMotion: true }),
+      JSON.stringify({ composerMomentsEnabled: true, reduceMotion: true }),
     );
     expect(loadSettings()).toMatchObject({
-      composerMomentsEnabled: true,
+      composerInteractionMode: "marbles",
       reduceMotion: true,
     });
 
@@ -64,7 +64,13 @@ describe("v0.1 settings migration", () => {
       "codex-styler.settings.v1",
       JSON.stringify({ composerMomentsEnabled: false }),
     );
-    expect(loadSettings().composerMomentsEnabled).toBe(false);
+    expect(loadSettings().composerInteractionMode).toBe("disabled");
+
+    localStorage.setItem(
+      "codex-styler.settings.v1",
+      JSON.stringify({ composerInteractionMode: "route" }),
+    );
+    expect(loadSettings().composerInteractionMode).toBe("route");
   });
 });
 

@@ -2,6 +2,7 @@ import {
   Check,
   Film,
   FolderOpen,
+  Gamepad2,
   Layers3,
   Leaf,
   MoreHorizontal,
@@ -167,13 +168,20 @@ import {
   type CompanionCollection,
 } from "./features/companions/CompanionsView";
 import { ThemeEditorView } from "./features/theme-editor/ThemeEditorView";
+import { InteractionsView } from "./features/interactions/InteractionsView";
 import {
   themeDraftsEqual,
   useThemeDraftHistory,
 } from "./features/theme-editor/use-theme-draft-history";
 
 type View =
-  "home" | "themes" | "companions" | "settings" | "editor" | "companion-editor";
+  | "home"
+  | "themes"
+  | "companions"
+  | "interactions"
+  | "settings"
+  | "editor"
+  | "companion-editor";
 type UpdateStatus = "idle" | "checking" | "current" | "error";
 type ApplySuccessMessage =
   | "configurationApplied"
@@ -795,7 +803,8 @@ export function App() {
           variant: variantSnapshot,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
           reduceMotion: settingsSnapshot.reduceMotion,
-          composerMomentsEnabled: settingsSnapshot.composerMomentsEnabled,
+          composerInteractionMode: settingsSnapshot.composerInteractionMode,
+          locale: resolveLocale(settingsSnapshot.locale),
           revision,
         },
         resolveAsset,
@@ -850,7 +859,8 @@ export function App() {
           variant: settingsSnapshot.themeVariant,
           runtimeStrategy: settingsSnapshot.runtimeStrategy,
           reduceMotion: settingsSnapshot.reduceMotion,
-          composerMomentsEnabled: settingsSnapshot.composerMomentsEnabled,
+          composerInteractionMode: settingsSnapshot.composerInteractionMode,
+          locale: resolveLocale(settingsSnapshot.locale),
           revision,
         },
         resolveAsset,
@@ -1034,7 +1044,7 @@ export function App() {
     const affectsRuntime =
       Object.prototype.hasOwnProperty.call(patch, "runtimeStrategy") ||
       Object.prototype.hasOwnProperty.call(patch, "reduceMotion") ||
-      Object.prototype.hasOwnProperty.call(patch, "composerMomentsEnabled");
+      Object.prototype.hasOwnProperty.call(patch, "composerInteractionMode");
     if (isLive && affectsRuntime) {
       void performApply(
         appliedTheme,
@@ -1781,6 +1791,11 @@ export function App() {
     { id: "home", label: "home", icon: <Monitor size={17} /> },
     { id: "themes", label: "themes", icon: <Palette size={17} /> },
     { id: "companions", label: "companions", icon: <PawPrint size={17} /> },
+    {
+      id: "interactions",
+      label: "interactions",
+      icon: <Gamepad2 size={17} />,
+    },
     { id: "settings", label: "settings", icon: <Settings size={17} /> },
   ];
   const activeNavigation =
@@ -2019,6 +2034,16 @@ export function App() {
               }
               isLive={isLive}
               busy={busy}
+            />
+          )}
+
+          {view === "interactions" && (
+            <InteractionsView
+              mode={settings.composerInteractionMode}
+              t={t}
+              onChange={(composerInteractionMode) =>
+                handleSettingsChange({ composerInteractionMode })
+              }
             />
           )}
 

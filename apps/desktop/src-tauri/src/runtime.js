@@ -1,5 +1,6 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 38) return;
+  const RUNTIME_VERSION = 39;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === RUNTIME_VERSION) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -1629,9 +1630,8 @@
           select,
           [role="button"],
           [role="tab"],
-          [role="option"],
-          [role="switch"]
-        ) {
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]) {
           transition: color var(--codex-styler-motion-duration) ease, background-color var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease, transform var(--codex-styler-motion-duration) ease !important;
         }
         @media (hover: hover) and (pointer: fine) {
@@ -1660,9 +1660,8 @@
           select,
           [role="button"],
           [role="tab"],
-          [role="option"],
-          [role="switch"]
-        ):focus-visible {
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):focus-visible {
           outline: 2px solid color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-focus)) !important;
           outline-offset: 2px !important;
           box-shadow: 0 0 0 4px color-mix(in srgb, ${appearance.accent} 14%, transparent) !important;
@@ -1695,9 +1694,28 @@
         ) {
           accent-color: ${appearance.accent} !important;
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"][aria-checked="true"] {
+        /* Switches keep Codex's native geometry and thumb mechanics. Theme
+           styling is deliberately limited to state color and the accessible
+           focus outline so imported themes cannot turn a compact toggle into
+           a generic active button. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"] {
+          accent-color: ${appearance.accent} !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:is(
+          [aria-checked="true"],
+          [data-state="checked"],
+          [data-state="on"]
+        ) {
           border-color: color-mix(in srgb, ${appearance.accent} 72%, ${appearance.border}) !important;
           background-color: color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-surface-raised)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:focus-visible {
+          outline: 2px solid color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-focus)) !important;
+          outline-offset: 2px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"]:is(:disabled, [aria-disabled="true"]) {
+          filter: saturate(.72);
+          opacity: .58 !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
           button,
@@ -1707,10 +1725,9 @@
           [role="button"],
           [role="tab"],
           [role="option"],
-          [role="switch"],
           [role="checkbox"],
           [role="radio"]
-        ):is(:disabled, [aria-disabled="true"]) {
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):is(:disabled, [aria-disabled="true"]) {
           color: var(--codex-styler-text-tertiary) !important;
           border-color: color-mix(in srgb, ${appearance.border} 54%, transparent) !important;
           background-color: color-mix(in srgb, var(--codex-styler-control) 48%, transparent) !important;
@@ -1721,11 +1738,8 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
           button,
           [role="button"],
-          [role="option"],
-          [role="switch"],
-          [role="checkbox"],
-          [role="radio"]
-        ):is(
+          [role="option"]
+        ):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):is(
           [aria-pressed="true"],
           [aria-checked="true"],
           [data-state="active"],
@@ -1799,20 +1813,20 @@
          * stroke geometry. Destructive, invalid and branded actions keep
          * their native meaning instead of being recolored by the theme.
          */
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
           overflow: visible;
           border-radius: max(3px, calc(${appearance.radius}px * 0.28));
           color: var(--codex-styler-icon) !important;
           box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 10%, transparent);
           filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 20%, transparent));
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
           overflow: visible;
           border-radius: 999px;
           color: var(--codex-styler-icon-emphasis) !important;
@@ -3146,7 +3160,10 @@
         settingsAdapter: composerSettingsAdapter,
       });
       composerMoments.configure({
-        enabled: experience.composerMomentsEnabled === true,
+        mode:
+          experience.composerInteractionMode ||
+          (experience.composerMomentsEnabled === true ? "marbles" : "disabled"),
+        locale: experience.locale === "zh-CN" ? "zh-CN" : "en",
         reduceMotion: experience.reduceMotion === true,
         palette: {
           accent: appearance.accent,
@@ -3423,7 +3440,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 38,
+    version: RUNTIME_VERSION,
     apply,
     updateEntity,
     pause: remove,

@@ -630,7 +630,9 @@ button:disabled {
 .home-current__preview {
   position: relative;
   min-width: 0;
+  overflow: hidden;
   padding: 16px;
+  border-radius: calc(var(--radius-lg) - 1px);
   background: #171a20;
 }
 
@@ -857,7 +859,7 @@ button:disabled {
   min-height: 430px;
   overflow: hidden;
   border: 1px solid var(--line-strong);
-  border-radius: 2px 22px 22px 2px;
+  border-radius: 22px;
   background: var(--shell-elevated);
   box-shadow: var(--shadow);
 }
@@ -1139,7 +1141,7 @@ button:disabled {
   overflow: hidden;
   padding: 0;
   border: 0;
-  border-radius: 3px 12px 12px 3px;
+  border-radius: 12px;
   background: #202522;
 }
 
@@ -1243,7 +1245,7 @@ button:disabled {
   min-height: 390px;
   overflow: hidden;
   border: 1px solid var(--preview-border-strong);
-  border-radius: 4px 14px 14px 4px;
+  border-radius: var(--preview-radius);
   color: var(--preview-text);
   background: var(--preview-bg);
   isolation: isolate;
@@ -3187,7 +3189,7 @@ button:disabled {
 
 .library-theme__visual {
   height: 86px;
-  border-radius: 5px 10px 10px 5px;
+  border-radius: 10px;
   background-position: center;
   background-size: cover;
 }
@@ -3959,7 +3961,7 @@ button:disabled {
 
 .new-theme-existing-list__preview {
   height: 56px;
-  border-radius: 5px 10px 10px 5px;
+  border-radius: 10px;
   background-position: center;
   background-size: cover;
 }

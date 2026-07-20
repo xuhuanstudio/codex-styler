@@ -8,6 +8,8 @@ import {
 } from "@codex-styler/theme-core";
 import { prepareThemeForRuntime } from "./assets";
 import type { RuntimeStrategy } from "./storage";
+import type { Locale } from "./i18n";
+import type { ComposerInteractionMode } from "./composer-interactions";
 
 export interface CodexDetection {
   installed: boolean;
@@ -63,12 +65,14 @@ export interface AppliedConfiguration {
   variant: "light" | "dark";
   runtimeStrategy: RuntimeStrategy;
   reduceMotion: boolean;
-  composerMomentsEnabled: boolean;
+  composerInteractionMode: ComposerInteractionMode;
+  locale: Locale;
   revision: number;
 }
 
 export interface RuntimeExperiencePreferences {
-  composerMomentsEnabled: boolean;
+  composerInteractionMode: ComposerInteractionMode;
+  locale: Locale;
   reduceMotion: boolean;
 }
 
@@ -212,7 +216,8 @@ export async function applyTheme(
   resolveAsset?: (theme: ThemeDefinition, path: string) => string,
   revision = 0,
   experience: RuntimeExperiencePreferences = {
-    composerMomentsEnabled: true,
+    composerInteractionMode: "disabled",
+    locale: "en",
     reduceMotion: false,
   },
 ): Promise<RuntimeStatus> {
@@ -258,7 +263,8 @@ export async function applyConfiguration(
     resolveAsset,
     configuration.revision,
     {
-      composerMomentsEnabled: configuration.composerMomentsEnabled,
+      composerInteractionMode: configuration.composerInteractionMode,
+      locale: configuration.locale,
       reduceMotion: configuration.reduceMotion,
     },
   );

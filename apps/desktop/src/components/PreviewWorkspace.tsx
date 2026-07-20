@@ -591,6 +591,7 @@ export function PreviewWorkspace({
       "--preview-radius": officialPreview
         ? "10px"
         : visual.appearance.radius + "px",
+      borderRadius: officialPreview ? "10px" : visual.appearance.radius + "px",
       "--preview-focus-blur": officialPreview
         ? "0px"
         : visual.appearance.focusBlur + "px",

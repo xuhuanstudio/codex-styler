@@ -181,6 +181,9 @@ describe("Codex Styler shell", () => {
     expect(screen.getByRole("button", { name: "Home" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Themes" })).toBeInTheDocument();
     expect(
+      screen.getByRole("button", { name: "Interactions" }),
+    ).toBeInTheDocument();
+    expect(
       screen.queryByRole("button", { name: "Create" }),
     ).not.toBeInTheDocument();
     expect(screen.getAllByText("Verified when applied").length).toBeGreaterThan(
@@ -201,6 +204,24 @@ describe("Codex Styler shell", () => {
     expect(viewport?.parentElement).toBe(main);
     expect(configurationDock?.parentElement).toBe(main);
     expect(configurationDock?.previousElementSibling).toBe(viewport);
+  });
+
+  it("keeps composer interactions as a dedicated, persistent selection", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Interactions" }));
+
+    expect(
+      screen.getByRole("heading", { name: "Interactions", level: 1 }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("option", { name: /Orbit Recipe/ }));
+
+    expect(
+      screen.getByRole("option", { name: /Orbit Recipe/ }),
+    ).toHaveAttribute("aria-selected", "true");
+    expect(
+      JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}")
+        .composerInteractionMode,
+    ).toBe("marbles");
   });
 
   it("uses the persistent setup bar instead of redundant selection toasts", () => {

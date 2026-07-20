@@ -1,7 +1,6 @@
 import {
   ChevronRight,
   FolderOpen,
-  Gamepad2,
   Languages,
   LockKeyhole,
   Monitor,
@@ -220,14 +219,6 @@ export function SettingsView({
           description={t("reduceMotionDescription")}
           checked={settings.reduceMotion}
           onChange={(checked) => onChange({ reduceMotion: checked })}
-        />
-
-        <SettingToggle
-          icon={<Gamepad2 size={17} />}
-          title={t("composerMoments")}
-          description={t("composerMomentsDescription")}
-          checked={settings.composerMomentsEnabled}
-          onChange={(checked) => onChange({ composerMomentsEnabled: checked })}
         />
 
         <SettingToggle

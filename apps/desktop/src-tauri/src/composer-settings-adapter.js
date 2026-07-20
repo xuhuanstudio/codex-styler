@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 1;
+  const FACTORY_VERSION = 2;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_SETTINGS_ADAPTER__?.version ===
     FACTORY_VERSION
@@ -58,6 +58,16 @@
   const createFactory = ({ resolveComposer }) => {
     let revision = 0;
 
+    const clickNative = (element) => {
+      if (!(element instanceof HTMLElement)) return;
+      element.dataset.codexStylerAdapterBypass = "true";
+      try {
+        element.click();
+      } finally {
+        delete element.dataset.codexStylerAdapterBypass;
+      }
+    };
+
     const resolveTrigger = () => {
       const composer = resolveComposer?.();
       const candidates = [
@@ -86,7 +96,7 @@
         trigger.getAttribute("data-state") !== "open" &&
         trigger.getAttribute("aria-expanded") !== "true"
       ) {
-        trigger.click();
+        clickNative(trigger);
       }
       return waitFor(() => visibleMenus().at(-1));
     };
@@ -97,7 +107,7 @@
         trigger?.getAttribute("data-state") === "open" ||
         trigger?.getAttribute("aria-expanded") === "true"
       ) {
-        trigger.click();
+        clickNative(trigger);
       } else if (visibleMenus().length > 0) dispatchEscape();
     };
 
@@ -244,8 +254,7 @@
       };
     };
 
-    const inspect = async () => {
-      const operationRevision = ++revision;
+    const inspectSnapshot = async (operationRevision) => {
       const trigger = resolveTrigger();
       if (!trigger) {
         return {
@@ -289,6 +298,11 @@
       };
     };
 
+    const inspect = async () => {
+      const operationRevision = ++revision;
+      return inspectSnapshot(operationRevision);
+    };
+
     const selectField = async (field, target) => {
       if (!target?.label) return true;
       const rootMenu = await openRootMenu();
@@ -320,8 +334,8 @@
 
     const apply = async (configuration) => {
       const operationRevision = ++revision;
-      const before = await inspect();
-      if (!before.available || operationRevision + 1 !== revision) {
+      const before = await inspectSnapshot(operationRevision);
+      if (!before.available || operationRevision !== revision) {
         return { ok: false, reason: before.reason || "unavailable" };
       }
       const changes = ["reasoning", "speed"].filter((field) => {
@@ -333,8 +347,14 @@
         const selected = await selectField(field, configuration[field]);
         if (!selected)
           return { ok: false, reason: `${field}-selection-failed` };
+        if (operationRevision !== revision) {
+          return { ok: false, reason: "stale" };
+        }
       }
-      const after = await inspect();
+      const after = await inspectSnapshot(operationRevision);
+      if (operationRevision !== revision) {
+        return { ok: false, reason: "stale" };
+      }
       const verified = changes.every(
         (field) =>
           normalize(after[field]?.current?.label).toLocaleLowerCase() ===
@@ -353,7 +373,25 @@
       closeMenus();
     };
 
-    return { inspect, apply, destroy };
+    const isTriggerTarget = (target) => {
+      const trigger = resolveTrigger();
+      return Boolean(
+        trigger &&
+        target instanceof Node &&
+        (target === trigger || trigger.contains(target)),
+      );
+    };
+
+    const openOfficialMenu = async () => openRootMenu();
+
+    return {
+      inspect,
+      apply,
+      destroy,
+      resolveTrigger,
+      isTriggerTarget,
+      openOfficialMenu,
+    };
   };
 
   createFactory.version = FACTORY_VERSION;

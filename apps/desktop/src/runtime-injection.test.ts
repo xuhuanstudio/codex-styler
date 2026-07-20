@@ -21,7 +21,9 @@ interface InjectedRuntime {
     mode: "auto" | "compatibility" | "developer",
     revision?: number,
     experience?: {
-      composerMomentsEnabled: boolean;
+      composerInteractionMode:
+        "disabled" | "marbles" | "claw" | "toss" | "balance" | "route";
+      locale: "en" | "zh-CN";
       reduceMotion: boolean;
     },
   ) => Promise<{
@@ -159,7 +161,7 @@ describe("injected compatibility runtime", () => {
     )();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(38);
+    expect(runtime().version).toBe(39);
   });
 
   it("adds theme-adaptive composer moments without touching prompt content", async () => {
@@ -182,12 +184,15 @@ describe("injected compatibility runtime", () => {
     });
 
     await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
-      composerMomentsEnabled: true,
+      composerInteractionMode: "toss",
+      locale: "en",
       reduceMotion: true,
     });
 
     const root = document.getElementById("codex-styler-composer-moments");
-    const trigger = root?.querySelector<HTMLButtonElement>(".csm-trigger");
+    const trigger = document.querySelector<HTMLButtonElement>(
+      "[data-codex-intelligence-trigger]",
+    );
     expect(root).not.toBeNull();
     expect(root?.style.getPropertyValue("--csm-accent")).toBe(
       nativeRefined.variants.dark.appearance.accent,
@@ -201,14 +206,9 @@ describe("injected compatibility runtime", () => {
       `${nativeRefined.variants.dark.appearance.focusBlur}px`,
     );
     expect(getComputedStyle(root as HTMLElement).zIndex).toBe("10");
-    expect(trigger).toHaveAccessibleName("Open configuration plays");
+    expect(root?.querySelector(".csm-trigger")).toBeNull();
 
     trigger?.click();
-    const menu = root?.querySelector<HTMLElement>("[role='menu']");
-    expect(menu).not.toHaveAttribute("hidden");
-    expect(root?.querySelectorAll("[role='menuitem']")).toHaveLength(5);
-
-    root?.querySelector<HTMLButtonElement>("[data-game='toss']")?.click();
     await vi.waitFor(() =>
       expect(root?.querySelector("[role='application']")).toHaveAccessibleName(
         "Lucky Setup",
@@ -227,7 +227,8 @@ describe("injected compatibility runtime", () => {
     document.body.innerHTML = codexFixture("task");
 
     await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
-      composerMomentsEnabled: false,
+      composerInteractionMode: "disabled",
+      locale: "en",
       reduceMotion: false,
     });
 
@@ -253,7 +254,8 @@ describe("injected compatibility runtime", () => {
     });
 
     const experience = {
-      composerMomentsEnabled: true,
+      composerInteractionMode: "claw" as const,
+      locale: "en" as const,
       reduceMotion: true,
     };
     await runtime().apply(
@@ -278,20 +280,17 @@ describe("injected compatibility runtime", () => {
       document.querySelectorAll("#codex-styler-composer-moments-style"),
     ).toHaveLength(1);
 
-    const trigger = document.querySelector<HTMLButtonElement>(".csm-trigger");
+    const trigger = document.querySelector<HTMLButtonElement>(
+      "[data-codex-intelligence-trigger]",
+    );
     trigger?.focus();
     trigger?.click();
-    const menuItems = document.querySelectorAll<HTMLButtonElement>(
-      ".csm-menu [role='menuitem']",
+    await vi.waitFor(() =>
+      expect(document.querySelector(".csm-proposal")).not.toBeNull(),
     );
-    expect(menuItems[0]).toHaveFocus();
-    document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
-    expect(menuItems[1]).toHaveFocus();
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(trigger).toHaveFocus();
-    expect(document.querySelector<HTMLElement>(".csm-menu")).toHaveAttribute(
-      "hidden",
-    );
+    expect(document.querySelector<HTMLElement>(".csm-stage")).toBeNull();
   });
 
   it("opens every animated composer moment and renders its first frame", async () => {
@@ -311,11 +310,6 @@ describe("injected compatibility runtime", () => {
       height: 110,
       toJSON: () => ({}),
     });
-    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
-      composerMomentsEnabled: true,
-      reduceMotion: false,
-    });
-
     const gradient = { addColorStop: vi.fn() };
     const context = {
       arc: vi.fn(),
@@ -349,12 +343,17 @@ describe("injected compatibility runtime", () => {
       return animationFrames.length;
     });
 
-    for (const game of ["marbles", "claw", "toss", "balance", "route"]) {
+    const games = ["marbles", "claw", "toss", "balance", "route"] as const;
+    for (const [index, game] of games.entries()) {
+      await runtime().apply(nativeRefined, "dark", "compatibility", index + 1, {
+        composerInteractionMode: game,
+        locale: "en",
+        reduceMotion: false,
+      });
       animationFrames.length = 0;
       context.clearRect.mockClear();
-      document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
       document
-        .querySelector<HTMLButtonElement>(`[data-game='${game}']`)
+        .querySelector<HTMLButtonElement>("[data-codex-intelligence-trigger]")
         ?.click();
       await vi.waitFor(() =>
         expect(
@@ -398,11 +397,13 @@ describe("injected compatibility runtime", () => {
     });
 
     await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
-      composerMomentsEnabled: true,
+      composerInteractionMode: "marbles",
+      locale: "en",
       reduceMotion: true,
     });
-    document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
-    document.querySelector<HTMLButtonElement>("[data-game='marbles']")?.click();
+    document
+      .querySelector<HTMLButtonElement>("[data-codex-intelligence-trigger]")
+      ?.click();
     await vi.waitFor(() =>
       expect(document.querySelector(".csm-proposal")).not.toBeNull(),
     );
@@ -424,6 +425,7 @@ describe("injected compatibility runtime", () => {
 
   it("stops safely when the native Codex configuration cannot be identified", async () => {
     document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
     const composer = document.querySelector(
       ".composer-surface-chrome",
     ) as HTMLElement;
@@ -440,18 +442,31 @@ describe("injected compatibility runtime", () => {
     });
 
     await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
-      composerMomentsEnabled: true,
+      composerInteractionMode: "balance",
+      locale: "zh-CN",
       reduceMotion: true,
     });
-    document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
-    document.querySelector<HTMLButtonElement>("[data-game='balance']")?.click();
+    document
+      .querySelectorAll("[data-fixture-field='reasoning'] [role='menuitem']")
+      .forEach((option, index) => {
+        if (index > 0) option.remove();
+      });
+    const trigger = document.querySelector<HTMLButtonElement>(
+      "[data-codex-intelligence-trigger]",
+    );
+    trigger?.click();
 
     await vi.waitFor(() =>
-      expect(document.querySelector(".csm-unavailable")).not.toBeNull(),
+      expect(
+        Array.from(
+          document.querySelectorAll<HTMLElement>("[role='menu']"),
+        ).some((menu) => !menu.hidden),
+      ).toBe(true),
     );
+    expect(document.querySelector(".csm-stage")).toBeNull();
     expect(document.querySelector(".csm-proposal")).toBeNull();
-    expect(document.body.textContent).toContain(
-      "No safely adjustable Codex configuration was found",
+    expect(document.body.textContent).not.toContain(
+      "未识别到可安全调整的 Codex 配置",
     );
   });
 
@@ -846,6 +861,29 @@ describe("injected compatibility runtime", () => {
     );
     expect(stylesheet?.textContent).toContain(
       'data-codex-styler-icons="themed"] body > [data-codex-styler-overlay-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      ':not([role="switch"]):not([role="checkbox"]):not([role="radio"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):focus-visible',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '):not([role="switch"]):not([role="checkbox"]):not([role="radio"]):is(:disabled, [aria-disabled="true"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[role="switch"]:is(\n          [aria-checked="true"]',
+    );
+    const switchTreatments = stylesheet?.textContent
+      ?.split("/* Switches keep Codex's native geometry")[1]
+      ?.split(
+        'html[data-codex-styler][data-codex-styler-mode="semantic"] body > [data-codex-styler-app-root] :is(\n          button,',
+      )[0];
+    expect(switchTreatments).toBeDefined();
+    expect(switchTreatments).toContain("accent-color:");
+    expect(switchTreatments).toContain("outline-offset: 2px !important");
+    expect(switchTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:width|height|padding|margin|border-radius|transform|box-shadow)\s*:/,
     );
     expect(stylesheet?.textContent).toContain(
       "color: var(--codex-styler-icon) !important",

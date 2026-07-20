@@ -5,6 +5,10 @@ import type {
   ThemeVariantName,
 } from "@codex-styler/theme-core";
 import type { LocalePreference } from "./i18n";
+import {
+  isComposerInteractionMode,
+  type ComposerInteractionMode,
+} from "./composer-interactions";
 
 export type ManagerAppearance = "system" | "light" | "dark";
 export type RuntimeStrategy = "enhanced" | "conservative";
@@ -39,7 +43,7 @@ export interface UserSettings {
   companionSizes: Record<string, number>;
   companionAttachments: Record<string, EntityAttachment | null>;
   reduceMotion: boolean;
-  composerMomentsEnabled: boolean;
+  composerInteractionMode: ComposerInteractionMode;
   automaticUpdateChecks: boolean;
   skippedUpdateVersion: string | null;
   lastUpdateCheckAt: string | null;
@@ -69,6 +73,7 @@ export function loadSettings(): UserSettings {
         runtimeStrategy?:
           RuntimeStrategy | "auto" | "compatibility" | "developer";
         manualUpdateChecks?: boolean;
+        composerMomentsEnabled?: boolean;
       };
       const runtimeStrategy: RuntimeStrategy =
         parsed.runtimeStrategy === "compatibility" ||
@@ -93,6 +98,7 @@ export function loadSettings(): UserSettings {
           : !parsed.manualUpdateChecks);
       const currentSettings = { ...parsed };
       delete currentSettings.manualUpdateChecks;
+      delete currentSettings.composerMomentsEnabled;
       return {
         ...defaultSettings(),
         ...currentSettings,
@@ -134,10 +140,13 @@ export function loadSettings(): UserSettings {
           typeof parsed.reduceMotion === "boolean"
             ? parsed.reduceMotion
             : false,
-        composerMomentsEnabled:
-          typeof parsed.composerMomentsEnabled === "boolean"
-            ? parsed.composerMomentsEnabled
-            : true,
+        composerInteractionMode: isComposerInteractionMode(
+          parsed.composerInteractionMode,
+        )
+          ? parsed.composerInteractionMode
+          : parsed.composerMomentsEnabled === true
+            ? "marbles"
+            : "disabled",
         automaticUpdateChecks,
         skippedUpdateVersion:
           typeof parsed.skippedUpdateVersion === "string" ||
@@ -175,7 +184,7 @@ function defaultSettings(): UserSettings {
     companionSizes: {},
     companionAttachments: {},
     reduceMotion: false,
-    composerMomentsEnabled: true,
+    composerInteractionMode: "disabled",
     automaticUpdateChecks: true,
     skippedUpdateVersion: null,
     lastUpdateCheckAt: null,

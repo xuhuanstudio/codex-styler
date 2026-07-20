@@ -61,16 +61,37 @@ test("English dark home keeps a balanced preview in a tall window", async ({
   await expect(currentSetup).toBeVisible();
   const dimensions = await currentSetup.evaluate((element) => {
     const bounds = element.getBoundingClientRect();
-    const preview = element
-      .querySelector(".home-current__preview")!
-      .getBoundingClientRect();
+    const previewElement = element.querySelector<HTMLElement>(
+      ".home-current__preview",
+    )!;
+    const preview = previewElement.getBoundingClientRect();
+    const previewStyle = getComputedStyle(previewElement);
+    const workspaceStyle = getComputedStyle(
+      previewElement.querySelector<HTMLElement>(".workspace-preview")!,
+    );
     return {
       height: bounds.height,
       previewAspectRatio: preview.width / preview.height,
+      previewRadii: [
+        previewStyle.borderTopLeftRadius,
+        previewStyle.borderTopRightRadius,
+        previewStyle.borderBottomRightRadius,
+        previewStyle.borderBottomLeftRadius,
+      ],
+      workspaceRadii: [
+        workspaceStyle.borderTopLeftRadius,
+        workspaceStyle.borderTopRightRadius,
+        workspaceStyle.borderBottomRightRadius,
+        workspaceStyle.borderBottomLeftRadius,
+      ],
     };
   });
   expect(dimensions.height).toBeGreaterThanOrEqual(450);
   expect(dimensions.previewAspectRatio).toBeLessThan(2.05);
+  expect(new Set(dimensions.previewRadii).size).toBe(1);
+  expect(dimensions.previewRadii[0]).not.toBe("0px");
+  expect(new Set(dimensions.workspaceRadii).size).toBe(1);
+  expect(dimensions.workspaceRadii[0]).not.toBe("0px");
   await expect(quickActions.first()).toHaveCSS("min-height", "100px");
   await expect(page).toHaveScreenshot("manager-en-dark-1600x1000.png", {
     fullPage: true,
@@ -622,6 +643,36 @@ test("settings controls share a stable professional layout", async ({
   await expect(page).toHaveScreenshot("settings-en-dark.png");
   await page.setViewportSize({ width: 960, height: 680 });
   await expect(page).toHaveScreenshot("settings-en-dark-960x680.png");
+});
+
+test("composer interactions use one dedicated, keyboard-safe selection", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await page.getByRole("button", { name: "Interactions" }).click();
+
+  const official = page.getByRole("option", {
+    name: /Use the official control/,
+  });
+  await official.focus();
+  await page.keyboard.press("ArrowDown");
+
+  const orbit = page.getByRole("option", { name: /Orbit Recipe/ });
+  await expect(orbit).toBeFocused();
+  await expect(orbit).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByText("Replaces the native control in place"),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("codex-styler.settings.v1") ?? "{}"),
+    ),
+  ).toMatchObject({ composerInteractionMode: "marbles" });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("Simplified Chinese light layout remains stable", async ({ page }) => {
