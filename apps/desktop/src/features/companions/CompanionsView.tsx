@@ -38,6 +38,7 @@ import type {
   SelectableCompanionPlacementMode,
 } from "../../lib/companion-placement-modes";
 import { matchesResourceSearch } from "../../lib/resource-search";
+import { useCompactDetailFlow } from "../../lib/use-compact-detail-flow";
 
 export type CompanionCollection = "builtIn" | "mine";
 
@@ -138,36 +139,27 @@ export function CompanionsView({
   isLive,
   busy,
 }: CompanionsViewProps) {
-  const [compactDetailOpen, setCompactDetailOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [browsedCompanionId, setBrowsedCompanionId] = useState<string | null>(
     selected?.id ?? null,
   );
-  const layoutRef = useRef<HTMLDivElement>(null);
   const companionListRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (!compactDetailOpen) return;
-    const element = layoutRef.current?.closest<HTMLElement>(
-      ".app-main__viewport",
-    );
-    if (!element) return;
-    if (typeof element.scrollTo === "function") {
-      element.scrollTo({
-        top: 0,
-        behavior: reduceMotion ? "auto" : "smooth",
-      });
-    } else {
-      element.scrollTop = 0;
-    }
-  }, [compactDetailOpen, reduceMotion]);
+  const {
+    closeDetail,
+    containerRef: layoutRef,
+    detailOpen: compactDetailOpen,
+    onKeyDown: onLayoutKeyDown,
+    openDetail,
+  } = useCompactDetailFlow<HTMLDivElement>(reduceMotion);
   const companions =
     collection === "builtIn" ? builtinCompanions : localCompanions;
   const filteredCompanions = companions.filter((item) => {
-    const copy = item.locales[locale] ?? item.locales.en ?? {
-      name: item.name,
-      description: item.description,
-    };
+    const copy = item.locales[locale] ??
+      item.locales.en ?? {
+        name: item.name,
+        description: item.description,
+      };
     return matchesResourceSearch(searchQuery, [
       copy.name,
       copy.description,
@@ -265,7 +257,7 @@ export function CompanionsView({
         activeTab={collection}
         onTabChange={(nextCollection) => {
           setSearchQuery("");
-          setCompactDetailOpen(false);
+          closeDetail({ restoreFocus: false });
           onCollectionChange(nextCollection);
         }}
         search={
@@ -360,16 +352,14 @@ export function CompanionsView({
 
       <div
         ref={layoutRef}
+        onKeyDown={onLayoutKeyDown}
         className={
           "companions-layout" +
           (compactDetailOpen ? " companions-layout--detail" : "")
         }
       >
         <section className="companion-preview-panel">
-          <button
-            className="compact-detail-back"
-            onClick={() => setCompactDetailOpen(false)}
-          >
+          <button className="compact-detail-back" onClick={() => closeDetail()}>
             <ArrowLeft size={14} />
             {t("backToCompanions")}
           </button>
@@ -541,10 +531,10 @@ export function CompanionsView({
               "companion-option" +
               (!selected ? " companion-option--active" : "")
             }
-            onClick={() => {
+            onClick={(event) => {
               setBrowsedCompanionId(null);
               onSelect(null);
-              setCompactDetailOpen(true);
+              openDetail(event.currentTarget);
             }}
             aria-pressed={!selected}
           >
@@ -652,10 +642,10 @@ export function CompanionsView({
                     "companion-option" +
                     (active ? " companion-option--active" : "")
                   }
-                  onClick={() => {
+                  onClick={(event) => {
                     setBrowsedCompanionId(item.id);
                     onSelect(item);
-                    setCompactDetailOpen(true);
+                    openDetail(event.currentTarget);
                   }}
                   aria-pressed={active}
                 >

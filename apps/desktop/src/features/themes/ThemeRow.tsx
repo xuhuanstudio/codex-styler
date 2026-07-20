@@ -19,7 +19,7 @@ export interface ThemeRowProps {
   active: boolean;
   live: boolean;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
-  onSelect: () => void;
+  onSelect: (trigger: HTMLButtonElement) => void;
   local: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -48,7 +48,7 @@ export function ThemeRow({
     <article className={"theme-row" + (active ? " theme-row--active" : "")}>
       <button
         className="theme-row__select"
-        onClick={onSelect}
+        onClick={(event) => onSelect(event.currentTarget)}
         aria-label={`${t("preview")}: ${localized.name}`}
         aria-pressed={active}
       />

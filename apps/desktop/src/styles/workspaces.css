@@ -19,14 +19,14 @@
 }
 
 .home-current {
-  min-height: clamp(380px, 46vh, 520px);
+  min-height: clamp(380px, 54vh, 560px);
   grid-template-columns: minmax(0, 1.55fr) minmax(280px, 0.68fr);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-panel);
 }
 
 .home-current .workspace-preview {
-  min-height: clamp(348px, calc(46vh - 32px), 488px);
+  min-height: clamp(348px, calc(54vh - 32px), 528px);
 }
 
 .home-current__content {
