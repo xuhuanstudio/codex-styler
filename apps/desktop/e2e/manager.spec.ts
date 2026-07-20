@@ -89,6 +89,78 @@ test("companion cards use independent portraits", async ({ page }) => {
   await expect(list).toHaveScreenshot("companion-list-en-dark.png");
 });
 
+test("compact companion details preserve a usable live preview", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await page.getByRole("button", { name: "Companions", exact: true }).click();
+  await page.locator(".companion-option").nth(1).click();
+
+  const detail = page.locator(
+    ".companions-layout--detail .companion-preview-panel",
+  );
+  const preview = detail.locator(".companion-preview-stage");
+  const summary = detail.locator(".companion-detail-summary");
+  const entity = preview.locator(".scene-entity");
+  await expect(detail).toBeVisible();
+  await expect(entity).toBeVisible();
+
+  const geometry = await detail.evaluate((panel) => {
+    const stage = panel.querySelector<HTMLElement>(".companion-preview-stage")!;
+    const summaryPanel = panel.querySelector<HTMLElement>(
+      ".companion-detail-summary",
+    )!;
+    const sprite = stage.querySelector<HTMLElement>(".scene-entity")!;
+    const stageBounds = stage.getBoundingClientRect();
+    const summaryBounds = summaryPanel.getBoundingClientRect();
+    const spriteBounds = sprite.getBoundingClientRect();
+    return {
+      stageHeight: stageBounds.height,
+      stageWidth: stageBounds.width,
+      summaryWidth: summaryBounds.width,
+      summaryContained:
+        summaryPanel.scrollHeight <= summaryPanel.clientHeight + 1 &&
+        summaryPanel.scrollWidth <= summaryPanel.clientWidth + 1,
+      entityInsideStage:
+        spriteBounds.top >= stageBounds.top &&
+        spriteBounds.left >= stageBounds.left &&
+        spriteBounds.right <= stageBounds.right &&
+        spriteBounds.bottom <= stageBounds.bottom,
+    };
+  });
+  expect(geometry.stageHeight).toBeGreaterThanOrEqual(220);
+  expect(geometry.stageWidth).toBeGreaterThan(geometry.summaryWidth);
+  expect(geometry.summaryContained).toBe(true);
+  expect(geometry.entityInsideStage).toBe(true);
+  await expect(preview).toBeVisible();
+  await expect(summary).toBeVisible();
+});
+
+test("sidebar hover remains distinct from the active destination", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  const active = page.getByRole("button", { name: "Home", exact: true });
+  const inactive = page.getByRole("button", { name: "Themes", exact: true });
+  const activeStyle = await active.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor };
+  });
+
+  await inactive.hover();
+  const hoveredBackground = await inactive.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(hoveredBackground).not.toBe(activeStyle.background);
+
+  await active.hover();
+  await expect
+    .poll(() =>
+      active.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .toBe(activeStyle.background);
+});
+
 test("resource libraries fit above the persistent setup bar", async ({
   page,
 }) => {

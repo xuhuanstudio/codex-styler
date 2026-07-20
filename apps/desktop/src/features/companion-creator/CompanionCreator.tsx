@@ -157,6 +157,7 @@ type DraftRestoreState =
 
 const copy = {
   en: {
+    kicker: "Local · data-only · reversible",
     title: "Companion Studio",
     subtitle: "Turn local media into a calibrated, portable companion.",
     steps: {
@@ -334,6 +335,7 @@ const copy = {
     saved: "Companion installed in My Companions.",
   },
   "zh-CN": {
+    kicker: "仅本机 · 数据隔离 · 可逆恢复",
     title: "伙伴工作室",
     subtitle: "把本地素材制作成已校准、可移植的互动伙伴。",
     steps: {
@@ -2380,7 +2382,7 @@ export function CompanionCreator({
           <ArrowLeft size={16} /> {c.back}
         </button>
         <div>
-          <span className="page-kicker">LOCAL · DATA-ONLY · REVERSIBLE</span>
+          <span className="page-kicker">{c.kicker}</span>
           <h1>{c.title}</h1>
           <p>{c.subtitle}</p>
         </div>

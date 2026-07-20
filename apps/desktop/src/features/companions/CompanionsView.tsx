@@ -208,9 +208,7 @@ export function CompanionsView({
         <div>
           <span className="page-kicker">{t("companionLibraryKicker")}</span>
           <h1>{t("companions")}</h1>
-          <p>
-            {t("dragCompanion")}. {t("companionIndependence")}
-          </p>
+          <p>{t("companionLibraryDescription")}</p>
         </div>
         <div className="page-heading__actions">
           <button className="secondary-button" onClick={onImport}>
@@ -261,7 +259,7 @@ export function CompanionsView({
         <section className="companion-projects">
           <div className="companion-projects__heading">
             <div>
-              <span className="page-kicker">AUTOSAVED CREATOR PROJECTS</span>
+              <span className="page-kicker">{t("companionDraftsKicker")}</span>
               <strong>{t("companionDrafts")}</strong>
               <p>{t("companionDraftsDetail")}</p>
             </div>

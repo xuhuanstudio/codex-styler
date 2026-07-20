@@ -228,9 +228,9 @@ button:disabled {
     transform 160ms ease;
 }
 
-.app-nav__item:hover {
+.app-nav__item:hover:not(.app-nav__item--active) {
   color: var(--ink);
-  background: color-mix(in srgb, var(--shell-elevated) 74%, transparent);
+  background: color-mix(in srgb, var(--shell-elevated) 58%, transparent);
 }
 
 .app-nav__item:active {
@@ -238,6 +238,11 @@ button:disabled {
 }
 
 .app-nav__item--active {
+  color: var(--accent-ink);
+  background: var(--accent-soft);
+}
+
+.app-nav__item--active:hover {
   color: var(--accent-ink);
   background: var(--accent-soft);
 }

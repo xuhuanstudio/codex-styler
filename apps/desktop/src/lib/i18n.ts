@@ -13,6 +13,9 @@ const messages = {
     homeKicker: "Workspace control",
     themeLibraryKicker: "Visual system library",
     companionLibraryKicker: "Independent scene entities",
+    companionLibraryDescription:
+      "Place companions by dragging. Recommended pairings are optional, and themes and companions always stay independent.",
+    companionDraftsKicker: "Autosaved creator projects",
     settingsKicker: "Local preferences",
     themeIndexKicker: "Theme index",
     themeLabel: "Theme",
@@ -614,6 +617,9 @@ const messages = {
     homeKicker: "工作区控制",
     themeLibraryKicker: "视觉系统库",
     companionLibraryKicker: "独立场景实体",
+    companionLibraryDescription:
+      "可通过拖拽调整伙伴位置；默认搭配仅供参考，主题与互动伙伴始终可以独立选择。",
+    companionDraftsKicker: "自动保存的创作工程",
     settingsKicker: "本地偏好设置",
     themeIndexKicker: "主题索引",
     themeLabel: "主题",

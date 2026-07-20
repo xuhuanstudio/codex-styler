@@ -862,7 +862,7 @@ export function ThemeEditorView({
           <div className="panel-title">
             <span>{t("appearance")}</span>
             <div className="inspector-heading-actions">
-              <small>{variant.toUpperCase()}</small>
+              <small>{t(variant)}</small>
               <button
                 className="inspector-close"
                 onClick={closeInspector}

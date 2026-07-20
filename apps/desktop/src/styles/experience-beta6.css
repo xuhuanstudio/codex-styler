@@ -726,7 +726,76 @@
   }
 
   .companions-layout--detail .companion-preview-panel {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .companions-layout--detail .compact-detail-back {
+    grid-row: 1;
+    grid-column: 1 / -1;
+  }
+
+  .companions-layout--detail .companion-preview-stage {
+    min-width: 0;
+    grid-row: 2;
+    grid-column: 1;
+  }
+
+  .companions-layout--detail .companion-detail-summary {
+    min-width: 0;
+    min-height: 0;
+    align-items: stretch;
+    align-self: stretch;
+    justify-content: flex-start;
+    gap: 12px;
+    grid-row: 2;
+    grid-column: 2;
+    overflow: hidden;
+    padding: 12px 14px;
+    border-top: 0;
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  .companions-layout--detail .companion-detail-summary > div:first-child > p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .companions-layout--detail .companion-detail-summary__side {
+    gap: 8px;
+  }
+
+  .companions-layout--detail .companion-detail-summary__badges {
+    flex-wrap: nowrap;
+  }
+
+  .companions-layout--detail .companion-detail-summary__badges span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .companions-layout--detail .companion-placement-controls {
+    gap: 6px;
+    padding-top: 7px;
+  }
+
+  .companions-layout--detail .companion-placement-modes button {
+    min-height: 30px;
+  }
+
+  .companions-layout--detail .companion-detail-summary__actions {
+    flex-wrap: nowrap;
+  }
+
+  .companions-layout--detail .companion-detail-summary__actions button {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .configuration-dock {
