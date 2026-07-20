@@ -2,11 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nativeRefined, type SceneEntity } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
 import composerMomentsSource from "../src-tauri/src/composer-moments.js?raw";
+import composerSettingsAdapterSource from "../src-tauri/src/composer-settings-adapter.js?raw";
 import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
 import { assignThemeColorHarmony } from "./lib/theme-color-harmony";
 import { resolveThemePreviewPalette } from "./lib/theme-preview-palette";
-import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
+import {
+  codexFixture,
+  installCodexIntelligenceFixture,
+  portalFixture,
+} from "./test/fixtures/codex-dom";
 
 interface InjectedRuntime {
   version: number;
@@ -115,7 +120,9 @@ describe("injected compatibility runtime", () => {
       return 1;
     });
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    Function(`${composerMomentsSource}\n${runtimeSource}`)();
+    Function(
+      `${composerSettingsAdapterSource}\n${composerMomentsSource}\n${runtimeSource}`,
+    )();
   });
 
   afterEach(() => {
@@ -147,14 +154,17 @@ describe("injected compatibility runtime", () => {
       }
     ).__CODEX_STYLER_RUNTIME__ = { version: 20, restore };
 
-    Function(`${composerMomentsSource}\n${runtimeSource}`)();
+    Function(
+      `${composerSettingsAdapterSource}\n${composerMomentsSource}\n${runtimeSource}`,
+    )();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(37);
+    expect(runtime().version).toBe(38);
   });
 
   it("adds theme-adaptive composer moments without touching prompt content", async () => {
     document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
     const composer = document.querySelector(
       ".composer-surface-chrome",
     ) as HTMLElement;
@@ -191,18 +201,22 @@ describe("injected compatibility runtime", () => {
       `${nativeRefined.variants.dark.appearance.focusBlur}px`,
     );
     expect(getComputedStyle(root as HTMLElement).zIndex).toBe("10");
-    expect(trigger).toHaveAccessibleName("Open composer moments");
+    expect(trigger).toHaveAccessibleName("Open configuration plays");
 
     trigger?.click();
     const menu = root?.querySelector<HTMLElement>("[role='menu']");
     expect(menu).not.toHaveAttribute("hidden");
-    expect(root?.querySelectorAll("[role='menuitem']")).toHaveLength(3);
+    expect(root?.querySelectorAll("[role='menuitem']")).toHaveLength(5);
 
     root?.querySelector<HTMLButtonElement>("[data-game='toss']")?.click();
-    expect(root?.querySelector("[role='application']")).toHaveAccessibleName(
-      "Lucky Toss",
+    await vi.waitFor(() =>
+      expect(root?.querySelector("[role='application']")).toHaveAccessibleName(
+        "Lucky Setup",
+      ),
     );
-    expect(root?.querySelector(".csm-static-result")).not.toBeNull();
+    expect(root?.querySelector(".csm-proposal")).not.toBeNull();
+    expect(root?.textContent).toContain("Reasoning effort");
+    expect(root?.textContent).toContain("Speed");
     expect(composer.textContent).toBe(originalPrompt);
 
     runtime().restore();
@@ -222,6 +236,7 @@ describe("injected compatibility runtime", () => {
 
   it("keeps composer moments idempotent across theme updates and restores focus", async () => {
     document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
     const composer = document.querySelector(
       ".composer-surface-chrome",
     ) as HTMLElement;
@@ -281,6 +296,7 @@ describe("injected compatibility runtime", () => {
 
   it("opens every animated composer moment and renders its first frame", async () => {
     document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
     const composer = document.querySelector(
       ".composer-surface-chrome",
     ) as HTMLElement;
@@ -333,18 +349,23 @@ describe("injected compatibility runtime", () => {
       return animationFrames.length;
     });
 
-    for (const game of ["marbles", "claw", "toss"]) {
+    for (const game of ["marbles", "claw", "toss", "balance", "route"]) {
       animationFrames.length = 0;
       context.clearRect.mockClear();
       document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
       document
         .querySelector<HTMLButtonElement>(`[data-game='${game}']`)
         ?.click();
+      await vi.waitFor(() =>
+        expect(
+          document.querySelector<HTMLElement>(".csm-stage"),
+        ).not.toBeNull(),
+      );
       const stage = document.querySelector<HTMLElement>(".csm-stage");
       expect(stage).toHaveFocus();
       expect(stage?.querySelector("canvas")).not.toBeNull();
       const keyboardAction = new KeyboardEvent("keydown", {
-        key: "Enter",
+        key: game === "balance" || game === "route" ? "ArrowRight" : "Enter",
         bubbles: true,
         cancelable: true,
       });
@@ -355,6 +376,83 @@ describe("injected compatibility runtime", () => {
       document.querySelector<HTMLButtonElement>(".csm-close")?.click();
       expect(document.querySelector(".csm-stage")).toBeNull();
     }
+  });
+
+  it("previews an exact configuration diff and verifies the native setting update", async () => {
+    document.body.innerHTML = codexFixture("task");
+    installCodexIntelligenceFixture();
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    const originalPrompt = composer.textContent;
+    vi.spyOn(composer, "getBoundingClientRect").mockReturnValue({
+      x: 180,
+      y: 540,
+      left: 180,
+      top: 540,
+      right: 820,
+      bottom: 650,
+      width: 640,
+      height: 110,
+      toJSON: () => ({}),
+    });
+
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerMomentsEnabled: true,
+      reduceMotion: true,
+    });
+    document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
+    document.querySelector<HTMLButtonElement>("[data-game='marbles']")?.click();
+    await vi.waitFor(() =>
+      expect(document.querySelector(".csm-proposal")).not.toBeNull(),
+    );
+    const proposal = document.querySelector(".csm-proposal") as HTMLElement;
+    expect(proposal.textContent).toContain("Model");
+    expect(proposal.querySelector("s")).not.toBeNull();
+
+    const apply = Array.from(proposal.querySelectorAll("button")).find(
+      (button) => button.textContent === "Apply configuration",
+    );
+    apply?.click();
+    await vi.waitFor(() =>
+      expect(proposal.textContent).toContain(
+        "Configuration applied and verified",
+      ),
+    );
+    expect(composer.textContent).toBe(originalPrompt);
+  });
+
+  it("stops safely when the native Codex configuration cannot be identified", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const composer = document.querySelector(
+      ".composer-surface-chrome",
+    ) as HTMLElement;
+    vi.spyOn(composer, "getBoundingClientRect").mockReturnValue({
+      x: 180,
+      y: 540,
+      left: 180,
+      top: 540,
+      right: 820,
+      bottom: 650,
+      width: 640,
+      height: 110,
+      toJSON: () => ({}),
+    });
+
+    await runtime().apply(nativeRefined, "dark", "compatibility", 1, {
+      composerMomentsEnabled: true,
+      reduceMotion: true,
+    });
+    document.querySelector<HTMLButtonElement>(".csm-trigger")?.click();
+    document.querySelector<HTMLButtonElement>("[data-game='balance']")?.click();
+
+    await vi.waitFor(() =>
+      expect(document.querySelector(".csm-unavailable")).not.toBeNull(),
+    );
+    expect(document.querySelector(".csm-proposal")).toBeNull();
+    expect(document.body.textContent).toContain(
+      "No safely adjustable Codex configuration was found",
+    );
   });
 
   it.each([

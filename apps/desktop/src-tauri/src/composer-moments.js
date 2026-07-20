@@ -1,5 +1,5 @@
 (() => {
-  const FACTORY_VERSION = 1;
+  const FACTORY_VERSION = 2;
   if (
     window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__?.version === FACTORY_VERSION
   ) {
@@ -8,7 +8,7 @@
 
   const ROOT_ID = "codex-styler-composer-moments";
   const STYLE_ID = "codex-styler-composer-moments-style";
-  const GAME_IDS = new Set(["marbles", "claw", "toss"]);
+  const GAME_IDS = new Set(["marbles", "claw", "toss", "balance", "route"]);
 
   const copy = () => {
     const chinese = document.documentElement.lang
@@ -16,38 +16,99 @@
       .startsWith("zh");
     return chinese
       ? {
-          title: "输入时刻",
-          trigger: "打开输入时刻",
+          title: "配置玩法",
+          trigger: "打开配置玩法",
           close: "关闭",
-          marbles: "滚珠漫游",
-          marblesDetail: "点击投放主题滚珠",
-          claw: "口袋抓取",
-          clawDetail: "移动并点击落爪",
-          toss: "幸运投掷",
-          tossDetail: "点击投出幸运徽章",
-          marbleHint: "点击任意位置继续投放",
-          clawHint: "移动抓钩，点击落下",
-          tossHint: "点击舞台投掷",
-          reduced: "已使用减少动态结果",
-          caught: "抓到了主题星标",
-          rolled: "幸运结果",
+          marbles: "轨道配方",
+          marblesDetail: "让滚珠组合一套真实配置",
+          claw: "抓取配置",
+          clawDetail: "从可用方案中抓取一个",
+          toss: "幸运配置",
+          tossDetail: "在安全候选中随机投掷",
+          balance: "深速天平",
+          balanceDetail: "在速度与思考深度间调校",
+          route: "星图路线",
+          routeDetail: "选择一条适合当前任务的路线",
+          modePhysics: "物理",
+          modeSkill: "操作",
+          modeChance: "随机",
+          modeTune: "调校",
+          modeChoose: "选择",
+          marbleHint: "投放滚珠，完成后生成配置方案",
+          clawHint: "移动抓钩，点击抓取配置",
+          tossHint: "点击舞台投出配置",
+          balanceHint: "左右移动选择倾向，回车确认",
+          routeHint: "选择一颗路线节点",
+          reduced: "已按减少动态生成方案",
+          caught: "已抓取配置",
+          rolled: "配置结果",
+          unavailable: "未识别到可安全调整的 Codex 配置",
+          unavailableDetail:
+            "当前版本不会执行猜测性修改；你仍可使用原生配置菜单。",
+          proposal: "配置结果",
+          model: "模型",
+          reasoning: "推理强度",
+          speed: "速度",
+          unchanged: "保持不变",
+          apply: "应用这套配置",
+          applying: "正在应用并验证…",
+          applied: "配置已应用并验证",
+          applyFailed: "未能验证配置，已停止继续修改",
+          retry: "再玩一次",
+          cancel: "取消",
+          presetQuick: "快速巡航",
+          presetBalanced: "均衡推进",
+          presetDeep: "深度专注",
+          presetPrecision: "精细推演",
+          presetAdaptive: "灵活折中",
         }
       : {
-          title: "Composer moments",
-          trigger: "Open composer moments",
+          title: "Configuration plays",
+          trigger: "Open configuration plays",
           close: "Close",
-          marbles: "Marble Drift",
-          marblesDetail: "Drop theme-tinted marbles",
-          claw: "Pocket Claw",
-          clawDetail: "Aim, then click to catch",
-          toss: "Lucky Toss",
-          tossDetail: "Throw a tiny lucky token",
-          marbleHint: "Click anywhere to drop another",
-          clawHint: "Move the claw, then click to drop",
-          tossHint: "Click the stage to toss",
-          reduced: "Reduced-motion result",
-          caught: "Theme star caught",
-          rolled: "Lucky result",
+          marbles: "Orbit Recipe",
+          marblesDetail: "Combine a real Codex configuration",
+          claw: "Preset Claw",
+          clawDetail: "Catch one available configuration",
+          toss: "Lucky Setup",
+          tossDetail: "Roll within safe configuration candidates",
+          balance: "Depth Balance",
+          balanceDetail: "Tune speed against reasoning depth",
+          route: "Constellation Route",
+          routeDetail: "Choose a route for the task ahead",
+          modePhysics: "Physics",
+          modeSkill: "Skill",
+          modeChance: "Chance",
+          modeTune: "Tune",
+          modeChoose: "Choose",
+          marbleHint: "Drop marbles to compose a configuration",
+          clawHint: "Aim, then catch a configuration",
+          tossHint: "Click the stage to roll a configuration",
+          balanceHint: "Move left or right, then press Enter",
+          routeHint: "Choose a route node",
+          reduced: "Configuration prepared without motion",
+          caught: "Configuration caught",
+          rolled: "Configuration result",
+          unavailable: "No safely adjustable Codex configuration was found",
+          unavailableDetail:
+            "This version will not guess at settings. The native configuration menu remains available.",
+          proposal: "Configuration result",
+          model: "Model",
+          reasoning: "Reasoning effort",
+          speed: "Speed",
+          unchanged: "Keep current",
+          apply: "Apply configuration",
+          applying: "Applying and verifying…",
+          applied: "Configuration applied and verified",
+          applyFailed:
+            "Could not verify the configuration; no further changes were made",
+          retry: "Play again",
+          cancel: "Cancel",
+          presetQuick: "Quick pass",
+          presetBalanced: "Balanced run",
+          presetDeep: "Deep focus",
+          presetPrecision: "Precision pass",
+          presetAdaptive: "Adaptive middle",
         };
   };
 
@@ -173,9 +234,9 @@
       #@@{ROOT_ID} .csm-menu {
         position: fixed;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 7px;
-        width: min(410px, calc(100vw - 24px));
+        width: min(520px, calc(100vw - 24px));
         padding: 8px;
         border: 1px solid color-mix(in srgb, var(--csm-border) 82%, transparent);
         border-radius: calc(var(--csm-radius) + 2px);
@@ -192,7 +253,7 @@
       }
       #@@{ROOT_ID} .csm-menu button {
         min-width: 0;
-        min-height: 68px;
+        min-height: 62px;
         padding: 10px;
         border: 1px solid transparent;
         border-radius: max(10px, calc(var(--csm-radius) - 5px));
@@ -228,64 +289,20 @@
         text-overflow: ellipsis;
         white-space: nowrap;
       }
-      #@@{ROOT_ID} .csm-menu-art {
-        display: flex;
+      #@@{ROOT_ID} .csm-game-mode {
+        display: inline-flex;
         align-items: center;
-        width: 28px;
-        height: 18px;
-        color: var(--csm-accent);
-      }
-      #@@{ROOT_ID} .csm-menu-art--marbles {
-        gap: 2px;
-      }
-      #@@{ROOT_ID} .csm-menu-art--marbles i {
-        width: 8px;
-        height: 8px;
-        border: 1px solid color-mix(in srgb, white 38%, transparent);
-        border-radius: 50%;
-        background: var(--csm-accent);
-        box-shadow: inset 2px 2px 3px rgb(255 255 255 / 25%);
-      }
-      #@@{ROOT_ID} .csm-menu-art--marbles i:nth-child(2) {
-        background: color-mix(in srgb, var(--csm-accent) 58%, white);
-        transform: translateY(4px);
-      }
-      #@@{ROOT_ID} .csm-menu-art--marbles i:nth-child(3) {
-        background: color-mix(in srgb, var(--csm-accent) 55%, #f3b94c);
-      }
-      #@@{ROOT_ID} .csm-menu-art--claw {
-        position: relative;
-        justify-content: center;
-      }
-      #@@{ROOT_ID} .csm-menu-art--claw::before {
-        content: "";
-        width: 2px;
-        height: 10px;
+        min-height: 18px;
+        padding: 0 6px;
+        border: 1px solid color-mix(in srgb, var(--csm-accent) 30%, var(--csm-border));
         border-radius: 999px;
-        background: currentColor;
-        transform: translateY(-4px);
-      }
-      #@@{ROOT_ID} .csm-menu-art--claw::after {
-        content: "";
-        position: absolute;
-        bottom: 1px;
-        width: 14px;
-        height: 8px;
-        border: solid currentColor;
-        border-width: 0 2px 2px;
-        border-radius: 0 0 9px 9px;
-      }
-      #@@{ROOT_ID} .csm-menu-art--toss {
-        justify-content: center;
-      }
-      #@@{ROOT_ID} .csm-menu-art--toss::before {
-        content: "";
-        width: 13px;
-        height: 13px;
-        border: 2px solid currentColor;
-        border-radius: 4px;
-        box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--csm-accent) 18%, transparent);
-        transform: rotate(17deg);
+        color: var(--csm-accent);
+        background: color-mix(in srgb, var(--csm-accent) 9%, transparent);
+        font-size: 8px;
+        font-weight: 750;
+        letter-spacing: .06em;
+        line-height: 1;
+        text-transform: uppercase;
       }
       #@@{ROOT_ID} .csm-stage {
         position: fixed;
@@ -361,6 +378,105 @@
         color: var(--csm-muted);
         font-size: 11px;
       }
+      #@@{ROOT_ID} .csm-proposal,
+      #@@{ROOT_ID} .csm-unavailable {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        align-content: center;
+        gap: 10px;
+        padding: 18px 44px 16px 18px;
+        background: color-mix(in srgb, var(--csm-surface) 94%, transparent);
+      }
+      #@@{ROOT_ID} .csm-proposal h3,
+      #@@{ROOT_ID} .csm-unavailable h3,
+      #@@{ROOT_ID} .csm-proposal p,
+      #@@{ROOT_ID} .csm-unavailable p {
+        margin: 0;
+      }
+      #@@{ROOT_ID} .csm-proposal h3,
+      #@@{ROOT_ID} .csm-unavailable h3 {
+        font-size: 14px;
+        line-height: 1.25;
+      }
+      #@@{ROOT_ID} .csm-proposal-name {
+        color: color-mix(in srgb, var(--csm-accent) 70%, var(--csm-text));
+      }
+      #@@{ROOT_ID} .csm-unavailable p,
+      #@@{ROOT_ID} .csm-proposal-status {
+        color: var(--csm-muted);
+        font-size: 11px;
+        line-height: 1.4;
+      }
+      #@@{ROOT_ID} .csm-config-diff {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        margin: 0;
+      }
+      #@@{ROOT_ID} .csm-config-diff div {
+        min-width: 0;
+        padding: 7px 8px;
+        border: 1px solid color-mix(in srgb, var(--csm-border) 72%, transparent);
+        border-radius: max(9px, calc(var(--csm-radius) - 6px));
+        background: color-mix(in srgb, var(--csm-text) 4%, transparent);
+      }
+      #@@{ROOT_ID} .csm-config-diff dt,
+      #@@{ROOT_ID} .csm-config-diff dd {
+        overflow: hidden;
+        margin: 0;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      #@@{ROOT_ID} .csm-config-diff dt {
+        color: var(--csm-muted);
+        font-size: 9px;
+      }
+      #@@{ROOT_ID} .csm-config-diff dd {
+        margin-top: 3px;
+        font-size: 11px;
+        font-weight: 650;
+      }
+      #@@{ROOT_ID} .csm-config-diff s {
+        margin-right: 4px;
+        color: var(--csm-muted);
+        font-weight: 450;
+        text-decoration-thickness: 1px;
+      }
+      #@@{ROOT_ID} .csm-proposal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      #@@{ROOT_ID} .csm-proposal-actions button {
+        min-height: 30px;
+        padding: 0 11px;
+        border: 1px solid color-mix(in srgb, var(--csm-border) 76%, transparent);
+        border-radius: max(9px, calc(var(--csm-radius) - 6px));
+        color: var(--csm-text);
+        background: color-mix(in srgb, var(--csm-text) 5%, transparent);
+        cursor: pointer;
+      }
+      #@@{ROOT_ID} .csm-proposal-actions button[data-primary='true'] {
+        border-color: color-mix(in srgb, var(--csm-accent) 64%, var(--csm-border));
+        color: color-mix(in srgb, var(--csm-accent) 16%, var(--csm-text));
+        background: color-mix(in srgb, var(--csm-accent) 24%, var(--csm-surface));
+      }
+      #@@{ROOT_ID} .csm-proposal-actions button:disabled {
+        cursor: wait;
+        opacity: .58;
+      }
+      @media (max-width: 520px) {
+        #@@{ROOT_ID} .csm-menu { grid-template-columns: 1fr; }
+        #@@{ROOT_ID} .csm-config-diff { grid-template-columns: 1fr; }
+        #@@{ROOT_ID} .csm-config-diff div {
+          display: flex;
+          align-items: baseline;
+          justify-content: space-between;
+          gap: 8px;
+        }
+        #@@{ROOT_ID} .csm-config-diff dd { margin-top: 0; }
+      }
       @media (prefers-reduced-motion: reduce) {
         #@@{ROOT_ID} .csm-trigger,
         #@@{ROOT_ID} .csm-menu button {
@@ -375,7 +491,7 @@
     document.head.appendChild(style);
   };
 
-  const createFactory = ({ resolveComposer }) => {
+  const createFactory = ({ resolveComposer, settingsAdapter }) => {
     let preferences = {
       enabled: false,
       reduceMotion: false,
@@ -401,6 +517,10 @@
     let canvas = null;
     let stageLabel = null;
     let currentGame = null;
+    let currentSnapshot = null;
+    let currentPresets = [];
+    let currentGameId = null;
+    let launchRevision = 0;
     let frameRequest = null;
     const timers = new Set();
     let composer = null;
@@ -409,6 +529,80 @@
 
     const palette = () => preferences.palette;
     const motionScale = () => 0.72 + preferences.motionIntensity * 0.56;
+
+    const presetName = (id) => {
+      const labels = copy();
+      return {
+        quick: labels.presetQuick,
+        balanced: labels.presetBalanced,
+        deep: labels.presetDeep,
+        precision: labels.presetPrecision,
+        adaptive: labels.presetAdaptive,
+      }[id];
+    };
+
+    const optionAt = (options, progress) =>
+      options[Math.round((options.length - 1) * clamp(progress, 0, 1))] || null;
+
+    const speedOption = (options, kind) => {
+      if (!options?.length) return null;
+      const matcher =
+        kind === "fast"
+          ? /(fast|quick|turbo|快速|极速)/i
+          : /(standard|normal|balanced|标准|普通|均衡)/i;
+      return (
+        options.find((option) => matcher.test(option.label)) ||
+        (kind === "fast" ? options.at(-1) : options[0])
+      );
+    };
+
+    const buildPresets = (snapshot) => {
+      const reasoning = snapshot?.reasoning?.options || [];
+      if (reasoning.length < 2) return [];
+      const speeds = snapshot?.speed?.options || [];
+      const definitions = [
+        { id: "quick", effort: 0.12, speed: "fast" },
+        { id: "balanced", effort: 0.5, speed: "standard" },
+        { id: "adaptive", effort: 0.66, speed: "fast" },
+        { id: "precision", effort: 0.82, speed: "standard" },
+        { id: "deep", effort: 1, speed: "standard" },
+      ];
+      const seen = new Set();
+      return definitions
+        .map((definition) => {
+          const targetReasoning = optionAt(reasoning, definition.effort);
+          const targetSpeed = speedOption(speeds, definition.speed);
+          const signature = [targetReasoning?.label, targetSpeed?.label].join(
+            "|",
+          );
+          if (!targetReasoning || seen.has(signature)) return null;
+          seen.add(signature);
+          return {
+            id: definition.id,
+            name: presetName(definition.id),
+            configuration: {
+              reasoning: targetReasoning,
+              speed: targetSpeed,
+            },
+          };
+        })
+        .filter(Boolean)
+        .filter((preset) => {
+          const reasoningChanged =
+            preset.configuration.reasoning?.label !==
+            snapshot.reasoning?.current?.label;
+          const speedChanged =
+            preset.configuration.speed?.label &&
+            preset.configuration.speed.label !== snapshot.speed?.current?.label;
+          return reasoningChanged || speedChanged;
+        });
+    };
+
+    const selectPreset = (index) =>
+      currentPresets[
+        ((Math.round(index) % currentPresets.length) + currentPresets.length) %
+          currentPresets.length
+      ] || null;
 
     const stopFrame = () => {
       if (frameRequest !== null) cancelAnimationFrame(frameRequest);
@@ -450,6 +644,7 @@
     };
 
     const closeStage = (restoreFocus = true) => {
+      launchRevision += 1;
       stopFrame();
       currentGame?.destroy?.();
       currentGame = null;
@@ -457,6 +652,9 @@
       stage = null;
       canvas = null;
       stageLabel = null;
+      currentSnapshot = null;
+      currentPresets = [];
+      currentGameId = null;
       if (restoreFocus) trigger?.focus({ preventScroll: true });
     };
 
@@ -486,7 +684,7 @@
         clamp(bounds.top - 13, 6, window.innerHeight - 35) + "px";
 
       if (menu && !menu.hidden) {
-        const width = Math.min(410, Math.max(290, bounds.width));
+        const width = Math.min(520, Math.max(290, bounds.width));
         menu.style.width = width + "px";
         menu.style.left =
           clamp(bounds.left, 8, Math.max(8, window.innerWidth - width - 8)) +
@@ -502,9 +700,14 @@
       }
 
       if (stage) {
-        const minimumHeight = Math.min(
-          132,
-          Math.max(96, window.innerHeight * 0.16),
+        const resultHeight = stage.classList.contains("csm-stage--result")
+          ? window.innerWidth <= 520
+            ? 226
+            : 166
+          : 0;
+        const minimumHeight = Math.max(
+          resultHeight,
+          Math.min(132, Math.max(96, window.innerHeight * 0.16)),
         );
         const height = Math.max(bounds.height, minimumHeight);
         const top = clamp(
@@ -547,14 +750,6 @@
       );
     };
 
-    const menuArt = (id) => {
-      const art = document.createElement("span");
-      art.className = "csm-menu-art csm-menu-art--" + id;
-      art.setAttribute("aria-hidden", "true");
-      if (id === "marbles") art.innerHTML = "<i></i><i></i><i></i>";
-      return art;
-    };
-
     const createMenu = () => {
       const labels = copy();
       const element = document.createElement("div");
@@ -563,15 +758,20 @@
       element.setAttribute("aria-label", labels.title);
       element.hidden = true;
       [
-        ["marbles", labels.marbles, labels.marblesDetail],
-        ["claw", labels.claw, labels.clawDetail],
-        ["toss", labels.toss, labels.tossDetail],
-      ].forEach(([id, title, detail]) => {
+        ["marbles", labels.marbles, labels.marblesDetail, labels.modePhysics],
+        ["claw", labels.claw, labels.clawDetail, labels.modeSkill],
+        ["toss", labels.toss, labels.tossDetail, labels.modeChance],
+        ["balance", labels.balance, labels.balanceDetail, labels.modeTune],
+        ["route", labels.route, labels.routeDetail, labels.modeChoose],
+      ].forEach(([id, title, detail, mode]) => {
         const button = document.createElement("button");
         button.type = "button";
         button.setAttribute("role", "menuitem");
         button.dataset.game = id;
-        button.append(menuArt(id));
+        const category = document.createElement("span");
+        category.className = "csm-game-mode";
+        category.textContent = mode;
+        button.append(category);
         const name = document.createElement("strong");
         name.textContent = title;
         const description = document.createElement("small");
@@ -653,25 +853,141 @@
       return { context, width, height, dpr };
     };
 
-    const staticResult = (gameId) => {
+    const fieldDiff = (term, current, target) => {
+      const wrapper = document.createElement("div");
+      const name = document.createElement("dt");
+      name.textContent = term;
+      const value = document.createElement("dd");
+      if (!target?.label || target.label === current?.label) {
+        value.textContent = current?.label || copy().unchanged;
+      } else {
+        const before = document.createElement("s");
+        before.textContent = current?.label || "—";
+        value.append(before, document.createTextNode(target.label));
+      }
+      wrapper.append(name, value);
+      return wrapper;
+    };
+
+    const showUnavailable = () => {
       if (!stage) return;
-      canvas.hidden = true;
+      stage.classList.add("csm-stage--result");
+      position();
+      stopFrame();
+      currentGame?.destroy?.();
+      currentGame = null;
+      if (canvas) canvas.hidden = true;
       const labels = copy();
       const result = document.createElement("div");
-      result.className = "csm-static-result";
-      const symbol = document.createElement("b");
-      const value =
-        gameId === "claw"
-          ? "✦"
-          : gameId === "toss"
-            ? String(1 + Math.floor(Math.random() * 6))
-            : "● ● ●";
-      symbol.textContent = value;
-      const caption = document.createElement("span");
-      caption.textContent = labels.reduced;
-      result.append(symbol, caption);
+      result.className = "csm-unavailable";
+      const title = document.createElement("h3");
+      title.textContent = labels.unavailable;
+      const detail = document.createElement("p");
+      detail.textContent = labels.unavailableDetail;
+      const actions = document.createElement("div");
+      actions.className = "csm-proposal-actions";
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = labels.close;
+      close.addEventListener("click", () => closeStage());
+      actions.appendChild(close);
+      result.append(title, detail, actions);
       stage.appendChild(result);
-      schedule(() => closeStage(), 1900);
+      close.focus({ preventScroll: true });
+    };
+
+    const showProposal = (preset) => {
+      if (!stage || !preset) return;
+      stage.classList.add("csm-stage--result");
+      position();
+      stopFrame();
+      currentGame?.destroy?.();
+      currentGame = null;
+      if (canvas) canvas.hidden = true;
+      stage.querySelector(".csm-proposal, .csm-static-result")?.remove();
+      const labels = copy();
+      setStageLabel(labels.proposal);
+      const result = document.createElement("div");
+      result.className = "csm-proposal";
+      result.setAttribute("role", "group");
+      result.setAttribute("aria-label", labels.proposal);
+      const title = document.createElement("h3");
+      const lead = document.createTextNode(labels.proposal + " · ");
+      const presetLabel = document.createElement("span");
+      presetLabel.className = "csm-proposal-name";
+      presetLabel.textContent = preset.name;
+      title.append(lead, presetLabel);
+      const diff = document.createElement("dl");
+      diff.className = "csm-config-diff";
+      diff.append(
+        fieldDiff(
+          labels.model,
+          currentSnapshot?.model?.current,
+          currentSnapshot?.model?.current,
+        ),
+        fieldDiff(
+          labels.reasoning,
+          currentSnapshot?.reasoning?.current,
+          preset.configuration.reasoning,
+        ),
+        fieldDiff(
+          labels.speed,
+          currentSnapshot?.speed?.current,
+          preset.configuration.speed,
+        ),
+      );
+      const status = document.createElement("p");
+      status.className = "csm-proposal-status";
+      status.setAttribute("role", "status");
+      const actions = document.createElement("div");
+      actions.className = "csm-proposal-actions";
+      const apply = document.createElement("button");
+      apply.type = "button";
+      apply.dataset.primary = "true";
+      apply.textContent = labels.apply;
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = labels.retry;
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = labels.cancel;
+      apply.addEventListener("click", async () => {
+        const buttons = [apply, retry, cancel];
+        buttons.forEach((button) => {
+          button.disabled = true;
+        });
+        status.textContent = labels.applying;
+        const outcome = await settingsAdapter?.apply?.(preset.configuration);
+        status.textContent = outcome?.ok ? labels.applied : labels.applyFailed;
+        if (outcome?.ok) {
+          apply.textContent = labels.applied;
+          schedule(() => closeStage(), 1050);
+        } else {
+          buttons.forEach((button) => {
+            button.disabled = false;
+          });
+          apply.focus({ preventScroll: true });
+        }
+      });
+      retry.addEventListener("click", () => {
+        const gameId = currentGameId;
+        closeStage(false);
+        start(gameId);
+      });
+      cancel.addEventListener("click", () => closeStage());
+      actions.append(apply, retry, cancel);
+      result.append(title, diff, status, actions);
+      stage.appendChild(result);
+      apply.focus({ preventScroll: true });
+    };
+
+    const staticResult = () => {
+      if (!stage) return;
+      canvas.hidden = true;
+      setStageLabel(copy().reduced);
+      showProposal(
+        selectPreset(Math.floor(Math.random() * currentPresets.length)),
+      );
     };
 
     const drawBall = (context, ball) => {
@@ -780,7 +1096,13 @@
         nextFrame(frame);
       };
       nextFrame(frame);
-      schedule(() => closeStage(), 5600);
+      schedule(() => {
+        const energy = balls.reduce(
+          (total, ball) => total + Math.abs(ball.vx) + Math.abs(ball.vy),
+          0,
+        );
+        showProposal(selectPreset(Math.round(energy) % currentPresets.length));
+      }, 3600);
       return { resize, pointer, keyboard, destroy: () => {} };
     };
 
@@ -874,7 +1196,8 @@
           if (drop <= 0) {
             phase = "done";
             setStageLabel(copy().caught);
-            schedule(() => closeStage(), 1200);
+            const capturedIndex = Math.max(0, prizes.indexOf(captured));
+            schedule(() => showProposal(selectPreset(capturedIndex)), 420);
           }
         }
         const railY = 26;
@@ -1013,7 +1336,7 @@
               token.angle =
                 Math.round(token.angle / (Math.PI / 2)) * (Math.PI / 2);
               setStageLabel(copy().rolled + ": " + result);
-              schedule(() => closeStage(), 1500);
+              schedule(() => showProposal(selectPreset(result - 1)), 520);
             }
           }
           if (token.x < 20 || token.x > width - 20) {
@@ -1030,14 +1353,211 @@
         if (!settledAt) nextFrame(frame);
       };
       nextFrame(frame);
-      schedule(() => closeStage(), 7200);
+      schedule(() => {
+        if (!token) launch(viewport?.width ? viewport.width * 0.5 : 0);
+      }, 4200);
       return { resize, pointer, keyboard, destroy: () => {} };
     };
 
-    const start = (gameId) => {
+    const createBalance = () => {
+      let viewport = prepareCanvas();
+      const colors = palette();
+      const nextFrame = createFrameScheduler();
+      let selected = Math.floor((currentPresets.length - 1) / 2);
+      let display = selected;
+      const resize = () => {
+        viewport = prepareCanvas();
+      };
+      const chooseFromX = (clientX) => {
+        if (!viewport) return;
+        const bounds = canvas.getBoundingClientRect();
+        selected = clamp(
+          Math.round(
+            ((clientX - bounds.left) / Math.max(1, bounds.width)) *
+              (currentPresets.length - 1),
+          ),
+          0,
+          currentPresets.length - 1,
+        );
+      };
+      const pointerMove = (event) => chooseFromX(event.clientX);
+      const pointer = (event) => {
+        chooseFromX(event.clientX);
+        showProposal(selectPreset(selected));
+      };
+      const keyboard = (key) => {
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+          selected = clamp(
+            selected + (key === "ArrowLeft" ? -1 : 1),
+            0,
+            currentPresets.length - 1,
+          );
+          return true;
+        }
+        if (key === "Enter" || key === " ") {
+          showProposal(selectPreset(selected));
+          return true;
+        }
+        return false;
+      };
+      const frame = () => {
+        if (!viewport || !stage) return;
+        display += (selected - display) * 0.16;
+        const { context, width, height } = viewport;
+        context.clearRect(0, 0, width, height);
+        const centerX = width / 2;
+        const centerY = height * 0.58;
+        const progress =
+          currentPresets.length > 1
+            ? display / (currentPresets.length - 1)
+            : 0.5;
+        const angle = (progress - 0.5) * 0.34;
+        context.save();
+        context.translate(centerX, centerY);
+        context.rotate(angle);
+        context.strokeStyle = colors.accent;
+        context.lineWidth = 4;
+        context.lineCap = "round";
+        context.beginPath();
+        context.moveTo(-width * 0.3, 0);
+        context.lineTo(width * 0.3, 0);
+        context.stroke();
+        context.fillStyle = mix(colors.accent, colors.surface, 0.22);
+        [-1, 1].forEach((side) => {
+          context.beginPath();
+          context.arc(side * width * 0.27, 0, 11, 0, Math.PI * 2);
+          context.fill();
+        });
+        context.restore();
+        context.fillStyle = rgba(colors.text, 0.76);
+        context.font = "650 11px ui-sans-serif, system-ui, sans-serif";
+        context.textAlign = "center";
+        context.fillText(
+          selectPreset(selected)?.name || "",
+          centerX,
+          centerY - 30,
+        );
+        context.fillStyle = rgba(colors.mutedText, 0.82);
+        context.font = "500 9px ui-sans-serif, system-ui, sans-serif";
+        context.fillText("SPEED", width * 0.2, height - 16);
+        context.fillText("DEPTH", width * 0.8, height - 16);
+        nextFrame(frame);
+      };
+      nextFrame(frame);
+      return { resize, pointer, pointerMove, keyboard, destroy: () => {} };
+    };
+
+    const createRoute = () => {
+      let viewport = prepareCanvas();
+      const colors = palette();
+      const nextFrame = createFrameScheduler();
+      let selected = Math.min(1, currentPresets.length - 1);
+      const resize = () => {
+        viewport = prepareCanvas();
+      };
+      const nodePositions = () =>
+        currentPresets.map((_, index) => ({
+          x: ((index + 1) / (currentPresets.length + 1)) * viewport.width,
+          y:
+            viewport.height *
+            (index % 2 === 0 ? 0.58 : index % 3 === 0 ? 0.7 : 0.42),
+        }));
+      const choose = (clientX, clientY) => {
+        if (!viewport) return;
+        const bounds = canvas.getBoundingClientRect();
+        const x = clientX - bounds.left;
+        const y = clientY - bounds.top;
+        const nodes = nodePositions();
+        selected = nodes.reduce(
+          (best, node, index) =>
+            Math.hypot(node.x - x, node.y - y) < best.distance
+              ? { index, distance: Math.hypot(node.x - x, node.y - y) }
+              : best,
+          { index: selected, distance: Number.POSITIVE_INFINITY },
+        ).index;
+      };
+      const pointerMove = (event) => choose(event.clientX, event.clientY);
+      const pointer = (event) => {
+        choose(event.clientX, event.clientY);
+        showProposal(selectPreset(selected));
+      };
+      const keyboard = (key) => {
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+          selected =
+            (selected +
+              (key === "ArrowLeft" ? -1 : 1) +
+              currentPresets.length) %
+            currentPresets.length;
+          return true;
+        }
+        if (key === "Enter" || key === " ") {
+          showProposal(selectPreset(selected));
+          return true;
+        }
+        return false;
+      };
+      const frame = (time) => {
+        if (!viewport || !stage) return;
+        const { context, width, height } = viewport;
+        context.clearRect(0, 0, width, height);
+        const nodes = nodePositions();
+        context.strokeStyle = rgba(colors.border, 0.7);
+        context.lineWidth = 1.5;
+        context.beginPath();
+        nodes.forEach((node, index) => {
+          if (index === 0) context.moveTo(node.x, node.y);
+          else context.lineTo(node.x, node.y);
+        });
+        context.stroke();
+        nodes.forEach((node, index) => {
+          const active = index === selected;
+          const pulse = active ? 1 + Math.sin(time / 220) * 0.08 : 1;
+          context.beginPath();
+          context.arc(
+            node.x,
+            node.y,
+            (active ? 11 : 7) * pulse,
+            0,
+            Math.PI * 2,
+          );
+          context.fillStyle = active
+            ? mix(colors.accent, "#ffffff", 0.16)
+            : mix(colors.accent, colors.surface, 0.42);
+          context.shadowColor = rgba(colors.accent, active ? 0.55 : 0.14);
+          context.shadowBlur = active ? 14 : 5;
+          context.fill();
+          context.shadowBlur = 0;
+        });
+        context.fillStyle = rgba(colors.text, 0.82);
+        context.font = "650 11px ui-sans-serif, system-ui, sans-serif";
+        context.textAlign = "center";
+        context.fillText(
+          selectPreset(selected)?.name || "",
+          width / 2,
+          height - 16,
+        );
+        nextFrame(frame);
+      };
+      nextFrame(frame);
+      return { resize, pointer, pointerMove, keyboard, destroy: () => {} };
+    };
+
+    const start = async (gameId) => {
       if (!GAME_IDS.has(gameId) || !root || !composer?.isConnected) return;
       closeMenu();
       closeStage(false);
+      const requestedRevision = ++launchRevision;
+      const snapshot = await settingsAdapter?.inspect?.();
+      if (
+        requestedRevision !== launchRevision ||
+        !root?.isConnected ||
+        !composer?.isConnected
+      ) {
+        return;
+      }
+      currentSnapshot = snapshot || null;
+      currentPresets = buildPresets(currentSnapshot);
+      currentGameId = gameId;
       const labels = copy();
       stage = document.createElement("section");
       stage.className = "csm-stage";
@@ -1049,7 +1569,11 @@
           ? labels.marbles
           : gameId === "claw"
             ? labels.claw
-            : labels.toss,
+            : gameId === "toss"
+              ? labels.toss
+              : gameId === "balance"
+                ? labels.balance
+                : labels.route,
       );
       stageLabel = document.createElement("span");
       stageLabel.className = "csm-stage-label";
@@ -1058,7 +1582,11 @@
           ? labels.marbleHint
           : gameId === "claw"
             ? labels.clawHint
-            : labels.tossHint;
+            : gameId === "toss"
+              ? labels.tossHint
+              : gameId === "balance"
+                ? labels.balanceHint
+                : labels.routeHint;
       const close = document.createElement("button");
       close.type = "button";
       close.className = "csm-close";
@@ -1071,11 +1599,15 @@
       root.appendChild(stage);
       position();
       stage.focus({ preventScroll: true });
+      if (!currentSnapshot?.available || currentPresets.length === 0) {
+        showUnavailable();
+        return;
+      }
       if (
         preferences.reduceMotion ||
         window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ) {
-        staticResult(gameId);
+        staticResult();
         return;
       }
       currentGame =
@@ -1083,7 +1615,11 @@
           ? createMarbles()
           : gameId === "claw"
             ? createClaw()
-            : createToss();
+            : gameId === "toss"
+              ? createToss()
+              : gameId === "balance"
+                ? createBalance()
+                : createRoute();
       stage.addEventListener("pointermove", (event) =>
         currentGame?.pointerMove?.(event),
       );

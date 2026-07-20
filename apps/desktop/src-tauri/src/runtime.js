@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 37) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 38) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -47,6 +47,7 @@
   let entityCleanup = null;
   let entityPositioner = null;
   let composerMoments = null;
+  let composerSettingsAdapter = null;
   let latestRevision = 0;
 
   const finiteBetween = (value, minimum, maximum) =>
@@ -506,6 +507,8 @@
   const remove = () => {
     composerMoments?.destroy?.();
     composerMoments = null;
+    composerSettingsAdapter?.destroy?.();
+    composerSettingsAdapter = null;
     if (scenePointerHandler)
       window.removeEventListener("pointermove", scenePointerHandler);
     if (sceneResetHandler) {
@@ -3130,9 +3133,17 @@
     document.body.appendChild(entityRoot);
     installEntity(entityRoot, theme, variant);
     const momentsFactory = window.__CODEX_STYLER_CREATE_COMPOSER_MOMENTS__;
+    const settingsAdapterFactory =
+      window.__CODEX_STYLER_CREATE_COMPOSER_SETTINGS_ADAPTER__;
     if (typeof momentsFactory === "function") {
+      if (typeof settingsAdapterFactory === "function") {
+        composerSettingsAdapter = settingsAdapterFactory({
+          resolveComposer: () => entityTarget("composer"),
+        });
+      }
       composerMoments = momentsFactory({
         resolveComposer: () => entityTarget("composer"),
+        settingsAdapter: composerSettingsAdapter,
       });
       composerMoments.configure({
         enabled: experience.composerMomentsEnabled === true,
@@ -3412,7 +3423,7 @@
   }
 
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 37,
+    version: 38,
     apply,
     updateEntity,
     pause: remove,

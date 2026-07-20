@@ -770,7 +770,8 @@ async fn apply_theme(
         serde_json::to_string(&compatibility_mode).map_err(|error| error.to_string())?;
     let experience_json = serde_json::to_string(&experience).map_err(|error| error.to_string())?;
     let expression = format!(
-        "{}\n{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {}, {});",
+        "{}\n{}\n{}\nwindow.__CODEX_STYLER_RUNTIME__.apply({}, {}, {}, {}, {});",
+        include_str!("composer-settings-adapter.js"),
         include_str!("composer-moments.js"),
         include_str!("runtime.js"),
         theme_json,
