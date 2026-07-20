@@ -53,7 +53,7 @@ export function HomeView({
     <div className="page home-page">
       <section className="page-heading home-heading">
         <div>
-          <span className="page-kicker">WORKSPACE CONTROL</span>
+          <span className="page-kicker">{t("homeKicker")}</span>
           <h1>{t("homeTitle")}</h1>
           <p>{t("homeDescription")}</p>
         </div>

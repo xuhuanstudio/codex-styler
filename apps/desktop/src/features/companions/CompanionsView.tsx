@@ -206,7 +206,7 @@ export function CompanionsView({
     <div className="page companions-page">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">INDEPENDENT SCENE ENTITIES</span>
+          <span className="page-kicker">{t("companionLibraryKicker")}</span>
           <h1>{t("companions")}</h1>
           <p>
             {t("dragCompanion")}. {t("companionIndependence")}

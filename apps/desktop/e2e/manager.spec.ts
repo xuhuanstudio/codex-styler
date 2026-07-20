@@ -154,7 +154,7 @@ test("resource libraries fit above the persistent setup bar", async ({
   await expectWorkspaceFit(".theme-library-workspace");
   await expectCompanionComposition(".featured-theme__preview");
   const themeDetails = page.locator(".featured-theme__copy");
-  await expect(themeDetails).toHaveCSS("overflow-y", "auto");
+  await expect(themeDetails).toHaveCSS("overflow-y", "hidden");
   await expect(page).toHaveScreenshot("themes-en-dark-1280x720.png");
 
   await page.getByRole("button", { name: "Companions", exact: true }).click();
@@ -203,7 +203,10 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   await previewSurface.hover();
   await expect(previewControlsTrigger).toBeVisible();
   await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
-  await expect(previewControlsTrigger).toHaveAttribute("aria-expanded", "false");
+  await expect(previewControlsTrigger).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
   await expect
     .poll(() =>
       previewControlsTrigger.evaluate((trigger) => {
@@ -219,6 +222,25 @@ test("theme library and focused editor remain usable at compact sizes", async ({
       }),
     )
     .toBe(true);
+  const desktopThemeDetail = page.locator(".featured-theme__copy");
+  const desktopThemeDetailFit = await desktopThemeDetail.evaluate((element) => {
+    const panel = element.getBoundingClientRect();
+    const action = element.querySelector<HTMLElement>(".button-row")!;
+    const coverage = element.querySelector<HTMLElement>(
+      ".theme-effect-summary",
+    )!;
+    return {
+      overflowIsContained: getComputedStyle(element).overflowY === "hidden",
+      actionVisible: action.getBoundingClientRect().bottom <= panel.bottom + 1,
+      coverageVisible:
+        coverage.getBoundingClientRect().bottom <= panel.bottom + 1,
+    };
+  });
+  expect(desktopThemeDetailFit).toEqual({
+    overflowIsContained: true,
+    actionVisible: true,
+    coverageVisible: true,
+  });
   await expect(page).toHaveScreenshot("themes-en-dark-1320x840.png");
 
   await page.setViewportSize({ width: 960, height: 680 });
@@ -241,6 +263,25 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   expect(compactTitlePosition.titleTop).toBeGreaterThanOrEqual(
     compactTitlePosition.panelTop,
   );
+  const compactThemeDetailFit = await compactThemeDetail.evaluate((element) => {
+    const panel = element.getBoundingClientRect();
+    const description = element.querySelector<HTMLElement>("p")!;
+    const action = element.querySelector<HTMLElement>(".button-row")!;
+    const coverage = element.querySelector<HTMLElement>(
+      ".theme-effect-summary",
+    )!;
+    return {
+      descriptionHeight: description.getBoundingClientRect().height,
+      actionVisible: action.getBoundingClientRect().bottom <= panel.bottom + 1,
+      contentIsContained:
+        getComputedStyle(element).overflowY === "hidden" &&
+        coverage.getBoundingClientRect().bottom <= panel.bottom + 1 &&
+        element.scrollWidth <= element.clientWidth + 1,
+    };
+  });
+  expect(compactThemeDetailFit.descriptionHeight).toBeGreaterThanOrEqual(20);
+  expect(compactThemeDetailFit.actionVisible).toBe(true);
+  expect(compactThemeDetailFit.contentIsContained).toBe(true);
   await expect(page).toHaveScreenshot("themes-detail-en-dark-960x680.png");
   await page.getByRole("button", { name: "Back to themes" }).click();
 
@@ -812,7 +853,9 @@ test("keyboard companion creator completes a static-image project", async ({
     name: "Edge review backgrounds",
   });
   for (const backdrop of ["Black", "White", "Theme color"] as const) {
-    await edgeReview.getByRole("button", { name: backdrop, exact: true }).click();
+    await edgeReview
+      .getByRole("button", { name: backdrop, exact: true })
+      .click();
     await page
       .getByRole("button", {
         name: new RegExp(`Confirm edges on ${backdrop.toLowerCase()}`),

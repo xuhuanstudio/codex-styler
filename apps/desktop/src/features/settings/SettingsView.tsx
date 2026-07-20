@@ -81,7 +81,7 @@ export function SettingsView({
     <div className="page settings-page">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">LOCAL PREFERENCES</span>
+          <span className="page-kicker">{t("settingsKicker")}</span>
           <h1>{t("settings")}</h1>
           <p>{t("privacyBody")}</p>
         </div>

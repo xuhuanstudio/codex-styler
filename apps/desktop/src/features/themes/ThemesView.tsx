@@ -186,7 +186,7 @@ export function ThemesView({
     <div className="page page--themes">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">VISUAL SYSTEM LIBRARY</span>
+          <span className="page-kicker">{t("themeLibraryKicker")}</span>
           <h1>{t("themeLibrary")}</h1>
           <p>{t("themeLibraryDetail")}</p>
         </div>
@@ -260,7 +260,7 @@ export function ThemesView({
           <div className="theme-library-master">
             <div className="section-heading section-heading--compact">
               <div>
-                <span>THEME INDEX</span>
+                <span>{t("themeIndexKicker")}</span>
                 <h2>
                   {collection === "builtIn"
                     ? t("builtInThemes")
@@ -338,8 +338,9 @@ export function ThemesView({
             </div>
             <div className="featured-theme__copy">
               <span>
-                THEME {String(Math.max(1, selectedIndex)).padStart(2, "0")} /{" "}
-                {localized.name.toUpperCase()}
+                {t("themeLabel")}{" "}
+                {String(Math.max(1, selectedIndex)).padStart(2, "0")} ·{" "}
+                {collection === "builtIn" ? t("builtInThemes") : t("myThemes")}
               </span>
               <h2>{localized.name}</h2>
               <p>{localized.description}</p>
@@ -366,6 +367,17 @@ export function ThemesView({
                   <small>{t("motionStyle")}</small>
                   <strong>{t(motionLabels[personality.motion])}</strong>
                 </div>
+              </div>
+              <div className="button-row">
+                <button
+                  className="secondary-button"
+                  onClick={() => onEdit(browsedTheme)}
+                >
+                  {collection === "builtIn"
+                    ? t("customizeCopy")
+                    : t("editTheme")}
+                  <ChevronRight size={15} />
+                </button>
               </div>
               <div className="theme-effect-summary">
                 <div className="theme-effect-summary__copy">
@@ -423,17 +435,6 @@ export function ThemesView({
                     </button>
                   ))}
                 </div>
-              </div>
-              <div className="button-row">
-                <button
-                  className="secondary-button"
-                  onClick={() => onEdit(browsedTheme)}
-                >
-                  {collection === "builtIn"
-                    ? t("customizeCopy")
-                    : t("editTheme")}
-                  <ChevronRight size={15} />
-                </button>
               </div>
             </div>
           </section>
