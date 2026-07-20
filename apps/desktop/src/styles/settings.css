@@ -39,7 +39,7 @@
 
 @media (max-width: 1120px) {
   .settings-layout .settings-group--split {
-    grid-template-columns: minmax(170px, 1fr) minmax(160px, 220px);
+    grid-template-columns: minmax(170px, 1fr) minmax(220px, 280px);
   }
 }
 

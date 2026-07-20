@@ -574,13 +574,13 @@
   container-type: inline-size;
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1.12fr) minmax(260px, 0.88fr);
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   grid-template-rows: auto auto;
   align-items: center;
-  gap: 8px 18px;
+  gap: 6px 16px;
   overflow-x: hidden;
   overflow-y: hidden;
-  padding: 11px 16px 9px;
+  padding: 8px 14px 7px;
 }
 
 .theme-detail-card__identity {
@@ -610,7 +610,7 @@
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font-size: 22px;
+  font-size: 21px;
   line-height: 1.1;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -625,11 +625,11 @@
 .theme-library-workspace .theme-detail-card__identity > p {
   display: block;
   min-width: 0;
-  height: 20px;
+  height: 18px;
   margin: 0;
   overflow: hidden;
   color: var(--text-secondary);
-  line-height: 20px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -639,20 +639,20 @@
 }
 
 .theme-library-workspace .theme-facts {
-  min-width: 240px;
+  min-width: 0;
   align-self: stretch;
   grid-row: 1;
   grid-column: 2;
   margin: 0;
-  padding: 0 0 0 18px;
+  padding: 0 0 0 14px;
   border-top: 0;
   border-bottom: 0;
   border-left: 1px solid var(--border-subtle);
 }
 
 .theme-library-workspace .theme-personality {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 11px 14px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px 10px;
 }
 
 .theme-library-workspace .theme-personality > div {
@@ -661,8 +661,12 @@
 }
 
 .theme-library-workspace .theme-personality strong {
+  display: -webkit-box;
+  overflow: hidden;
   line-height: 1.25;
   overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .theme-library-workspace .configuration-state,
@@ -672,23 +676,29 @@
 
 .theme-library-workspace .theme-effect-summary {
   display: grid;
-  min-height: 32px;
-  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 26px;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   margin-top: 0;
-  padding: 4px 6px;
+  padding: 3px 5px;
 }
 
-.theme-library-workspace .theme-effect-summary__copy small {
+.theme-library-workspace .theme-effect-summary__copy {
   display: none;
 }
 
 .theme-library-workspace .theme-effect-summary__list {
+  flex-wrap: nowrap;
   justify-content: flex-start;
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+.theme-library-workspace .theme-effect-summary__list > button {
+  min-height: 21px;
+  padding: 2px 6px;
 }
 
 .theme-effect-summary {
@@ -885,6 +895,8 @@
 }
 
 .companions-layout .companion-preview-panel {
+  container-name: companion-detail;
+  container-type: inline-size;
   display: flex;
   min-height: 0;
   flex-direction: column;
@@ -899,8 +911,8 @@
 .companions-layout .companion-preview-panel .workspace-preview {
   min-height: 0;
   flex: 1;
-  border: 0;
-  border-radius: 0;
+  border: 1px solid var(--preview-border-strong);
+  border-radius: calc(var(--radius-lg) - 4px);
 }
 
 .companion-preview-stage {
@@ -908,6 +920,7 @@
   display: flex;
   min-height: 0;
   flex: 1;
+  margin: 9px;
 }
 
 .companion-preview-stage .drag-hint {
@@ -916,13 +929,13 @@
 }
 
 .companion-detail-summary {
-  display: flex;
-  min-height: 148px;
+  display: grid;
+  min-height: 104px;
   flex: 0 0 auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px 20px;
+  grid-template-columns: minmax(170px, 0.72fr) minmax(360px, 1.28fr);
+  gap: 16px;
+  padding: 11px 16px 12px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -956,8 +969,12 @@
 .companion-placement-controls {
   display: grid;
   width: 100%;
-  gap: 7px;
-  padding-top: 8px;
+  grid-template-areas:
+    "heading heading"
+    "modes size";
+  grid-template-columns: minmax(150px, 1.1fr) minmax(138px, 0.9fr);
+  gap: 6px 8px;
+  padding-top: 6px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -967,6 +984,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+}
+
+.companion-placement-controls__heading {
+  grid-area: heading;
 }
 
 .companion-placement-controls__heading strong {
@@ -988,6 +1009,7 @@
 }
 
 .companion-placement-modes {
+  grid-area: modes;
   display: grid;
   width: 100%;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1046,9 +1068,10 @@
 }
 
 .companion-placement-controls__row {
+  grid-area: size;
   display: grid;
-  grid-template-columns: minmax(90px, 1fr) auto auto;
-  gap: 9px;
+  grid-template-columns: minmax(54px, 1fr) auto auto;
+  gap: 7px;
 }
 
 .companion-placement-controls__row output {
@@ -1069,30 +1092,44 @@
 .companion-detail-summary__badges {
   display: flex;
   flex: none;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  gap: 5px;
 }
 
 .companion-detail-summary__badges span {
-  min-height: 24px;
-  padding: 5px 8px;
+  min-height: 22px;
+  padding: 4px 7px;
   border: 1px solid var(--border-subtle);
   border-radius: 999px;
   background: var(--surface-subtle);
 }
 
 .companion-detail-summary__side {
-  display: flex;
-  min-width: min(100%, 310px);
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  display: grid;
+  min-width: 0;
+  width: 100%;
+  grid-template-areas:
+    "badges"
+    "placement"
+    "actions";
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 7px 9px;
+}
+
+.companion-detail-summary__side .companion-placement-controls {
+  grid-area: placement;
+}
+
+.companion-detail-summary__side .companion-detail-summary__badges {
+  grid-area: badges;
 }
 
 .companion-detail-summary__actions {
   display: flex;
+  grid-area: actions;
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 6px;
@@ -1103,6 +1140,28 @@
   padding-inline: 10px;
   font-size: var(--type-caption);
   white-space: nowrap;
+}
+
+@container companion-detail (max-width: 620px) {
+  .companion-detail-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
+  }
+
+  .companion-detail-summary > div:first-child {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .companion-detail-summary > div:first-child > strong {
+    margin-top: 0;
+  }
+
+  .companion-detail-summary > div:first-child > p {
+    display: none;
+  }
 }
 
 @media (max-width: 1100px) {
@@ -1336,7 +1395,7 @@
   }
 
   .companion-detail-summary {
-    min-height: 128px;
-    padding-block: 13px;
+    min-height: 96px;
+    padding-block: 9px 10px;
   }
 }

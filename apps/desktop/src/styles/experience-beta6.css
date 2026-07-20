@@ -688,19 +688,19 @@
   }
 
   .theme-library-workspace--detail {
-    min-height: 364px;
-    flex-basis: 364px;
+    min-height: 386px;
+    flex-basis: 386px;
   }
 
   .theme-library-workspace--detail .featured-theme {
     display: grid;
-    min-height: 360px;
-    grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
-    grid-template-rows: auto minmax(320px, 1fr);
+    min-height: 382px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(218px, 1fr) auto;
   }
 
   .theme-library-workspace--detail .featured-theme__preview {
-    min-height: 320px;
+    min-height: 218px;
     grid-row: 2;
     grid-column: 1;
   }
@@ -711,20 +711,16 @@
   }
 
   .theme-library-workspace--detail .featured-theme__copy {
-    display: flex;
-    max-height: none;
-    flex-direction: column;
-    justify-content: flex-start;
-    grid-row: 2;
-    grid-column: 2;
+    display: grid;
+    max-height: 128px;
+    grid-template-columns: minmax(210px, 0.78fr) minmax(330px, 1.22fr);
+    grid-template-rows: auto auto;
+    grid-row: 3;
+    grid-column: 1;
     overflow-y: hidden;
-    padding: 12px 14px;
-    border-top: 0;
-    border-left: 1px solid var(--border-subtle);
-  }
-
-  .theme-library-workspace--detail .featured-theme__copy > * {
-    flex: none;
+    padding: 8px 14px 7px;
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
   }
 
   .theme-library-workspace--detail .theme-detail-card__identity > p {
@@ -733,20 +729,24 @@
   }
 
   .theme-library-workspace--detail .theme-facts {
-    padding: 12px 0 0;
-    border-top: 1px solid var(--border-subtle);
-    border-left: 0;
+    padding: 0 0 0 14px;
+    border-top: 0;
+    border-left: 1px solid var(--border-subtle);
   }
 
   .theme-library-workspace--detail .theme-detail-card__title-row {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .theme-library-workspace--detail .theme-detail-card__title-row h2 {
+    font-size: 20px;
   }
 
   .theme-library-workspace--detail
     .theme-detail-card__title-row
     .secondary-button {
-    width: 100%;
+    width: auto;
   }
 
   .theme-library-workspace--detail .theme-effect-summary {
@@ -754,6 +754,8 @@
   }
 
   .companions-layout--detail {
+    min-height: 400px;
+    flex-basis: 400px;
     grid-template-areas: "detail";
   }
 
@@ -763,8 +765,8 @@
 
   .companions-layout--detail .companion-preview-panel {
     display: grid;
-    grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(218px, 1fr) auto;
   }
 
   .companions-layout--detail .compact-detail-back {
@@ -785,12 +787,12 @@
     align-self: stretch;
     justify-content: flex-start;
     gap: 12px;
-    grid-row: 2;
-    grid-column: 2;
+    grid-row: 3;
+    grid-column: 1;
     overflow: hidden;
-    padding: 12px 14px;
-    border-top: 0;
-    border-left: 1px solid var(--border-subtle);
+    padding: 9px 14px 10px;
+    border-top: 1px solid var(--border-subtle);
+    border-left: 0;
   }
 
   .companions-layout--detail .companion-detail-summary > div:first-child > p {
@@ -903,6 +905,57 @@
 
   .home-current .workspace-preview {
     min-height: 286px;
+  }
+
+  .page--themes,
+  .companions-page {
+    padding-top: 20px;
+    padding-bottom: 12px;
+  }
+
+  .page--themes > .page-heading,
+  .companions-page > .page-heading {
+    margin-bottom: 12px;
+  }
+
+  .page--themes > .resource-library-toolbar,
+  .companions-page > .companions-toolbar {
+    margin-bottom: 10px;
+  }
+}
+
+@media (max-width: 1060px) and (max-height: 760px) {
+  .theme-library-workspace--detail,
+  .companions-layout--detail {
+    min-height: clamp(330px, calc(100dvh - 330px), 400px);
+    flex-basis: clamp(330px, calc(100dvh - 330px), 400px);
+  }
+
+  .theme-library-workspace--detail .featured-theme {
+    min-height: 326px;
+    grid-template-rows: auto minmax(184px, 1fr) auto;
+  }
+
+  .theme-library-workspace--detail .featured-theme__preview {
+    min-height: 184px;
+  }
+
+  .theme-library-workspace--detail .featured-theme__copy {
+    max-height: 120px;
+  }
+
+  .companions-layout--detail .companion-preview-panel {
+    grid-template-rows: auto minmax(184px, 1fr) auto;
+  }
+
+  .companions-layout--detail .companion-detail-summary {
+    grid-template-columns: minmax(150px, 0.55fr) minmax(0, 1.45fr);
+    gap: 9px;
+    padding-block: 8px 9px;
+  }
+
+  .companions-layout--detail .companion-detail-summary > div:first-child > p {
+    display: none;
   }
 }
 
