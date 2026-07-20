@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { nativeRefined } from "@codex-styler/theme-core";
+import { nativeRefined, type SceneEntity } from "@codex-styler/theme-core";
 import runtimeSource from "../src-tauri/src/runtime.js?raw";
-import { contrastRatio } from "./lib/contrast";
+import { contrastRatio, minimumContrast } from "./lib/contrast";
 import { resolveThemeContrast } from "./lib/theme-contrast";
+import { assignThemeColorHarmony } from "./lib/theme-color-harmony";
+import { resolveThemePreviewPalette } from "./lib/theme-preview-palette";
 import { codexFixture, portalFixture } from "./test/fixtures/codex-dom";
 
 interface InjectedRuntime {
@@ -25,10 +27,74 @@ interface InjectedRuntime {
   restore: () => void;
 }
 
+interface InjectedRuntimeInternals {
+  semanticPalette: (
+    appearance: (typeof nativeRefined)["variants"]["light"]["appearance"],
+    background: (typeof nativeRefined)["variants"]["light"]["background"],
+    contrastSystem: ReturnType<typeof resolveThemeContrast>,
+  ) => ReturnType<typeof resolveThemePreviewPalette>;
+}
+
 function runtime(): InjectedRuntime {
   return (
     window as typeof window & { __CODEX_STYLER_RUNTIME__: InjectedRuntime }
   ).__CODEX_STYLER_RUNTIME__;
+}
+
+function runtimeInternals(): InjectedRuntimeInternals {
+  return (
+    window as typeof window & {
+      __CODEX_STYLER_RUNTIME_INTERNALS__: InjectedRuntimeInternals;
+    }
+  ).__CODEX_STYLER_RUNTIME_INTERNALS__;
+}
+
+const TEST_IMAGE =
+  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA" +
+  "DUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
+
+function testSpriteEntity(overrides: Partial<SceneEntity> = {}): SceneEntity {
+  return {
+    id: "test-companion",
+    name: "Test companion",
+    renderer: {
+      type: "sprite-atlas",
+      asset: TEST_IMAGE,
+      pages: [TEST_IMAGE],
+      columns: 2,
+      rows: 2,
+      framesPerPage: 4,
+      frameWidth: 1,
+      frameHeight: 1,
+      directions: 4,
+      frameCount: 4,
+      poses: [
+        { id: "pose-up", angle: 0, frame: 0 },
+        { id: "pose-right", angle: 90, frame: 1 },
+        { id: "pose-down", angle: 180, frame: 2 },
+        { id: "pose-left", angle: 270, frame: 3 },
+      ],
+      idleClips: [
+        {
+          id: "blink",
+          poseIds: ["pose-up"],
+          frames: [{ frame: 0, durationMs: 80 }],
+          minimumDelayMs: 500,
+          maximumDelayMs: 1000,
+        },
+      ],
+      neutralFrame: 0,
+      reducedMotionFrame: 0,
+      transitionFps: 30,
+      normalization: "preserve",
+      alphaThreshold: 12,
+    },
+    behaviors: ["idle", "look-at-pointer", "reduce-motion-fallback"],
+    anchor: { x: 80, y: 70 },
+    size: 80,
+    opacity: 1,
+    ...overrides,
+  };
 }
 
 describe("injected compatibility runtime", () => {
@@ -37,6 +103,8 @@ describe("injected compatibility runtime", () => {
     document.body.innerHTML = "";
     delete (window as unknown as Record<string, unknown>)
       .__CODEX_STYLER_RUNTIME__;
+    delete (window as unknown as Record<string, unknown>)
+      .__CODEX_STYLER_RUNTIME_INTERNALS__;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       callback(performance.now() + 20);
       return 1;
@@ -47,6 +115,8 @@ describe("injected compatibility runtime", () => {
 
   afterEach(() => {
     runtime().restore();
+    delete (window as unknown as Record<string, unknown>)
+      .__CODEX_STYLER_RUNTIME_INTERNALS__;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -70,12 +140,136 @@ describe("injected compatibility runtime", () => {
       window as typeof window & {
         __CODEX_STYLER_RUNTIME__: { version: number; restore: () => void };
       }
-    ).__CODEX_STYLER_RUNTIME__ = { version: 8, restore };
+    ).__CODEX_STYLER_RUNTIME__ = { version: 20, restore };
 
     Function(runtimeSource)();
 
     expect(restore).toHaveBeenCalledOnce();
-    expect(runtime().version).toBe(18);
+    expect(runtime().version).toBe(36);
+  });
+
+  it.each([
+    [{ surfaceOpacity: 0.96, focusOpacity: 0.98, focusBlur: 0 }, "solid"],
+    [{ surfaceOpacity: 0.88, focusOpacity: 0.94, focusBlur: 10 }, "layered"],
+    [{ surfaceOpacity: 0.78, focusOpacity: 0.9, focusBlur: 20 }, "frosted"],
+  ] as const)(
+    "derives the %s surface recipe as %s material",
+    async (appearance, expectedMaterial) => {
+      const theme = structuredClone(nativeRefined);
+      Object.assign(theme.variants.dark.appearance, appearance);
+
+      await runtime().apply(theme, "dark", "compatibility");
+
+      expect(document.documentElement.dataset.codexStylerMaterial).toBe(
+        expectedMaterial,
+      );
+    },
+  );
+
+  it.each([
+    ["native", "balanced"],
+    ["editorial", "editorial"],
+    ["immersive", "cinematic"],
+  ] as const)(
+    "derives the %s layout as %s typography without extending the theme format",
+    async (layout, expectedTypography) => {
+      const theme = structuredClone(nativeRefined);
+      theme.variants.dark.appearance.layout = layout;
+
+      await runtime().apply(theme, "dark", "compatibility");
+
+      expect(document.documentElement.dataset.codexStylerTypography).toBe(
+        expectedTypography,
+      );
+    },
+  );
+
+  it.each(["light", "dark"] as const)(
+    "keeps the %s preview palette identical to the injected runtime",
+    (variant) => {
+      const theme = structuredClone(nativeRefined);
+      const visual = theme.variants[variant];
+      const contrastSystem = resolveThemeContrast(theme, variant);
+      const previewPalette = resolveThemePreviewPalette(
+        visual.appearance,
+        visual.background.color,
+        contrastSystem,
+      );
+
+      expect(
+        runtimeInternals().semanticPalette(
+          visual.appearance,
+          visual.background,
+          contrastSystem,
+        ),
+      ).toEqual(previewPalette);
+    },
+  );
+
+  it.each(["tonal", "contrast"] as const)(
+    "keeps the %s color harmony identical in preview and runtime",
+    (recipe) => {
+      const theme = structuredClone(nativeRefined);
+      assignThemeColorHarmony(theme, "dark", recipe);
+      const visual = theme.variants.dark;
+      const contrastSystem = resolveThemeContrast(theme, "dark");
+
+      expect(
+        runtimeInternals().semanticPalette(
+          visual.appearance,
+          visual.background,
+          contrastSystem,
+        ),
+      ).toEqual(
+        resolveThemePreviewPalette(
+          visual.appearance,
+          visual.background.color,
+          contrastSystem,
+        ),
+      );
+    },
+  );
+
+  it("derives functional colors from the actual surface tone instead of the variant label", () => {
+    const theme = structuredClone(nativeRefined);
+    const visual = theme.variants.light;
+    visual.background.color = "#090B10";
+    visual.background.overlay = "#090B10";
+    visual.background.overlayOpacity = 1;
+    visual.appearance.surface = "#151820";
+    visual.appearance.text = "#F4F6FA";
+    visual.appearance.mutedText = "#C2C8D2";
+    visual.appearance.palette = {
+      ...visual.appearance.palette,
+      success: "#14311F",
+      warning: "#3A2910",
+    };
+    const contrastSystem = resolveThemeContrast(theme, "light");
+    const previewPalette = resolveThemePreviewPalette(
+      visual.appearance,
+      visual.background.color,
+      contrastSystem,
+    );
+    const injectedPalette = runtimeInternals().semanticPalette(
+      visual.appearance,
+      visual.background,
+      contrastSystem,
+    );
+
+    expect(contrastSystem.tone).toBe("light");
+    expect(injectedPalette).toEqual(previewPalette);
+    expect(
+      minimumContrast(
+        injectedPalette.success,
+        contrastSystem.strongBackgrounds,
+      ),
+    ).toBeGreaterThanOrEqual(4.49);
+    expect(
+      minimumContrast(
+        injectedPalette.warning,
+        contrastSystem.strongBackgrounds,
+      ),
+    ).toBeGreaterThanOrEqual(4.49);
   });
 
   it("renders validated scene layers and updates parallax without blocking Codex", async () => {
@@ -115,6 +309,9 @@ describe("injected compatibility runtime", () => {
       }),
     );
     expect(gradient?.style.transform).toContain("translate(");
+
+    window.dispatchEvent(new Event("blur"));
+    expect(gradient?.style.transform).toBe("");
 
     runtime().restore();
     expect(document.querySelector(".cs-layer")).toBeNull();
@@ -221,6 +418,13 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement.dataset.codexStylerPage).toBe("home");
     expect(document.documentElement.dataset.codexStylerLayout).toBe("native");
     expect(document.documentElement.dataset.codexStylerIcons).toBe("contained");
+    expect(document.documentElement.dataset.codexStylerGeometry).toBe(
+      "balanced",
+    );
+    expect(document.documentElement.dataset.codexStylerTypography).toBe(
+      "balanced",
+    );
+    expect(document.documentElement.dataset.codexStylerMotion).toBe("fluid");
     const stylesheet = document.getElementById("codex-styler-runtime-style");
     expect(stylesheet?.textContent).toContain("main.main-surface article");
     expect(stylesheet?.textContent).toContain(
@@ -262,6 +466,63 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       "main.main-surface > header:not(.app-header-tint)",
     );
+    expect(stylesheet?.textContent).toContain(
+      '[role="tab"][aria-selected="true"]',
+    );
+    expect(stylesheet?.textContent).toContain(":focus-visible");
+    expect(stylesheet?.textContent).toContain("accent-color:");
+    expect(stylesheet?.textContent).toContain('[aria-disabled="true"]');
+    expect(stylesheet?.textContent).toContain('[aria-invalid="true"]');
+    expect(stylesheet?.textContent).toContain('[data-state="active"]');
+    expect(stylesheet?.textContent).toContain(
+      "progress::-webkit-progress-value",
+    );
+    expect(stylesheet?.textContent).toContain("::-webkit-scrollbar-thumb");
+    expect(
+      stylesheet?.textContent?.match(/scrollbar-width: thin/g),
+    ).toHaveLength(1);
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-overlay-root] *::-webkit-scrollbar-thumb",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-decorations="expressive"',
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[contenteditable="true"] {\n          caret-color:',
+    );
+    expect(stylesheet?.textContent).toContain(':is(a, [role="link"]):hover');
+    expect(stylesheet?.textContent).toContain("::target-text");
+    expect(stylesheet?.textContent).toContain("[data-sonner-toast]");
+    expect(stylesheet?.textContent).toContain('[role="tooltip"]');
+    expect(stylesheet?.textContent).toContain(":not(pre) > code");
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] table",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] details",
+    );
+    expect(stylesheet?.textContent).toContain(
+      '[data-message-author-role="user"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "var(--codex-styler-control-active)",
+    );
+    expect(stylesheet?.textContent).toContain("details[open] > summary");
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] ins",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "body > [data-codex-styler-app-root] del",
+    );
+    expect(stylesheet?.textContent).toContain(":is(samp, output)");
+    expect(stylesheet?.textContent).toContain('[role="progressbar"]');
+    expect(stylesheet?.textContent).toContain('[role="treeitem"]');
+    expect(stylesheet?.textContent).toContain('[role="gridcell"]');
+    expect(stylesheet?.textContent).toContain("fieldset");
+    expect(stylesheet?.textContent).toContain("figcaption");
     const appHeaderRule = stylesheet?.textContent
       ?.split("header.app-header-tint {")[1]
       ?.split("}")[0];
@@ -274,16 +535,92 @@ describe("injected compatibility runtime", () => {
       'data-codex-styler-layout="immersive"] main.main-surface',
     );
     expect(stylesheet?.textContent).toContain(
-      'data-codex-styler-icons="contained"] aside.app-shell-left-panel button > svg:first-child',
+      'data-codex-styler-icons="contained"] body > [data-codex-styler-app-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-icons="themed"] body > [data-codex-styler-overlay-root] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"])',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "color: var(--codex-styler-icon) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "color: var(--codex-styler-icon-emphasis) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      ':not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand])',
     );
     expect(stylesheet?.textContent).toContain(
       'data-codex-styler-decorations="subtle"] main.main-surface',
     );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-page="settings"] body > [data-codex-styler-app-root] .main-surface',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-decorations="expressive"] :is(\n          .composer-surface-chrome',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-geometry="precise"] body > [data-codex-styler-app-root] [role="tablist"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-geometry="soft"] body > [data-codex-styler-app-root] [role="tab"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-material="solid"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-material="frosted"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-raised) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-overlay) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "background: var(--codex-styler-material-sunken) !important",
+    );
+    expect(stylesheet?.textContent).toContain(
+      'data-codex-styler-typography="editorial"]',
+    );
+    expect(stylesheet?.textContent).toContain(
+      "line-height: var(--codex-styler-content-leading) !important",
+    );
+    const typographyTreatments = stylesheet?.textContent
+      ?.split("/* Theme typography is content-scoped")[1]
+      ?.split(
+        'html[data-codex-styler][data-codex-styler-mode="semantic"] body > [data-codex-styler-app-root] :is(fieldset',
+      )[0];
+    expect(typographyTreatments).toBeDefined();
+    expect(typographyTreatments).toContain("[data-message-author-role]");
+    expect(typographyTreatments).toContain(".ProseMirror");
+    expect(typographyTreatments).toContain("html:lang(zh)");
+    expect(typographyTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:font-family|font-size|width|height|padding|margin)\s*:/,
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-duration: 190ms",
+    );
     const iconTreatments = stylesheet?.textContent
-      ?.split("/* Icon treatments preserve")[1]
+      ?.split("/*\n         * Icon treatments are semantic")[1]
       ?.split("/* Full home composition")[0];
+    expect(iconTreatments).toBeDefined();
     expect(iconTreatments).not.toMatch(
-      /(?:^|\n)\s*(?:width|height|padding|background)\s*:/,
+      /(?:^|\n)\s*(?:width|height|padding|background|stroke-width)\s*:/,
+    );
+    expect(iconTreatments).toContain("box-shadow: 0 0 0 3px");
+    const decorationTreatments = stylesheet?.textContent
+      ?.split("/* Decoration depth is intentionally geometry-safe")[1]
+      ?.split(
+        'html[data-codex-styler][data-codex-styler-mode="semantic"] ::selection',
+      )[0];
+    expect(decorationTreatments).toBeDefined();
+    expect(decorationTreatments).toContain(
+      '[data-pip-obstacle="thread-summary-panel"]',
+    );
+    expect(decorationTreatments).toContain('[role="alertdialog"]');
+    expect(decorationTreatments).toContain('[role="tabpanel"]');
+    expect(decorationTreatments).not.toMatch(
+      /(?:^|\n)\s*(?:position|display|width|height|z-index|inset)\s*:/,
     );
     expect(stylesheet?.textContent).not.toContain("body > div:first-child");
     expect(stylesheet?.textContent).toContain(
@@ -426,6 +763,12 @@ describe("injected compatibility runtime", () => {
       controlHover: "#303741",
       success: "#52C982",
     };
+    const contrastSystem = resolveThemeContrast(theme, "dark");
+    const previewPalette = resolveThemePreviewPalette(
+      theme.variants.dark.appearance,
+      theme.variants.dark.background.color,
+      contrastSystem,
+    );
 
     await runtime().apply(theme, "dark", "developer");
 
@@ -438,7 +781,15 @@ describe("injected compatibility runtime", () => {
       "--codex-styler-control-hover: #303741",
     );
     expect(stylesheet?.textContent).toContain(
-      "--codex-styler-success: #52C982",
+      `--codex-styler-success: ${previewPalette.success}`,
+    );
+    expect(stylesheet?.textContent).toContain("--codex-styler-icon:");
+    expect(stylesheet?.textContent).toContain("--codex-styler-icon-emphasis:");
+    expect(stylesheet?.textContent).toContain(
+      "--color-icon-primary: var(--codex-styler-icon-emphasis)",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--color-background-status-success: color-mix(in srgb, var(--codex-styler-success) 16%, var(--codex-styler-surface))",
     );
   });
 
@@ -448,6 +799,7 @@ describe("injected compatibility runtime", () => {
     const image = "data:image/png;base64,iVBORw0KGgo=";
     delete theme.variants.light.background.image;
     theme.variants.light.appearance.surfaceOpacity = 0.3;
+    theme.variants.light.appearance.focusOpacity = 0.97;
     theme.variants.light.appearance.palette = {
       surfaceRaised: theme.variants.light.appearance.text,
       control: theme.variants.light.appearance.text,
@@ -484,6 +836,14 @@ describe("injected compatibility runtime", () => {
     expect(stylesheet?.textContent).toContain(
       `${Math.round(contrastSystem.quietSurfaceOpacity * 100)}%, transparent) !important`,
     );
+    expect(stylesheet?.textContent).toContain(
+      `${Math.round(contrastSystem.strongSurfaceOpacity * 100)}%, transparent) !important`,
+    );
+    expect(contrastSystem.strongSurfaceOpacity).toBeGreaterThanOrEqual(0.97);
+    expect(stylesheet?.textContent).toContain("scrollbar-width: thin");
+    expect(stylesheet?.textContent).toContain(
+      "::-webkit-scrollbar-thumb:hover",
+    );
     expect(stylesheet?.textContent).toContain("color-scheme: light !important");
     expect(stylesheet?.textContent).toContain(
       '[class~="text-token-text-primary"]',
@@ -510,6 +870,66 @@ describe("injected compatibility runtime", () => {
     expect(document.documentElement).not.toHaveAttribute(
       "data-codex-styler-contrast",
     );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-geometry",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-material",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-typography",
+    );
+    expect(document.documentElement).not.toHaveAttribute(
+      "data-codex-styler-motion",
+    );
+  });
+
+  it("maps theme intensity to geometry-safe runtime motion profiles", async () => {
+    document.body.innerHTML = codexFixture("task");
+    const theme = structuredClone(nativeRefined);
+    theme.variants.dark.motion.intensity = 0.9;
+
+    await runtime().apply(theme, "dark", "developer");
+
+    const stylesheet = document.getElementById("codex-styler-runtime-style");
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-motion",
+      "expressive",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-duration: 240ms",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "--codex-styler-motion-lift: 3px",
+    );
+    expect(stylesheet?.textContent).toContain(
+      "@keyframes codex-styler-surface-enter",
+    );
+    const overlayMotion = stylesheet?.textContent
+      ?.split("@keyframes codex-styler-surface-enter")[1]
+      ?.split('[role="tooltip"]')[0];
+    expect(overlayMotion).toBeDefined();
+    expect(overlayMotion).toContain(
+      "opacity: var(--codex-styler-motion-overlay-opacity)",
+    );
+    expect(overlayMotion).not.toContain("transform:");
+    expect(stylesheet?.textContent).toContain(
+      '[data-codex-styler-motion="fluid"]',
+    );
+    expect(stylesheet?.textContent).toContain("animation: none !important");
+
+    theme.variants.dark.motion.intensity = 0;
+    await runtime().apply(theme, "dark", "developer");
+    expect(document.documentElement).toHaveAttribute(
+      "data-codex-styler-motion",
+      "still",
+    );
+    expect(
+      document.getElementById("codex-styler-runtime-style")?.textContent,
+    ).toContain("--codex-styler-motion-duration: 0ms");
+    expect(
+      document.getElementById("codex-styler-runtime-style")?.textContent,
+    ).toContain("transform: translateX(0px)");
   });
 
   it("repairs a stale Codex foreground without dropping the semantic theme", async () => {
@@ -652,54 +1072,8 @@ describe("injected compatibility runtime", () => {
       clearRect: vi.fn(),
       drawImage: vi.fn(),
     } as unknown as CanvasRenderingContext2D);
-    const image =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA" +
-      "DUlEQVR42mNk+M/wHwAF/gL+X2NDWQAAAABJRU5ErkJggg==";
     const theme = structuredClone(nativeRefined);
-    const entity = {
-      id: "test-companion",
-      name: "Test companion",
-      renderer: {
-        type: "sprite-atlas" as const,
-        asset: image,
-        pages: [image],
-        columns: 2,
-        rows: 2,
-        framesPerPage: 4,
-        frameWidth: 1,
-        frameHeight: 1,
-        directions: 4,
-        frameCount: 4,
-        poses: [
-          { id: "pose-up", angle: 0, frame: 0 },
-          { id: "pose-right", angle: 90, frame: 1 },
-          { id: "pose-down", angle: 180, frame: 2 },
-          { id: "pose-left", angle: 270, frame: 3 },
-        ],
-        idleClips: [
-          {
-            id: "blink",
-            poseIds: ["pose-up"],
-            frames: [{ frame: 0, durationMs: 80 }],
-            minimumDelayMs: 500,
-            maximumDelayMs: 1000,
-          },
-        ],
-        neutralFrame: 0,
-        reducedMotionFrame: 0,
-        transitionFps: 30,
-        normalization: "preserve" as const,
-        alphaThreshold: 12,
-      },
-      behaviors: [
-        "idle" as const,
-        "look-at-pointer" as const,
-        "reduce-motion-fallback" as const,
-      ],
-      anchor: { x: 80, y: 70 },
-      size: 80,
-      opacity: 1,
-    };
+    const entity = testSpriteEntity();
     theme.scene.entities = [entity];
 
     const outcome = await runtime().apply(theme, "dark", "compatibility", 5);
@@ -714,5 +1088,89 @@ describe("injected compatibility runtime", () => {
     expect(
       document.getElementById("codex-styler-entity-root")?.childElementCount,
     ).toBe(0);
+  });
+
+  it("keeps free and attached companions inside a size-aware safe area", async () => {
+    vi.stubGlobal("matchMedia", () => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    vi.spyOn(window, "innerWidth", "get").mockReturnValue(360);
+    vi.spyOn(window, "innerHeight", "get").mockReturnValue(280);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      clearRect: vi.fn(),
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+
+    const theme = structuredClone(nativeRefined);
+    const entity = testSpriteEntity({
+      anchor: { x: 99, y: 99 },
+      size: 140,
+    });
+    theme.scene.entities = [entity];
+    await runtime().apply(theme, "dark", "compatibility", 5);
+
+    const canvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(canvas).toHaveStyle({ left: "282px", top: "202px" });
+
+    const composer = document.createElement("div");
+    composer.className = "composer-surface-chrome";
+    let targetX = 260;
+    vi.spyOn(composer, "getBoundingClientRect").mockImplementation(
+      () =>
+        ({
+          x: targetX,
+          y: 210,
+          left: targetX,
+          top: 210,
+          right: targetX + 80,
+          bottom: 258,
+          width: 80,
+          height: 48,
+          toJSON: () => ({}),
+        }) as DOMRect,
+    );
+    document.body.appendChild(composer);
+    runtime().updateEntity(
+      {
+        ...entity,
+        attachment: {
+          target: "composer",
+          edge: "top",
+          align: 1,
+          offset: { x: 12, y: 3 },
+        },
+      },
+      6,
+    );
+    const attachedCanvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(attachedCanvas).toHaveStyle({ left: "282px", top: "213px" });
+
+    targetX = 20;
+    document.dispatchEvent(new Event("scroll"));
+    expect(attachedCanvas).toHaveStyle({ left: "112px", top: "213px" });
+
+    composer.remove();
+    runtime().updateEntity(
+      {
+        ...entity,
+        attachment: {
+          target: "composer",
+          edge: "top",
+          align: 1,
+          offset: { x: 12, y: 3 },
+        },
+      },
+      7,
+    );
+    const fallbackCanvas = document.querySelector<HTMLCanvasElement>(
+      "#codex-styler-entity-root canvas",
+    );
+    expect(fallbackCanvas).toHaveStyle({ left: "282px", top: "202px" });
   });
 });

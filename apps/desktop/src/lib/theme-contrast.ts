@@ -18,6 +18,7 @@ export interface ThemeContrastSystem {
   textPrimary: string;
   textSecondary: string;
   textTertiary: string;
+  /** Foreground tone selected for the composite UI surfaces. */
   tone: "light" | "dark";
 }
 
@@ -114,6 +115,7 @@ export function resolveThemeContrast(
     0.98,
     Math.max(
       authoredSurfaceOpacity,
+      appearance.focusOpacity,
       quietSurfaceOpacity + (imageBacked ? 0.12 : 0.08),
     ),
   );

@@ -131,7 +131,7 @@
   font-size: var(--type-caption);
 }
 
-.companion-detail-summary strong {
+.companion-detail-summary > div:first-child > strong {
   font-size: var(--type-section);
 }
 
@@ -220,6 +220,31 @@
 .creator-source-summary dd,
 .creator-dropzone__content strong {
   font-size: var(--type-body);
+}
+
+@media (min-width: 1180px) {
+  .app-brand strong {
+    font-size: 17px;
+    letter-spacing: -0.25px;
+  }
+
+  .theme-library-workspace .featured-theme__copy h2 {
+    font-size: 26px;
+    line-height: 1.08;
+  }
+
+  .companion-detail-summary > div:first-child > strong {
+    font-size: 20px;
+  }
+
+  .editor-header h1,
+  .creator-header h1 {
+    font-size: 23px;
+  }
+
+  .home-actions small {
+    font-size: 12.5px;
+  }
 }
 
 .creator-segmented button,

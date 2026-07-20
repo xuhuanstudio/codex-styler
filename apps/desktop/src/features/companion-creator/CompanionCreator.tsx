@@ -48,11 +48,15 @@ import {
   commonSubjectCrop,
   calibrateDirections,
   diagnoseSharedAlignment,
+  expandSharedCanvasToContent,
+  fitSharedContentScale,
   nearestDirectionFrame,
   normalizeAngle,
+  pointerAngle,
   suggestSharedAlignment,
   type DirectionCalibration,
 } from "./calibration";
+import { BehaviorAudition } from "./BehaviorAudition";
 import { compileCompanion } from "./compiler";
 import { DirectionDial } from "./DirectionDial";
 import {
@@ -69,6 +73,9 @@ import {
 import {
   companionProjectIsPristine,
   createCompanionProject,
+  DEFAULT_CONTENT_SCALE,
+  MAX_CONTENT_SCALE,
+  MIN_CONTENT_SCALE,
   normalizeCompanionProject,
   resetCompanionProjectDerivedState,
   suggestedCompanionName,
@@ -88,6 +95,7 @@ import {
   diagnoseMotionRange,
   motionPreviewFrames,
   motionRangeSignature,
+  resolveMotionAudition,
   type MotionPlayback,
 } from "./motions";
 import {
@@ -104,7 +112,16 @@ import {
 } from "./restore-flow";
 import { AtlasGridPreview, SourceMediaPreview } from "./SourcePreview";
 import { CalibrationHealth, CalibrationSummary } from "./CalibrationStatus";
+import { AlignmentAssistant } from "./AlignmentAssistant";
+import { EdgeQualityReview } from "./EdgeQualityReview";
+import { useEdgeAnalysis } from "./use-edge-analysis";
 import { ImportStep } from "./ImportStep";
+import {
+  markEdgeBackdropReviewed,
+  pendingEdgeReview,
+  resetEdgeReview,
+  summarizeEdgeReview,
+} from "./quality-review";
 import {
   CleanupBrushStage,
   DirectionTimeline,
@@ -140,6 +157,7 @@ type DraftRestoreState =
 
 const copy = {
   en: {
+    kicker: "Local · data-only · reversible",
     title: "Companion Studio",
     subtitle: "Turn local media into a calibrated, portable companion.",
     steps: {
@@ -220,7 +238,7 @@ const copy = {
       "Mark blinks, breathing and small gestures as idle ranges. They remain attached to poses instead of becoming duplicate directions.",
     addMotion: "Add current idle range",
     testHelp:
-      "Move the pointer in the stage to test direction selection. The final package contains compiled atlases, not your source video.",
+      "Test direction selection and saved idle motions together. Pointer movement interrupts an idle motion just like the final runtime.",
     save: "Build and install companion",
     building: "Building companion…",
     description: "Description",
@@ -240,6 +258,7 @@ const copy = {
     clips: "clips",
     excludedFrames: "excluded",
     packageLimitsReady: "Compiled assets fit package limits",
+    edgeReviewReady: "Edges reviewed on black, white and theme surfaces",
     packageLimits:
       "Limits: 512 frames · 8192 px per side · 8 atlas pages · 48 MiB decoded per page · 20 MiB encoded per asset",
     outputIssue: {
@@ -267,6 +286,9 @@ const copy = {
     reviewFrames: "Restore an included frame",
     reviewDirections: "Complete direction calibration",
     reviewOutput: "Fix compiled output",
+    reviewEdges: "Inspect final edges",
+    reviewEdgesDetail:
+      "Check the final pixels on black, white and theme surfaces before building.",
     reviewIssue: "Open the step that needs attention",
     dragCompanion: "Drag companion position",
     previewHeight: "Composer height (preview)",
@@ -313,6 +335,7 @@ const copy = {
     saved: "Companion installed in My Companions.",
   },
   "zh-CN": {
+    kicker: "仅本机 · 数据隔离 · 可逆恢复",
     title: "伙伴工作室",
     subtitle: "把本地素材制作成已校准、可移植的互动伙伴。",
     steps: {
@@ -393,7 +416,7 @@ const copy = {
       "将眨眼、呼吸和小动作标记为空闲区间，它们会关联姿态，而不会伪装成重复方向。",
     addMotion: "添加当前小动作区间",
     testHelp:
-      "在舞台内移动光标测试方向选择。最终包只包含编译后的图集，不包含源视频。",
+      "在同一舞台联调方向选择与已保存的小动作；移动光标会像实际运行时一样立即中断动作。",
     save: "构建并安装伙伴",
     building: "正在构建伙伴…",
     description: "伙伴描述",
@@ -413,6 +436,7 @@ const copy = {
     clips: "个片段",
     excludedFrames: "帧已排除",
     packageLimitsReady: "编译资源符合伙伴包限制",
+    edgeReviewReady: "已在黑、白和主题色表面检查边缘",
     packageLimits:
       "限制：512 帧 · 单边 8192 px · 8 页图集 · 每页解码 48 MiB · 单个编码资源 20 MiB",
     outputIssue: {
@@ -439,6 +463,8 @@ const copy = {
     reviewFrames: "恢复至少一个有效帧",
     reviewDirections: "完成方向校准",
     reviewOutput: "修复编译输出",
+    reviewEdges: "检查最终边缘",
+    reviewEdgesDetail: "构建前请在黑色、白色和主题色表面检查最终像素。",
     reviewIssue: "打开需要处理的步骤",
     dragCompanion: "拖动伙伴位置",
     previewHeight: "输入框高度（仅预览）",
@@ -772,6 +798,13 @@ export function CompanionCreator({
   const [calibrationStart, setCalibrationStart] = useState(0);
   const [calibrationEnd, setCalibrationEnd] = useState(0);
   const [pointer, setPointer] = useState({ x: 50, y: 18 });
+  const [testMotionSelectionId, setTestMotionSelectionId] = useState<
+    string | null
+  >(null);
+  const [testMotionPlayback, setTestMotionPlayback] = useState<{
+    motionId: string;
+    frameIndex: number;
+  } | null>(null);
   const [testComposerHeight, setTestComposerHeight] = useState(70);
   const [brushMode, setBrushMode] = useState<"keep" | "erase">("erase");
   const [brushScope, setBrushScope] = useState<"current" | "all">("current");
@@ -1174,8 +1207,14 @@ export function CompanionCreator({
         project.frames,
         project.sharedCrop,
         project.groundLine,
+        project.contentScale,
       ),
-    [project.frames, project.groundLine, project.sharedCrop],
+    [
+      project.contentScale,
+      project.frames,
+      project.groundLine,
+      project.sharedCrop,
+    ],
   );
   const activeAlignmentDiagnostic = alignmentDiagnostics.frames.find(
     (diagnostic) => diagnostic.frameIndex === currentFrame,
@@ -1211,6 +1250,32 @@ export function CompanionCreator({
   const alignmentCanvas = useMemo(
     () => sharedCanvasDimensions(frames),
     [frames],
+  );
+  const fittedContentScale = useMemo(
+    () =>
+      fitSharedContentScale(
+        project.frames,
+        project.sharedCrop,
+        project.groundLine,
+      ),
+    [project.frames, project.groundLine, project.sharedCrop],
+  );
+  const expandedAlignmentCanvas = useMemo(
+    () =>
+      expandSharedCanvasToContent(
+        project.frames,
+        project.sharedCrop,
+        project.groundLine,
+        project.contentScale,
+        alignmentCanvas,
+      ),
+    [
+      alignmentCanvas,
+      project.contentScale,
+      project.frames,
+      project.groundLine,
+      project.sharedCrop,
+    ],
   );
 
   useEffect(() => {
@@ -1248,6 +1313,13 @@ export function CompanionCreator({
     () => summarizeCompanionOutput(project, calibration),
     [calibration, project],
   );
+  const edgeReview = useMemo(
+    () =>
+      project.step === "test"
+        ? summarizeEdgeReview(project)
+        : pendingEdgeReview(),
+    [project],
+  );
   const currentDirectionAnchor = project.directionAnchors.find(
     (anchor) => anchor.frameIndex === currentFrame,
   );
@@ -1261,16 +1333,58 @@ export function CompanionCreator({
       setAngle(currentDirectionAnchor.angle);
     }
   }, [currentDirectionAnchor?.angle, currentDirectionAnchor?.id, project.step]);
+  const pointerDirection = useMemo(
+    () => pointerAngle(pointer.x, pointer.y, 50, 50),
+    [pointer.x, pointer.y],
+  );
   const previewFrameIndex = useMemo(() => {
-    const pointerAngle = normalizeAngle(
-      (Math.atan2(pointer.x - 50, 50 - pointer.y) * 180) / Math.PI,
-    );
     return nearestDirectionFrame(
       calibration.frameAngles,
-      pointerAngle,
+      pointerDirection,
       project.neutralFrame,
     );
-  }, [calibration.frameAngles, pointer, project.neutralFrame]);
+  }, [calibration.frameAngles, pointerDirection, project.neutralFrame]);
+  const testMotionPlan = useMemo(
+    () => resolveMotionAudition(project, pointerDirection),
+    [pointerDirection, project],
+  );
+  const selectedTestMotion =
+    testMotionPlan.motions.find(
+      (motion) => motion.id === testMotionSelectionId,
+    ) ??
+    testMotionPlan.motions[0] ??
+    null;
+  const playingTestMotion = testMotionPlayback
+    ? (testMotionPlan.motions.find(
+        (motion) => motion.id === testMotionPlayback.motionId,
+      ) ?? null)
+    : null;
+  const displayedTestFrameIndex = playingTestMotion
+    ? testMotionPlayback!.frameIndex
+    : previewFrameIndex;
+  useEffect(() => {
+    if (project.step !== "test" || !testMotionPlayback) return;
+    if (!playingTestMotion) {
+      setTestMotionPlayback(null);
+      return;
+    }
+    const currentPosition = Math.max(
+      0,
+      playingTestMotion.frames.indexOf(testMotionPlayback.frameIndex),
+    );
+    const timeout = window.setTimeout(() => {
+      const nextPosition = currentPosition + 1;
+      if (nextPosition >= playingTestMotion.frames.length) {
+        setTestMotionPlayback(null);
+        return;
+      }
+      setTestMotionPlayback({
+        motionId: playingTestMotion.id,
+        frameIndex: playingTestMotion.frames[nextPosition]!,
+      });
+    }, playingTestMotion.frameDurationMs);
+    return () => window.clearTimeout(timeout);
+  }, [playingTestMotion, project.step, testMotionPlayback]);
   const motionDiagnostics = useMemo(
     () => diagnoseMotionRange(project, motionStart, motionEnd),
     [motionEnd, motionStart, project],
@@ -1298,6 +1412,11 @@ export function CompanionCreator({
   );
   const cleanupDirty =
     frames.length > 0 && cleanupAppliedSignature !== cleanupSignature;
+  const edgeAnalysis = useEdgeAnalysis(
+    project,
+    frames,
+    project.step === "test" && !cleanupDirty,
+  );
 
   const clearDerivedMedia = () => {
     setSourceFiles([]);
@@ -1613,6 +1732,7 @@ export function CompanionCreator({
         // Direction cannot be inferred safely from frame order. Users assign
         // visual keyframes explicitly in the calibration workspace.
         next.directionAnchors = [];
+        resetEdgeReview(next);
         next.neutralFrame = 0;
         next.reducedMotionFrame = 0;
         next.step = "cleanup";
@@ -1654,6 +1774,7 @@ export function CompanionCreator({
         next.frames.forEach((frame, index) => {
           frame.subjectBounds = bounds[index] ?? undefined;
         });
+        resetEdgeReview(next);
         if (!applySuggestedSharedAlignment(next, cleaned)) {
           next.sharedCrop =
             commonSubjectCrop(next.frames, 8) ?? next.sharedCrop;
@@ -1941,14 +2062,17 @@ export function CompanionCreator({
   const readinessCount =
     Number(metadataValid) +
     Number(includedFrameCount > 0) +
+    Number(alignmentDiagnostics.ready) +
     Number(directionSetupValid) +
     Number(outputSummary.withinLimits) +
-    1;
+    Number(edgeReview.complete);
   const buildReady =
     metadataValid &&
     includedFrameCount > 0 &&
+    alignmentDiagnostics.ready &&
     directionSetupValid &&
-    outputSummary.withinLimits;
+    outputSummary.withinLimits &&
+    edgeReview.complete;
   const stepHasChanges =
     projectStateSignature(project) !==
     projectStateSignature(stepBaseline.current);
@@ -2073,6 +2197,10 @@ export function CompanionCreator({
       void navigateToStep("cleanup");
       return;
     }
+    if (!alignmentDiagnostics.ready) {
+      void navigateToStep("align");
+      return;
+    }
     if (!directionSetupValid) {
       void navigateToStep("calibrate");
       return;
@@ -2081,6 +2209,20 @@ export function CompanionCreator({
       const target: CreatorStep =
         outputSummary.issue === "frame-limit" ? "extract" : "align";
       void navigateToStep(target);
+      return;
+    }
+    if (!edgeReview.complete) {
+      if (edgeReview.next) {
+        updateProject((next) => {
+          next.preview.background = edgeReview.next!;
+          return next;
+        });
+      }
+      window.requestAnimationFrame(() => {
+        const review = document.getElementById("companion-edge-quality-review");
+        review?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+        review?.focus({ preventScroll: true });
+      });
     }
   };
 
@@ -2088,14 +2230,33 @@ export function CompanionCreator({
     ? { title: c.reviewMetadata, detail: c.fixMetadata }
     : includedFrameCount === 0
       ? { title: c.reviewFrames, detail: c.outputIssue["missing-frames"] }
-      : !directionSetupValid
-        ? { title: c.reviewDirections, detail: c.reviewIssue }
-        : !outputSummary.withinLimits && outputSummary.issue
-          ? {
-              title: c.reviewOutput,
-              detail: c.outputIssue[outputSummary.issue],
-            }
-          : null;
+      : !alignmentDiagnostics.ready
+        ? {
+            title: locale === "zh-CN" ? "检查画布" : "Review canvas",
+            detail:
+              locale === "zh-CN"
+                ? "确保所有有效帧都位于共享画布内并对齐地面线。"
+                : "Keep every included frame inside the shared canvas and on the ground line.",
+          }
+        : !directionSetupValid
+          ? { title: c.reviewDirections, detail: c.reviewIssue }
+          : !outputSummary.withinLimits && outputSummary.issue
+            ? {
+                title: c.reviewOutput,
+                detail: c.outputIssue[outputSummary.issue],
+              }
+            : !edgeReview.complete
+              ? { title: c.reviewEdges, detail: c.reviewEdgesDetail }
+              : null;
+
+  const confirmEdgeReviewBackdrop = (backdrop: "black" | "white" | "theme") => {
+    updateProject((next) => {
+      markEdgeBackdropReviewed(next, backdrop);
+      const updatedReview = summarizeEdgeReview(next);
+      next.preview.background = updatedReview.next ?? backdrop;
+      return next;
+    });
+  };
 
   const resetCurrentStep = () => {
     const baseline = structuredClone(stepBaseline.current);
@@ -2221,7 +2382,7 @@ export function CompanionCreator({
           <ArrowLeft size={16} /> {c.back}
         </button>
         <div>
-          <span className="page-kicker">LOCAL · DATA-ONLY · REVERSIBLE</span>
+          <span className="page-kicker">{c.kicker}</span>
           <h1>{c.title}</h1>
           <p>{c.subtitle}</p>
         </div>
@@ -2269,7 +2430,11 @@ export function CompanionCreator({
         </div>
       </header>
 
-      <nav className="creator-steps" aria-label={c.title}>
+      <nav
+        className="creator-steps"
+        aria-label={c.title}
+        data-scroll-surface="horizontal"
+      >
         {stepOrder.map((step, index) => (
           <button
             key={step}
@@ -2399,7 +2564,11 @@ export function CompanionCreator({
         </div>
       )}
 
-      <div className="creator-workbench" hidden={Boolean(restoreState)}>
+      <div
+        className="creator-workbench"
+        data-scroll-surface="workspace"
+        hidden={Boolean(restoreState)}
+      >
         <main className="creator-stage">
           {project.step === "import" && (
             <ImportStep
@@ -3308,6 +3477,7 @@ export function CompanionCreator({
                     canvas={alignmentCanvas}
                     crop={project.sharedCrop}
                     groundLine={project.groundLine}
+                    contentScale={project.contentScale}
                     currentFrame={currentFrame}
                     tool={alignmentTool}
                     view={alignmentView}
@@ -3342,119 +3512,68 @@ export function CompanionCreator({
                   </p>
                 </div>
                 <aside className="creator-inspector-panel creator-inspector-panel--align">
-                  <section
-                    className={`alignment-readiness ${
-                      alignmentDiagnostics.ready
-                        ? "alignment-readiness--ready"
-                        : "alignment-readiness--warning"
-                    }`}
-                  >
-                    <div className="alignment-readiness__heading">
-                      <span>
-                        {alignmentDiagnostics.ready ? (
-                          <Check size={15} />
-                        ) : (
-                          <AlertTriangle size={15} />
-                        )}
-                      </span>
-                      <div>
-                        <h3>
-                          {alignmentDiagnostics.ready
-                            ? locale === "zh-CN"
-                              ? "共享画布已就绪"
-                              : "Shared canvas ready"
-                            : locale === "zh-CN"
-                              ? "仍有帧需要对齐"
-                              : "Some frames need alignment"}
-                        </h3>
-                        <p>
-                          {alignmentDiagnostics.ready
-                            ? locale === "zh-CN"
-                              ? "所有有效帧都在画布内，并落在同一地面线上。"
-                              : "Every included frame fits the canvas and meets one ground line."
-                            : locale === "zh-CN"
-                              ? "先自动对齐，再用叠影和当前帧工具检查偏差。"
-                              : "Auto-align first, then inspect drift with onion skin and the current-frame tool."}
-                        </p>
-                      </div>
-                    </div>
-                    <div
-                      className="alignment-metrics"
-                      aria-label={
-                        locale === "zh-CN"
-                          ? "对齐诊断"
-                          : "Alignment diagnostics"
-                      }
-                    >
-                      <div>
-                        <strong>
-                          {alignmentDiagnostics.boundedFrames}/
-                          {alignmentDiagnostics.includedFrames}
-                        </strong>
-                        <span>
-                          {locale === "zh-CN" ? "已识别" : "Detected"}
-                        </span>
-                      </div>
-                      <div
-                        className={
-                          alignmentDiagnostics.outsideCrop ? "has-warning" : ""
+                  <AlignmentAssistant
+                    locale={locale}
+                    diagnostics={alignmentDiagnostics}
+                    currentScale={project.contentScale}
+                    fittedScale={fittedContentScale}
+                    canExpand={Boolean(expandedAlignmentCanvas)}
+                    onFit={() =>
+                      updateProject((next) => {
+                        const fitted = fitSharedContentScale(
+                          next.frames,
+                          next.sharedCrop,
+                          next.groundLine,
+                        );
+                        if (
+                          fitted !== null &&
+                          fitted < next.contentScale - 0.001
+                        ) {
+                          next.contentScale = fitted;
                         }
-                      >
-                        <strong>{alignmentDiagnostics.outsideCrop}</strong>
-                        <span>
-                          {locale === "zh-CN" ? "超出画布" : "Outside"}
-                        </span>
-                      </div>
-                      <div
-                        className={
-                          alignmentDiagnostics.baselineOutliers ||
-                          alignmentDiagnostics.centerOutliers
-                            ? "has-warning"
-                            : ""
-                        }
-                      >
-                        <strong>
-                          {Math.round(
-                            Math.max(
-                              alignmentDiagnostics.maximumBaselineDelta,
-                              alignmentDiagnostics.maximumCenterDelta,
-                            ),
-                          )}{" "}
-                          px
-                        </strong>
-                        <span>
-                          {locale === "zh-CN"
-                            ? "最大对齐偏差"
-                            : "Max alignment drift"}
-                        </span>
-                      </div>
-                    </div>
-                    {alignmentDiagnostics.missingBounds > 0 && (
-                      <p className="alignment-readiness__issue">
-                        {locale === "zh-CN"
-                          ? `${alignmentDiagnostics.missingBounds} 帧没有可识别主体；请返回背景处理或排除这些帧。`
-                          : `${alignmentDiagnostics.missingBounds} frame(s) have no detectable subject; clean them up or exclude them.`}
-                      </p>
-                    )}
-                    <button
-                      className="button button--ghost creator-inspector-action"
-                      onClick={() => {
-                        updateProject((next) => {
-                          applySuggestedSharedAlignment(next, frames);
-                          return next;
+                        return next;
+                      })
+                    }
+                    onExpand={() =>
+                      updateProject((next) => {
+                        const expanded = expandSharedCanvasToContent(
+                          next.frames,
+                          next.sharedCrop,
+                          next.groundLine,
+                          next.contentScale,
+                          alignmentCanvas,
+                        );
+                        if (!expanded) return next;
+                        next.sharedCrop = expanded.crop;
+                        next.groundLine = expanded.groundLine;
+                        next.frames.forEach((frame) => {
+                          frame.baselineOffset.x += expanded.offsetDelta.x;
+                          frame.baselineOffset.y += expanded.offsetDelta.y;
                         });
-                      }}
-                    >
-                      <Sparkles size={15} />
-                      {alignmentDiagnostics.ready
-                        ? locale === "zh-CN"
-                          ? "重新对齐全部有效帧"
-                          : "Re-align included frames"
-                        : locale === "zh-CN"
-                          ? "自动对齐全部有效帧"
-                          : "Auto-align included frames"}
-                    </button>
-                  </section>
+                        return next;
+                      })
+                    }
+                    onInspect={() => {
+                      const outlier = alignmentDiagnostics.frames.find(
+                        (diagnostic) =>
+                          diagnostic.missingBounds ||
+                          diagnostic.outsideCrop ||
+                          Math.abs(diagnostic.baselineDelta ?? 0) > 2 ||
+                          Math.abs(diagnostic.centerDelta ?? 0) > 2,
+                      );
+                      if (!outlier) return;
+                      selectCalibrationFrame(outlier.frameIndex);
+                      setAlignmentTool("frame");
+                      setAlignmentView("overlay");
+                    }}
+                    onAutoAlign={() =>
+                      updateProject((next) => {
+                        applySuggestedSharedAlignment(next, frames);
+                        return next;
+                      })
+                    }
+                    onReturnCleanup={() => setStep("cleanup")}
+                  />
                   <section>
                     <div className="creator-section-heading">
                       <div>
@@ -3596,6 +3715,99 @@ export function CompanionCreator({
                             : "Crop and ground line apply to every included frame."}
                         </p>
                       </div>
+                    </div>
+                    <div className="alignment-scale-control">
+                      <div className="alignment-scale-control__heading">
+                        <span>
+                          <strong>
+                            {locale === "zh-CN" ? "全局尺寸" : "Global size"}
+                          </strong>
+                          <small>
+                            {locale === "zh-CN"
+                              ? "所有有效帧统一等比缩放"
+                              : "Uniform scale for every included frame"}
+                          </small>
+                        </span>
+                        <label>
+                          <input
+                            type="number"
+                            min={MIN_CONTENT_SCALE * 100}
+                            max={MAX_CONTENT_SCALE * 100}
+                            step={1}
+                            aria-label={
+                              locale === "zh-CN"
+                                ? "全局尺寸百分比"
+                                : "Global size percentage"
+                            }
+                            value={Math.round(project.contentScale * 100)}
+                            onChange={(event) =>
+                              updateProject((next) => {
+                                const percentage = Number(event.target.value);
+                                if (!Number.isFinite(percentage)) return next;
+                                next.contentScale = clamp(
+                                  percentage / 100,
+                                  MIN_CONTENT_SCALE,
+                                  MAX_CONTENT_SCALE,
+                                );
+                                return next;
+                              })
+                            }
+                          />
+                          <span>%</span>
+                        </label>
+                      </div>
+                      <div className="alignment-scale-control__slider">
+                        <input
+                          type="range"
+                          min={MIN_CONTENT_SCALE * 100}
+                          max={MAX_CONTENT_SCALE * 100}
+                          step={1}
+                          value={project.contentScale * 100}
+                          aria-label={
+                            locale === "zh-CN"
+                              ? "调整所有帧的统一尺寸"
+                              : "Adjust the uniform size of all frames"
+                          }
+                          onChange={(event) =>
+                            updateProject((next) => {
+                              next.contentScale =
+                                Number(event.target.value) / 100;
+                              return next;
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          className="button button--ghost"
+                          disabled={
+                            Math.abs(
+                              project.contentScale - DEFAULT_CONTENT_SCALE,
+                            ) < 0.001
+                          }
+                          onClick={() =>
+                            updateProject((next) => {
+                              next.contentScale = DEFAULT_CONTENT_SCALE;
+                              return next;
+                            })
+                          }
+                        >
+                          <RotateCcw size={13} />
+                          100%
+                        </button>
+                      </div>
+                      <p>
+                        {locale === "zh-CN"
+                          ? "以共享画布中心和地面线为支点；不会修改或逐帧压缩源素材。"
+                          : "Anchored to the shared center and ground line; source frames are never resized independently."}
+                      </p>
+                      {project.contentScale < 0.65 && (
+                        <p className="alignment-scale-control__warning">
+                          <AlertTriangle size={13} />
+                          {locale === "zh-CN"
+                            ? "缩放低于 65%。建议检查异常帧，避免少数大帧让全部画面过小。"
+                            : "Scale is below 65%. Inspect outliers so one oversized frame does not make every pose too small."}
+                        </p>
+                      )}
                     </div>
                     <div className="creator-coordinate-grid">
                       {project.sharedCrop &&
@@ -4636,10 +4848,17 @@ export function CompanionCreator({
                     frame={frames.find(
                       (item) =>
                         item.sourceIndex ===
-                        project.frames[previewFrameIndex]?.sourceIndex,
+                        project.frames[displayedTestFrameIndex]?.sourceIndex,
                     )}
+                    logicalFrame={project.frames[displayedTestFrameIndex]}
+                    crop={project.sharedCrop}
+                    groundLine={project.groundLine}
+                    contentScale={project.contentScale}
                     pointer={pointer}
-                    onPointer={setPointer}
+                    onPointer={(nextPointer) => {
+                      setTestMotionPlayback(null);
+                      setPointer(nextPointer);
+                    }}
                     placement={project.placement}
                     backdrop={project.preview.background}
                     composerHeight={testComposerHeight}
@@ -4657,11 +4876,50 @@ export function CompanionCreator({
                   />
                 </div>
                 <aside className="creator-inspector-panel creator-inspector-panel--test">
+                  <BehaviorAudition
+                    locale={locale}
+                    plan={testMotionPlan}
+                    selectedMotionId={selectedTestMotion?.id ?? null}
+                    playing={Boolean(playingTestMotion)}
+                    onSelect={(motionId) => {
+                      setTestMotionPlayback(null);
+                      setTestMotionSelectionId(motionId);
+                    }}
+                    onToggle={() => {
+                      if (testMotionPlayback) {
+                        setTestMotionPlayback(null);
+                        return;
+                      }
+                      if (!selectedTestMotion) return;
+                      setTestMotionSelectionId(selectedTestMotion.id);
+                      setTestMotionPlayback({
+                        motionId: selectedTestMotion.id,
+                        frameIndex: selectedTestMotion.frames[0]!,
+                      });
+                    }}
+                  />
+                  <EdgeQualityReview
+                    locale={locale}
+                    currentBackdrop={project.preview.background}
+                    summary={edgeReview}
+                    analysis={edgeAnalysis}
+                    onInspect={(backdrop) =>
+                      updateProject((next) => {
+                        next.preview.background = backdrop;
+                        return next;
+                      })
+                    }
+                    onConfirm={confirmEdgeReviewBackdrop}
+                    onRepair={(frameIndex) => {
+                      if (frameIndex !== undefined) setCurrentFrame(frameIndex);
+                      void navigateToStep("cleanup");
+                    }}
+                  />
                   <section className="creator-readiness creator-build-section">
                     <div className="creator-readiness__heading">
                       <h3>{c.readiness}</h3>
                       <span>
-                        {readinessCount}/5 {c.readyCount}
+                        {readinessCount}/6 {c.readyCount}
                       </span>
                     </div>
                     <ul>
@@ -4699,9 +4957,23 @@ export function CompanionCreator({
                         )}
                         {c.packageLimitsReady}
                       </li>
-                      <li data-ready="true">
-                        <Check size={14} />
-                        {c.placementReady}
+                      <li data-ready={alignmentDiagnostics.ready}>
+                        {alignmentDiagnostics.ready ? (
+                          <Check size={14} />
+                        ) : (
+                          <AlertTriangle size={14} />
+                        )}
+                        {locale === "zh-CN"
+                          ? "共享画布与全局尺寸已就绪"
+                          : "Shared canvas and global size ready"}
+                      </li>
+                      <li data-ready={edgeReview.complete}>
+                        {edgeReview.complete ? (
+                          <Check size={14} />
+                        ) : (
+                          <AlertTriangle size={14} />
+                        )}
+                        {c.edgeReviewReady}
                       </li>
                     </ul>
                     <div className="creator-output-summary">
@@ -5024,7 +5296,10 @@ export function CompanionCreator({
                   {c.frame} {currentFrame + 1}
                 </span>
               </div>
-              <div className="creator-frame-strip__items">
+              <div
+                className="creator-frame-strip__items"
+                data-scroll-surface="horizontal"
+              >
                 {project.frames.map((logical, index) => {
                   const frame = frames.find(
                     (item) => item.sourceIndex === logical.sourceIndex,

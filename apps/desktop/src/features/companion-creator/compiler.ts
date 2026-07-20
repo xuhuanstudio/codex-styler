@@ -9,9 +9,14 @@ import {
 } from "@codex-styler/theme-core";
 import { calibrateDirections, normalizeAngle } from "./calibration";
 import { companionPackageId, companionSlug } from "./companion-id";
+import { drawLogicalFrame } from "./frame-renderer";
 import type { ExtractedFrame } from "./media";
-import type { CompanionCreatorProject, FrameBounds } from "./model";
-import { validateMotionRanges } from "./motions";
+import type {
+  CompanionCreatorProject,
+  FrameBounds,
+  LogicalFrame,
+} from "./model";
+import { assignedPoseIdsForMotion, validateMotionRanges } from "./motions";
 
 export const decodedPageLimit = 48 * 1024 * 1024;
 export const encodedFileLimit = 20 * 1024 * 1024;
@@ -176,30 +181,52 @@ export function expandMotionFrames<T>(
 
 async function portraitAsset(
   frame: ExtractedFrame,
+  logical: LogicalFrame,
   crop: FrameBounds,
+  groundLine: number | null,
+  contentScale: number,
 ): Promise<EncodedCanvasAsset> {
   const bitmap = await createImageBitmap(frame.blob);
+  const frameCanvas = document.createElement("canvas");
+  frameCanvas.width = Math.ceil(crop.width);
+  frameCanvas.height = Math.ceil(crop.height);
+  const frameContext = frameCanvas.getContext("2d");
+  if (!frameContext) throw new Error("Canvas 2D is unavailable");
+  drawLogicalFrame(
+    frameContext,
+    bitmap,
+    logical,
+    crop,
+    groundLine,
+    contentScale,
+    0,
+    0,
+    frameCanvas.width,
+    frameCanvas.height,
+  );
+  bitmap.close();
+
   const size = 256;
   const canvas = document.createElement("canvas");
   canvas.width = size;
   canvas.height = size;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Canvas 2D is unavailable");
-  const scale = Math.min(size / crop.width, size / crop.height) * 0.9;
-  const width = crop.width * scale;
-  const height = crop.height * scale;
+  const scale =
+    Math.min(size / frameCanvas.width, size / frameCanvas.height) * 0.9;
+  const width = frameCanvas.width * scale;
+  const height = frameCanvas.height * scale;
   context.drawImage(
-    bitmap,
-    crop.x,
-    crop.y,
-    crop.width,
-    crop.height,
+    frameCanvas,
+    0,
+    0,
+    frameCanvas.width,
+    frameCanvas.height,
     (size - width) / 2,
     size - height,
     width,
     height,
   );
-  bitmap.close();
   return encodedCanvasAsset(canvas);
 }
 
@@ -239,7 +266,10 @@ export async function compileCompanion(
   const files = new Map<string, Uint8Array>();
   const portrait = await portraitAsset(
     frameBySource.get(activeLogicalFrames[0]!.sourceIndex)!,
+    activeLogicalFrames[0]!,
     crop,
+    project.groundLine,
+    project.contentScale,
   );
   const previewPath = `previews/portrait.${portrait.extension}`;
   files.set(previewPath, portrait.bytes);
@@ -252,12 +282,13 @@ export async function compileCompanion(
     canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Canvas 2D is unavailable");
-    context.drawImage(
+    drawLogicalFrame(
+      context,
       bitmap,
-      crop.x,
-      crop.y,
-      crop.width,
-      crop.height,
+      activeLogicalFrames[0]!,
+      crop,
+      project.groundLine,
+      project.contentScale,
       0,
       0,
       canvas.width,
@@ -270,7 +301,7 @@ export async function compileCompanion(
     const definition: CompanionPackageDefinition = {
       format: COMPANION_FORMAT,
       id,
-      version: "0.2.0-beta.6",
+      version: "0.2.0-beta.7",
       metadata: {
         name: project.name,
         description: project.description.trim(),
@@ -337,12 +368,13 @@ export async function compileCompanion(
       const cell = packedIndex - first;
       const x = (cell % layout.columns) * width;
       const y = Math.floor(cell / layout.columns) * height;
-      context.drawImage(
+      drawLogicalFrame(
+        context,
         bitmap,
-        crop.x - logical.baselineOffset.x,
-        crop.y - logical.baselineOffset.y,
-        crop.width,
-        crop.height,
+        logical,
+        crop,
+        project.groundLine,
+        project.contentScale,
         x,
         y,
         width,
@@ -400,16 +432,11 @@ export async function compileCompanion(
     );
   }
 
-  const anchorPoseIds = new Map(
-    project.directionAnchors.map((anchor) => [
-      anchor.id,
-      poses.reduce((nearest, pose) => {
-        const frame = nearestPackedFrame(anchor.frameIndex, packedIndexes);
-        return Math.abs(pose.frame - frame) < Math.abs(nearest.frame - frame)
-          ? pose
-          : nearest;
-      }, poses[0]!).id,
-    ]),
+  const activeDirectionAnchors = project.directionAnchors.filter(
+    (anchor) =>
+      anchor.frameIndex >= 0 &&
+      anchor.frameIndex < project.frames.length &&
+      !project.frames[anchor.frameIndex]?.excluded,
   );
   const idleClips: CompanionIdleClip[] = project.motionRanges.flatMap(
     (motion) => {
@@ -432,9 +459,11 @@ export async function compileCompanion(
       });
       if (clipFrames.length === 0) return [];
       clipFrames = expandMotionFrames(clipFrames, motion.playback);
-      const allowed = motion.poseAnchorIds
-        .map((anchorId) => anchorPoseIds.get(anchorId))
-        .filter((poseId): poseId is string => Boolean(poseId));
+      const allowed = assignedPoseIdsForMotion(
+        poses,
+        activeDirectionAnchors,
+        motion.poseAnchorIds,
+      );
       return [
         {
           id: companionSlug(motion.name) + `-${motion.id.slice(-4)}`,
@@ -450,7 +479,7 @@ export async function compileCompanion(
   const definition: CompanionPackageDefinition = {
     format: COMPANION_FORMAT,
     id,
-    version: "0.2.0-beta.6",
+    version: "0.2.0-beta.7",
     metadata: {
       name: project.name,
       description: project.description.trim(),

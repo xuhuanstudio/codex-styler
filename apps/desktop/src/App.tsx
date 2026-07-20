@@ -118,6 +118,16 @@ import {
   persistGeneratedTheme,
   type ThemeAssetMap,
 } from "./lib/theme-files";
+import { assignThemeVariantField } from "./lib/theme-draft";
+import {
+  assignThemeColorHarmony,
+  type ThemeColorHarmonyId,
+} from "./lib/theme-color-harmony";
+import {
+  applyCompanionPlacementMode,
+  resolveCompanionPlacementMode,
+  type SelectableCompanionPlacementMode,
+} from "./lib/companion-placement-modes";
 
 const CompanionCreator = lazy(() =>
   import("./features/companion-creator/CompanionCreator").then((module) => ({
@@ -281,7 +291,7 @@ export function App() {
   } | null>(null);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.6");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.7");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);
@@ -1133,15 +1143,18 @@ export function App() {
   ) {
     commitThemeDraft(
       (next) => {
-        const target = next.variants[variant][section] as unknown as Record<
-          string,
-          number | string | object
-        >;
-        target[key] = value;
+        assignThemeVariantField(next, variant, section, key, value);
         return next;
       },
       historyGroup ?? `${variant}.${section}.${key}`,
     );
+  }
+
+  function setThemeColorHarmony(recipe: ThemeColorHarmonyId) {
+    commitThemeDraft((next) => {
+      assignThemeColorHarmony(next, variant, recipe);
+      return next;
+    }, `${variant}.appearance.color-harmony`);
   }
 
   function addSceneLayer(type: "image" | "gradient" | "vignette") {
@@ -1196,6 +1209,15 @@ export function App() {
     });
   }
 
+  function commitSelectedCompanionOverrides(next: UserSettings) {
+    if (!selectedCompanion) return;
+    dispatchSession({
+      type: "selection/companion-overrides",
+      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    });
+    scheduleLiveCompanionSync(next);
+  }
+
   function updateEntitySize(size: number) {
     if (!selectedCompanion) return;
     const current = settingsRef.current;
@@ -1205,11 +1227,7 @@ export function App() {
         [selectedCompanion.id]: size,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
-    });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function updateEntityAnchor(anchor: { x: number; y: number }) {
@@ -1221,11 +1239,7 @@ export function App() {
         [selectedCompanion.id]: anchor,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
-    });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
   }
 
   function updateEntityAttachment(attachment: EntityAttachment | null) {
@@ -1237,11 +1251,60 @@ export function App() {
         [selectedCompanion.id]: attachment,
       },
     });
-    dispatchSession({
-      type: "selection/companion-overrides",
-      companionOverrides: companionOverridesFor(selectedCompanion, next),
+    commitSelectedCompanionOverrides(next);
+  }
+
+  function setEntityPlacementMode(mode: SelectableCompanionPlacementMode) {
+    if (!selectedCompanion) return;
+    const current = settingsRef.current;
+    const hasAttachmentOverride = Object.prototype.hasOwnProperty.call(
+      current.companionAttachments,
+      selectedCompanion.id,
+    );
+    const currentPlacement = {
+      anchor:
+        current.companionAnchors[selectedCompanion.id] ??
+        selectedCompanion.entity.anchor,
+      attachment: hasAttachmentOverride
+        ? current.companionAttachments[selectedCompanion.id]
+        : (selectedCompanion.entity.attachment ?? null),
+    };
+    if (resolveCompanionPlacementMode(currentPlacement.attachment) === mode) {
+      return;
+    }
+    const placement = applyCompanionPlacementMode(
+      mode,
+      currentPlacement,
+      selectedCompanion.entity.attachment,
+    );
+    const next = updateSettings({
+      companionAnchors: {
+        ...current.companionAnchors,
+        [selectedCompanion.id]: placement.anchor,
+      },
+      companionAttachments: {
+        ...current.companionAttachments,
+        [selectedCompanion.id]: placement.attachment,
+      },
     });
-    scheduleLiveCompanionSync(next);
+    commitSelectedCompanionOverrides(next);
+  }
+
+  function resetEntityPlacement() {
+    if (!selectedCompanion) return;
+    const current = settingsRef.current;
+    const companionAnchors = { ...current.companionAnchors };
+    const companionSizes = { ...current.companionSizes };
+    const companionAttachments = { ...current.companionAttachments };
+    delete companionAnchors[selectedCompanion.id];
+    delete companionSizes[selectedCompanion.id];
+    delete companionAttachments[selectedCompanion.id];
+    const next = updateSettings({
+      companionAnchors,
+      companionSizes,
+      companionAttachments,
+    });
+    commitSelectedCompanionOverrides(next);
   }
 
   function selectCompanion(companion: CompanionDefinition | null) {
@@ -1687,8 +1750,6 @@ export function App() {
 
   function changeThemeCollection(collection: ThemeCollection) {
     setThemeCollection(collection);
-    const first = collection === "builtIn" ? builtinThemes[0] : localThemes[0];
-    if (first) chooseTheme(first);
   }
 
   async function handleDeleteTheme() {
@@ -1831,7 +1892,16 @@ export function App() {
           </div>
         </header>
 
-        <div ref={appMainRef} className="app-main__viewport">
+        <div
+          ref={appMainRef}
+          className="app-main__viewport"
+          data-view={view}
+          data-scroll-surface={
+            view === "editor" || view === "companion-editor"
+              ? undefined
+              : "page"
+          }
+        >
           {view === "home" && (
             <HomeView
               locale={locale}
@@ -1859,7 +1929,7 @@ export function App() {
             <ThemesView
               locale={locale}
               selectedTheme={selectedTheme}
-              previewTheme={composeTheme(selectedTheme)}
+              previewThemeFor={(theme) => composeTheme(theme)}
               localThemes={localThemes}
               collection={themeCollection}
               variant={variant}
@@ -1881,7 +1951,9 @@ export function App() {
             <CompanionsView
               locale={locale}
               selected={selectedCompanion}
-              theme={composeTheme(selectedTheme)}
+              previewThemeFor={(companion) =>
+                composeTheme(selectedTheme, companion)
+              }
               localCompanions={localCompanions}
               projects={companionProjects}
               collection={companionCollection}
@@ -1902,6 +1974,42 @@ export function App() {
               onImport={() => companionImportRef.current?.click()}
               onExport={(companion) => void handleExportCompanion(companion)}
               onDelete={setPendingCompanionDelete}
+              selectedSize={
+                selectedCompanion
+                  ? (settings.companionSizes[selectedCompanion.id] ??
+                    selectedCompanion.entity.size)
+                  : null
+              }
+              placementCustomized={Boolean(
+                selectedCompanion &&
+                (Object.prototype.hasOwnProperty.call(
+                  settings.companionAnchors,
+                  selectedCompanion.id,
+                ) ||
+                  Object.prototype.hasOwnProperty.call(
+                    settings.companionSizes,
+                    selectedCompanion.id,
+                  ) ||
+                  Object.prototype.hasOwnProperty.call(
+                    settings.companionAttachments,
+                    selectedCompanion.id,
+                  )),
+              )}
+              placementMode={
+                selectedCompanion
+                  ? resolveCompanionPlacementMode(
+                      Object.prototype.hasOwnProperty.call(
+                        settings.companionAttachments,
+                        selectedCompanion.id,
+                      )
+                        ? settings.companionAttachments[selectedCompanion.id]
+                        : selectedCompanion.entity.attachment,
+                    )
+                  : "free"
+              }
+              onSizeChange={updateEntitySize}
+              onPlacementModeChange={setEntityPlacementMode}
+              onResetPlacement={resetEntityPlacement}
               onAnchorChange={updateEntityAnchor}
               onAttachmentChange={updateEntityAttachment}
               resolveAsset={resolveAsset}
@@ -1947,6 +2055,7 @@ export function App() {
               reduceMotion={settings.reduceMotion}
               t={t}
               onUpdateVariant={updateVariant}
+              onSetColorHarmony={setThemeColorHarmony}
               onAddSceneLayer={addSceneLayer}
               onUpdateSceneLayer={updateSceneLayer}
               onRemoveSceneLayer={removeSceneLayer}
@@ -1995,6 +2104,7 @@ export function App() {
 
           {view === "settings" && (
             <SettingsView
+              locale={locale}
               settings={settings}
               detection={detection}
               currentVersion={currentVersion}
@@ -2255,9 +2365,7 @@ export function App() {
             <span className="confirm-dialog__icon">
               <Trash2 size={18} />
             </span>
-            <h2 id="delete-companion-project-title">
-              {t("deleteDraftTitle")}
-            </h2>
+            <h2 id="delete-companion-project-title">{t("deleteDraftTitle")}</h2>
             <p>{t("deleteDraftBody")}</p>
             <strong>{pendingCompanionProjectDelete.name}</strong>
             <div className="button-row">
@@ -2332,6 +2440,7 @@ export function App() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="diagnostics-title"
+            data-scroll-surface="panel"
           >
             <header>
               <span className="confirm-dialog__icon">
@@ -2361,7 +2470,9 @@ export function App() {
             </div>
             <details>
               <summary>{t("previewDiagnosticText")}</summary>
-              <pre>{diagnosticsSummary(diagnosticsReport)}</pre>
+              <pre data-scroll-surface="canvas">
+                {diagnosticsSummary(diagnosticsReport)}
+              </pre>
             </details>
             <div className="button-row">
               <button
@@ -2403,7 +2514,7 @@ export function App() {
             </div>
             <p>{t("updateAvailableBody")}</p>
             {availableUpdate.releaseNotes ? (
-              <div className="update-dialog__notes">
+              <div className="update-dialog__notes" data-scroll-surface="panel">
                 <strong>{t("releaseNotes")}</strong>
                 <p className="update-dialog__summary">
                   {availableUpdate.releaseNotes.summary}
@@ -2430,7 +2541,7 @@ export function App() {
                 )}
               </div>
             ) : availableUpdate.notes ? (
-              <div className="update-dialog__notes">
+              <div className="update-dialog__notes" data-scroll-surface="panel">
                 <strong>{t("releaseNotes")}</strong>
                 <p>{availableUpdate.notes}</p>
               </div>
@@ -2565,7 +2676,7 @@ function NewThemeDialog({
         </header>
 
         {step === "choose" ? (
-          <div className="new-theme-options">
+          <div className="new-theme-options" data-scroll-surface="panel">
             <button
               className="new-theme-option new-theme-option--image"
               onClick={onImage}
@@ -2607,7 +2718,7 @@ function NewThemeDialog({
             </button>
           </div>
         ) : (
-          <div className="new-theme-existing-list">
+          <div className="new-theme-existing-list" data-scroll-surface="panel">
             {themes.map((theme) => {
               const copy = theme.locales[locale] ?? theme.locales.en;
               const preview = theme.metadata.preview

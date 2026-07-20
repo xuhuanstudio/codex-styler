@@ -17,6 +17,19 @@ import {
 } from "./compiler";
 import { createCompanionProject } from "./model";
 
+function canvasContextMock() {
+  return {
+    save: vi.fn(),
+    beginPath: vi.fn(),
+    rect: vi.fn(),
+    clip: vi.fn(),
+    translate: vi.fn(),
+    scale: vi.fn(),
+    drawImage: vi.fn(),
+    restore: vi.fn(),
+  };
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
@@ -82,9 +95,10 @@ describe("generated companion asset formats", () => {
       "createImageBitmap",
       vi.fn().mockResolvedValue({ close: vi.fn(), width: 2, height: 2 }),
     );
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      drawImage: vi.fn(),
-    } as unknown as CanvasRenderingContext2D);
+    const context = canvasContextMock();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      context as unknown as CanvasRenderingContext2D,
+    );
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
       (callback) =>
         callback(
@@ -102,13 +116,15 @@ describe("generated companion asset formats", () => {
     project.author = "Codex Styler";
     project.license = "CC0-1.0";
     project.sharedCrop = { x: 0, y: 0, width: 2, height: 2 };
+    project.groundLine = 2;
+    project.contentScale = 0.75;
     project.frames = [
       {
         id: "frame-0",
         sourceIndex: 0,
         excluded: false,
         visualDelta: 0,
-        baselineOffset: { x: 0, y: 0 },
+        baselineOffset: { x: 2, y: 3 },
       },
     ];
 
@@ -129,6 +145,8 @@ describe("generated companion asset formats", () => {
       "previews/portrait.png",
       "assets/companion.png",
     ]);
+    expect(context.scale).toHaveBeenCalledWith(0.75, 0.75);
+    expect(context.translate).toHaveBeenCalledWith(2, 3);
   });
 
   it("renames every atlas page when a WebView falls back to PNG", async () => {
@@ -142,9 +160,9 @@ describe("generated companion asset formats", () => {
       "createImageBitmap",
       vi.fn().mockResolvedValue({ close: vi.fn(), width: 2, height: 2 }),
     );
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      drawImage: vi.fn(),
-    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      canvasContextMock() as unknown as CanvasRenderingContext2D,
+    );
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
       (callback) => callback(new Blob([png], { type: "image/webp" })),
     );
@@ -202,5 +220,79 @@ describe("generated companion asset formats", () => {
     expect(installed.companion.entity.renderer.asset).toBe(
       "assets/atlas-1.png",
     );
+  });
+
+  it("compiles an idle motion for every interpolated pose in its anchor sector", async () => {
+    const png = Uint8Array.from(
+      atob(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlDq0EAAAAASUVORK5CYII=",
+      ),
+      (character) => character.charCodeAt(0),
+    );
+    vi.stubGlobal(
+      "createImageBitmap",
+      vi.fn().mockResolvedValue({ close: vi.fn(), width: 16, height: 16 }),
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(
+      canvasContextMock() as unknown as CanvasRenderingContext2D,
+    );
+    vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
+      (callback) => callback(new Blob([png], { type: "image/png" })),
+    );
+
+    const project = createCompanionProject("local.motion-sectors");
+    project.name = "Motion sectors";
+    project.description = "A direction-aware motion compiler fixture.";
+    project.author = "Codex Styler";
+    project.license = "CC0-1.0";
+    project.sharedCrop = { x: 0, y: 0, width: 16, height: 16 };
+    project.frames = Array.from({ length: 16 }, (_, index) => ({
+      id: `frame-${index}`,
+      sourceIndex: index,
+      excluded: false,
+      visualDelta: index === 0 ? 0 : 1,
+      baselineOffset: { x: 0, y: 0 },
+    }));
+    project.directionAnchors = [
+      { id: "north", frameIndex: 0, angle: 0 },
+      { id: "east", frameIndex: 6, angle: 90 },
+      { id: "south", frameIndex: 9, angle: 180 },
+      { id: "west", frameIndex: 12, angle: 270 },
+      { id: "north-west", frameIndex: 15, angle: 330 },
+    ];
+    project.motionRanges = [
+      {
+        id: "north-blink",
+        name: "North blink",
+        poseAnchorIds: ["north"],
+        startFrame: 1,
+        endFrame: 2,
+        playback: "ping-pong",
+        speed: 1,
+        minimumDelayMs: 1_000,
+        maximumDelayMs: 2_000,
+      },
+    ];
+
+    const result = await compileCompanion(
+      project,
+      project.frames.map((frame, index) => ({
+        id: frame.id,
+        sourceIndex: index,
+        blob: new Blob([png], { type: "image/png" }),
+        url: `blob:motion-${index}`,
+        width: 16,
+        height: 16,
+      })),
+    );
+
+    expect(result.companion.entity.renderer.type).toBe("sprite-atlas");
+    if (result.companion.entity.renderer.type !== "sprite-atlas") {
+      throw new Error("Expected a sprite atlas companion");
+    }
+    expect(result.companion.entity.renderer.idleClips?.[0]?.poseIds).toEqual([
+      "pose-000",
+      "pose-003",
+    ]);
   });
 });

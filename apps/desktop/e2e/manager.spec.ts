@@ -89,18 +89,279 @@ test("companion cards use independent portraits", async ({ page }) => {
   await expect(list).toHaveScreenshot("companion-list-en-dark.png");
 });
 
+test("compact companion details preserve a usable live preview", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await page.getByRole("button", { name: "Companions", exact: true }).click();
+  await page.locator(".companion-option").nth(1).click();
+
+  const detail = page.locator(
+    ".companions-layout--detail .companion-preview-panel",
+  );
+  const preview = detail.locator(".companion-preview-stage");
+  const summary = detail.locator(".companion-detail-summary");
+  const entity = preview.locator(".scene-entity");
+  await expect(detail).toBeVisible();
+  await expect(entity).toBeVisible();
+
+  const geometry = await detail.evaluate((panel) => {
+    const stage = panel.querySelector<HTMLElement>(".companion-preview-stage")!;
+    const summaryPanel = panel.querySelector<HTMLElement>(
+      ".companion-detail-summary",
+    )!;
+    const sprite = stage.querySelector<HTMLElement>(".scene-entity")!;
+    const stageBounds = stage.getBoundingClientRect();
+    const summaryBounds = summaryPanel.getBoundingClientRect();
+    const spriteBounds = sprite.getBoundingClientRect();
+    return {
+      stageHeight: stageBounds.height,
+      stageWidth: stageBounds.width,
+      summaryWidth: summaryBounds.width,
+      summaryContained:
+        summaryPanel.scrollHeight <= summaryPanel.clientHeight + 1 &&
+        summaryPanel.scrollWidth <= summaryPanel.clientWidth + 1,
+      entityInsideStage:
+        spriteBounds.top >= stageBounds.top &&
+        spriteBounds.left >= stageBounds.left &&
+        spriteBounds.right <= stageBounds.right &&
+        spriteBounds.bottom <= stageBounds.bottom,
+    };
+  });
+  expect(geometry.stageHeight).toBeGreaterThanOrEqual(220);
+  expect(geometry.stageWidth).toBeGreaterThanOrEqual(
+    geometry.summaryWidth - 20,
+  );
+  expect(geometry.summaryContained).toBe(true);
+  expect(geometry.entityInsideStage).toBe(true);
+  await expect(preview).toBeVisible();
+  await expect(summary).toBeVisible();
+});
+
+test("sidebar hover remains distinct from the active destination", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 960, height: 680 });
+  const active = page.getByRole("button", { name: "Home", exact: true });
+  const inactive = page.getByRole("button", { name: "Themes", exact: true });
+  const activeStyle = await active.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { background: style.backgroundColor };
+  });
+
+  await inactive.hover();
+  const hoveredBackground = await inactive.evaluate(
+    (element) => getComputedStyle(element).backgroundColor,
+  );
+  expect(hoveredBackground).not.toBe(activeStyle.background);
+
+  await active.hover();
+  await expect
+    .poll(() =>
+      active.evaluate((element) => getComputedStyle(element).backgroundColor),
+    )
+    .toBe(activeStyle.background);
+});
+
+test("resource libraries fit above the persistent setup bar", async ({
+  page,
+}) => {
+  await openManager(page, "en", "dark", { width: 1280, height: 720 });
+
+  const expectWorkspaceFit = async (selector: string) => {
+    const geometry = await page.locator(selector).evaluate((element) => {
+      const viewport = document.querySelector<HTMLElement>(
+        ".app-main__viewport",
+      )!;
+      const dock = document.querySelector<HTMLElement>(".configuration-dock")!;
+      const pageElement = element.closest<HTMLElement>(".page")!;
+      const bounds = element.getBoundingClientRect();
+      const viewportBounds = viewport.getBoundingClientRect();
+      const dockBounds = dock.getBoundingClientRect();
+      const pageBounds = pageElement.getBoundingClientRect();
+      return {
+        pageFitsViewport: pageBounds.bottom <= viewportBounds.bottom + 1,
+        workspaceClearsViewport: bounds.bottom <= viewportBounds.bottom - 16,
+        workspaceClearsDock: bounds.bottom <= dockBounds.top - 20,
+      };
+    });
+    expect(geometry).toEqual({
+      pageFitsViewport: true,
+      workspaceClearsViewport: true,
+      workspaceClearsDock: true,
+    });
+  };
+
+  const expectCompanionComposition = async (selector: string) => {
+    const composition = await page.locator(selector).evaluate((scope) => {
+      const preview = scope.querySelector<HTMLElement>(".workspace-preview")!;
+      const entity = scope.querySelector<HTMLElement>(".scene-entity")!;
+      const sprite = entity.querySelector<HTMLElement>(
+        ".scene-entity__sprite, .scene-entity__image",
+      )!;
+      const composer = scope.querySelector<HTMLElement>(
+        ".workspace-composer__field",
+      )!;
+      const previewBounds = preview.getBoundingClientRect();
+      const entityBounds = entity.getBoundingClientRect();
+      const spriteBounds = sprite.getBoundingClientRect();
+      const composerBounds = composer.getBoundingClientRect();
+      return {
+        heightOccupancy: entityBounds.height / previewBounds.height,
+        groundedDistance: Math.abs(entityBounds.bottom - composerBounds.top),
+        entityInsidePreview:
+          entityBounds.top >= previewBounds.top &&
+          entityBounds.right <= previewBounds.right,
+        spriteMatchesEntity:
+          Math.abs(spriteBounds.width - entityBounds.width) < 1 &&
+          Math.abs(spriteBounds.height - entityBounds.height) < 1,
+      };
+    });
+    expect(composition.heightOccupancy).toBeGreaterThanOrEqual(0.14);
+    expect(composition.heightOccupancy).toBeLessThanOrEqual(0.25);
+    expect(composition.groundedDistance).toBeLessThanOrEqual(2);
+    expect(composition.entityInsidePreview).toBe(true);
+    expect(composition.spriteMatchesEntity).toBe(true);
+  };
+
+  await page.getByRole("button", { name: "Themes", exact: true }).click();
+  await expectWorkspaceFit(".theme-library-workspace");
+  await expectCompanionComposition(".featured-theme__preview");
+  const themeDetails = page.locator(".featured-theme__copy");
+  await expect(themeDetails).toHaveCSS("overflow-y", "hidden");
+  await expect(page).toHaveScreenshot("themes-en-dark-1280x720.png");
+
+  await page.getByRole("button", { name: "Companions", exact: true }).click();
+  await expectWorkspaceFit(".companions-layout");
+  await expectCompanionComposition(".companion-preview-panel");
+  await expect(page).toHaveScreenshot("companions-en-dark-1280x720.png");
+
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expectWorkspaceFit(".companions-layout");
+  const compactViewport = page.locator(".app-main__viewport");
+  await expect
+    .poll(() =>
+      compactViewport.evaluate(
+        (element) => element.scrollHeight === element.clientHeight,
+      ),
+    )
+    .toBe(true);
+});
+
 test("theme library and focused editor remain usable at compact sizes", async ({
   page,
 }) => {
   await openManager(page, "en", "dark", { width: 1320, height: 840 });
   await page.getByRole("button", { name: "Themes", exact: true }).click();
   await expect(page.locator(".theme-library-workspace")).toBeVisible();
+  const appearanceComparison = page.getByRole("group", {
+    name: "Compare appearance",
+  });
+  const previewSurface = page.locator(".featured-theme__preview");
+  const previewControlsTrigger = page.getByRole("button", {
+    name: "Task & composer",
+  });
+  await previewSurface.hover();
+  await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
+  await previewControlsTrigger.click();
+  await appearanceComparison.getByRole("button", { name: "Official" }).click();
+  await expect(
+    page.locator(".featured-theme__preview .workspace-preview"),
+  ).toHaveAttribute("data-preview-presentation", "official");
+  await expect(
+    page.locator(".featured-theme__preview .workspace-entity"),
+  ).toHaveCount(0);
+  await previewSurface.hover();
+  await previewControlsTrigger.click();
+  await appearanceComparison.getByRole("button", { name: "Styled" }).click();
+  await previewSurface.hover();
+  await expect(previewControlsTrigger).toBeVisible();
+  await expect(previewControlsTrigger).toHaveCSS("opacity", "1");
+  await expect(previewControlsTrigger).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  await expect
+    .poll(() =>
+      previewControlsTrigger.evaluate((trigger) => {
+        const bounds = trigger.getBoundingClientRect();
+        const topmostElement = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2,
+        );
+        return (
+          topmostElement === trigger ||
+          (topmostElement !== null && trigger.contains(topmostElement))
+        );
+      }),
+    )
+    .toBe(true);
+  const desktopThemeDetail = page.locator(".featured-theme__copy");
+  const desktopThemeDetailFit = await desktopThemeDetail.evaluate((element) => {
+    const panel = element.getBoundingClientRect();
+    const action = element.querySelector<HTMLElement>(
+      ".theme-detail-card__title-row .secondary-button",
+    )!;
+    const coverage = element.querySelector<HTMLElement>(
+      ".theme-effect-summary",
+    )!;
+    return {
+      overflowIsContained: getComputedStyle(element).overflowY === "hidden",
+      actionVisible: action.getBoundingClientRect().bottom <= panel.bottom + 1,
+      coverageVisible:
+        coverage.getBoundingClientRect().bottom <= panel.bottom + 1,
+    };
+  });
+  expect(desktopThemeDetailFit).toEqual({
+    overflowIsContained: true,
+    actionVisible: true,
+    coverageVisible: true,
+  });
   await expect(page).toHaveScreenshot("themes-en-dark-1320x840.png");
 
   await page.setViewportSize({ width: 960, height: 680 });
   await expect(page.locator(".theme-library-master")).toBeVisible();
   await expect(page.locator(".featured-theme")).toBeHidden();
   await expect(page).toHaveScreenshot("themes-en-dark-960x680.png");
+
+  await page.locator(".theme-row__select").first().click();
+  const compactThemeDetail = page.locator(
+    ".theme-library-workspace--detail .featured-theme__copy",
+  );
+  await expect(compactThemeDetail).toBeVisible();
+  const compactTitlePosition = await compactThemeDetail.evaluate((element) => {
+    const title = element.querySelector("h2");
+    return {
+      panelTop: element.getBoundingClientRect().top,
+      titleTop: title?.getBoundingClientRect().top ?? -1,
+    };
+  });
+  expect(compactTitlePosition.titleTop).toBeGreaterThanOrEqual(
+    compactTitlePosition.panelTop,
+  );
+  const compactThemeDetailFit = await compactThemeDetail.evaluate((element) => {
+    const panel = element.getBoundingClientRect();
+    const description = element.querySelector<HTMLElement>("p")!;
+    const action = element.querySelector<HTMLElement>(
+      ".theme-detail-card__title-row .secondary-button",
+    )!;
+    const coverage = element.querySelector<HTMLElement>(
+      ".theme-effect-summary",
+    )!;
+    return {
+      descriptionHeight: description.getBoundingClientRect().height,
+      actionVisible: action.getBoundingClientRect().bottom <= panel.bottom + 1,
+      contentIsContained:
+        getComputedStyle(element).overflowY === "hidden" &&
+        coverage.getBoundingClientRect().bottom <= panel.bottom + 1 &&
+        element.scrollWidth <= element.clientWidth + 1,
+    };
+  });
+  expect(compactThemeDetailFit.descriptionHeight).toBeGreaterThanOrEqual(20);
+  expect(compactThemeDetailFit.actionVisible).toBe(true);
+  expect(compactThemeDetailFit.contentIsContained).toBe(true);
+  await expect(page).toHaveScreenshot("themes-detail-en-dark-960x680.png");
+  await page.getByRole("button", { name: "Back to themes" }).click();
 
   await page.getByRole("button", { name: "New theme" }).click();
   await page.getByRole("button", { name: /Start blank/ }).click();
@@ -111,13 +372,26 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   ).toBeHidden();
   await expect(
     page.getByRole("region", { name: "Live effect mapped" }),
-  ).toContainText("5 preview views");
+  ).toContainText("8 preview views");
   const saveDraft = page.getByRole("button", { name: "Save draft" });
   await expect(saveDraft).toBeDisabled();
   await expect(saveDraft).toHaveAttribute("data-dirty", "false");
   await expect(page).toHaveScreenshot("theme-editor-en-dark-960x680.png");
 
-  await page.getByRole("button", { name: "Surfaces" }).click();
+  const previewScenario = page.getByRole("combobox", {
+    name: "Preview scenario",
+  });
+  await previewScenario.selectOption("changes");
+  await expect(page.locator(".workspace-change-review")).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Changes" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await page.getByRole("tab", { name: "Terminal" }).click();
+  await expect(previewScenario).toHaveValue("terminal");
+  await expect(page.locator(".workspace-terminal-activity")).toBeVisible();
+
+  await page.getByRole("button", { name: "Interface system" }).click();
   await expect(
     page.getByRole("button", { name: "Appearance" }),
   ).toHaveAttribute("aria-expanded", "true");
@@ -125,17 +399,36 @@ test("theme library and focused editor remain usable at compact sizes", async ({
     page.getByRole("region", { name: "Enhanced mode effect" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Preview on Task & composer" })
+    .getByRole("button", { name: "Preview on Components & states" })
     .click();
   await expect(page.locator(".workspace-preview")).toHaveAttribute(
     "data-preview-scenario",
-    "task",
+    "components",
   );
+  await expect(page.locator(".workspace-component-grid")).toBeVisible();
   await expect(page.locator('[data-theme-control^="surfaces."]')).toHaveCount(
-    6,
+    13,
   );
+  await expect(
+    page.locator('[data-theme-control="surfaces.treatment"]'),
+  ).toBeVisible();
   const savedPreview = page.getByRole("button", { name: "Saved" });
   await expect(savedPreview).toBeDisabled();
+  const frostedMaterial = page.getByRole("button", { name: "Frosted" });
+  await frostedMaterial.click();
+  await expect(frostedMaterial).toHaveAttribute("aria-pressed", "true");
+  await page.locator("summary").filter({ hasText: "Fine tune" }).click();
+  await expect(
+    page.getByRole("slider", { name: /Focused panel opacity/ }),
+  ).toHaveValue("0.92");
+  await expect(page.getByRole("slider", { name: /Glass blur/ })).toHaveValue(
+    "20",
+  );
+  await expect(page.locator(".workspace-preview")).toHaveCSS(
+    "--preview-focus-blur",
+    "20px",
+  );
+  await expect(savedPreview).toBeEnabled();
   await page
     .getByRole("combobox", { name: "Workspace layout" })
     .selectOption("immersive");
@@ -169,6 +462,32 @@ test("theme library and focused editor remain usable at compact sizes", async ({
   );
   await expect(page.locator(".inspector-content")).not.toHaveAttribute("inert");
 
+  await page
+    .locator(".canvas-version-control")
+    .getByRole("button", { name: "Official", exact: true })
+    .click();
+  await expect(page.locator(".canvas-stage")).toHaveAttribute(
+    "data-preview-version",
+    "official",
+  );
+  await expect(page.locator(".workspace-preview")).toHaveAttribute(
+    "data-preview-presentation",
+    "official",
+  );
+  await expect(
+    page.getByText("Official Codex reference", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".inspector-content")).toHaveAttribute("inert");
+  await page.getByRole("button", { name: "Return" }).click();
+  await expect(page.locator(".canvas-stage")).toHaveAttribute(
+    "data-preview-version",
+    "current",
+  );
+  await expect(page.locator(".workspace-preview")).toHaveAttribute(
+    "data-preview-presentation",
+    "styled",
+  );
+
   await page.getByRole("button", { name: "Back to themes" }).click();
   const unsavedDialog = page.getByRole("dialog", {
     name: "Save this theme before leaving?",
@@ -186,21 +505,36 @@ test("scroll surfaces use product chrome instead of platform defaults", async ({
   page,
 }) => {
   await openManager(page, "en", "dark", { width: 960, height: 680 });
+  await expect
+    .poll(() =>
+      page
+        .locator("html")
+        .evaluate((element) => getComputedStyle(element).colorScheme),
+    )
+    .toBe("dark");
   await page.getByRole("button", { name: "Themes", exact: true }).click();
 
   const themeList = page.locator(".theme-list");
   await expect(themeList).toBeVisible();
   const themeScrollChrome = await themeList.evaluate((element) => {
     const style = getComputedStyle(element);
+    const scrollbar = getComputedStyle(element, "::-webkit-scrollbar");
+    const track = getComputedStyle(element, "::-webkit-scrollbar-track");
     const thumb = getComputedStyle(element, "::-webkit-scrollbar-thumb");
     return {
       color: style.scrollbarColor,
+      gutter: style.scrollbarGutter,
       width: style.scrollbarWidth,
+      nativeWidth: scrollbar.width,
+      trackBackground: track.backgroundColor,
       thumbRadius: thumb.borderRadius,
     };
   });
   expect(themeScrollChrome.color).not.toBe("auto");
+  expect(themeScrollChrome.gutter).toBe("auto");
   expect(themeScrollChrome.width).toBe("thin");
+  expect(themeScrollChrome.nativeWidth).toBe("8px");
+  expect(themeScrollChrome.trackBackground).toBe("rgba(0, 0, 0, 0)");
   expect(themeScrollChrome.thumbRadius).toBe("999px");
 
   await page.getByRole("button", { name: "Companions" }).click();
@@ -215,15 +549,68 @@ test("scroll surfaces use product chrome instead of platform defaults", async ({
     .not.toBe("auto");
 
   await page.getByRole("button", { name: "New companion" }).click();
+  const appViewport = page.locator(".app-main__viewport");
   const creatorSteps = page.locator(".creator-steps");
+  const creatorWorkbench = page.locator(".creator-workbench");
+  const creatorFooter = page.locator(".creator-footer");
   await expect(creatorSteps).toBeVisible();
-  await expect
-    .poll(() =>
-      creatorSteps.evaluate(
-        (element) => getComputedStyle(element).scrollbarColor,
-      ),
-    )
-    .not.toBe("auto");
+  const creatorLayout = await page.evaluate(() => {
+    const viewport = document.querySelector<HTMLElement>(
+      ".app-main__viewport",
+    )!;
+    const steps = document.querySelector<HTMLElement>(".creator-steps")!;
+    const workbench =
+      document.querySelector<HTMLElement>(".creator-workbench")!;
+    const footer = document.querySelector<HTMLElement>(".creator-footer")!;
+    const stepsScrollbar = getComputedStyle(steps, "::-webkit-scrollbar");
+    const stepsTrack = getComputedStyle(steps, "::-webkit-scrollbar-track");
+    const viewportStyle = getComputedStyle(viewport);
+    const workbenchStyle = getComputedStyle(workbench);
+    const stepsRect = steps.getBoundingClientRect();
+    const workbenchRect = workbench.getBoundingClientRect();
+    const footerRect = footer.getBoundingClientRect();
+    return {
+      viewportOverflowX: viewportStyle.overflowX,
+      viewportOverflowY: viewportStyle.overflowY,
+      workbenchOverflowY: workbenchStyle.overflowY,
+      stepsScrollbarHeight: stepsScrollbar.height,
+      stepsTrackBackground: stepsTrack.backgroundColor,
+      stepsFitWithoutRail: steps.scrollWidth <= steps.clientWidth,
+      workbenchStartsAfterSteps: workbenchRect.top >= stepsRect.bottom - 1,
+      workbenchEndsBeforeFooter: workbenchRect.bottom <= footerRect.top + 1,
+      footerEndsInsideViewport: footerRect.bottom <= window.innerHeight + 1,
+    };
+  });
+  expect(creatorLayout).toEqual({
+    viewportOverflowX: "hidden",
+    viewportOverflowY: "hidden",
+    workbenchOverflowY: "auto",
+    stepsScrollbarHeight: "6px",
+    stepsTrackBackground: "rgba(0, 0, 0, 0)",
+    stepsFitWithoutRail: true,
+    workbenchStartsAfterSteps: true,
+    workbenchEndsBeforeFooter: true,
+    footerEndsInsideViewport: true,
+  });
+  await expect(appViewport).toHaveAttribute("data-view", "companion-editor");
+  await expect(creatorWorkbench).toBeVisible();
+  await expect(creatorFooter).toBeVisible();
+
+  const lateCascadeFallback = await page.evaluate(() => {
+    const onboardingContent = document.createElement("div");
+    onboardingContent.className = "onboarding-content";
+    onboardingContent.dataset.scrollSurface = "panel";
+    document.body.append(onboardingContent);
+    const style = getComputedStyle(onboardingContent);
+    const result = {
+      color: style.scrollbarColor,
+      gutter: style.scrollbarGutter,
+    };
+    onboardingContent.remove();
+    return result;
+  });
+  expect(lateCascadeFallback.color).not.toBe("auto");
+  expect(lateCascadeFallback.gutter).toBe("auto");
 });
 
 test("settings controls share a stable professional layout", async ({
@@ -342,7 +729,9 @@ test("keyboard companion creator completes a static-image project", async ({
   await expect(generateFrames).toBeVisible();
   await expect(page).toHaveScreenshot("creator-extract-en-dark.png");
   await generateFrames.press("Enter");
-  await expect(page.getByRole("heading", { name: "Clean up" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Clean up" })).toBeVisible({
+    timeout: 20_000,
+  });
   await expect(page.getByText("Processing is synchronized")).toBeVisible();
   await page.getByRole("button", { name: "Import", exact: true }).click();
   await page
@@ -398,6 +787,33 @@ test("keyboard companion creator completes a static-image project", async ({
     page.getByRole("heading", { name: "Shared canvas ready" }),
   ).toBeVisible();
   await expect(page).toHaveScreenshot("creator-align-en-dark.png");
+  await page.setViewportSize({ width: 960, height: 680 });
+  await expect(page).toHaveScreenshot("creator-align-en-dark-960x680.png");
+  await page.setViewportSize({ width: 1320, height: 840 });
+  const globalSize = page.getByLabel("Global size percentage");
+  await globalSize.fill("125");
+  await expect(
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Fit all frames to canvas" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Shared canvas ready" }),
+  ).toBeVisible();
+  await expect
+    .poll(async () => Number(await globalSize.inputValue()))
+    .toBeLessThanOrEqual(100);
+  await expect(
+    page.locator(".alignment-current-frame").locator("xpath=.."),
+  ).toHaveAttribute("transform", /scale\(0\./);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(globalSize).toHaveValue("125");
+  await expect(
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Shared canvas ready" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Current frame", exact: true })
     .click();
@@ -421,7 +837,7 @@ test("keyboard companion creator completes a static-image project", async ({
     .poll(async () => Number(await baselineX.inputValue()))
     .not.toBe(baselineXBefore);
   await expect(
-    page.getByRole("heading", { name: "Some frames need alignment" }),
+    page.getByRole("heading", { name: "Alignment assistant found an issue" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Snap current frame" }).click();
   await expect(
@@ -509,6 +925,22 @@ test("keyboard companion creator completes a static-image project", async ({
     .fill("A keyboard-tested local companion.");
   await page.getByLabel("Author").fill("Test creator");
   await page.getByLabel("Asset license").selectOption("CC0-1.0");
+
+  await reviewSetup.press("Enter");
+  const edgeReview = page.getByRole("group", {
+    name: "Edge review backgrounds",
+  });
+  for (const backdrop of ["Black", "White", "Theme color"] as const) {
+    await edgeReview
+      .getByRole("button", { name: backdrop, exact: true })
+      .click();
+    await page
+      .getByRole("button", {
+        name: new RegExp(`Confirm edges on ${backdrop.toLowerCase()}`),
+      })
+      .click();
+  }
+
   const buildCompanion = page.getByRole("button", {
     name: /Build and install companion/,
   });
@@ -561,12 +993,40 @@ test("standard H.264 MP4 extracts without conversion", async ({ page }) => {
   await expect(page.getByText("short-h264.mp4", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: /Next/ }).click();
   await expect(page.getByRole("button", { name: "Set in" })).toBeVisible();
+  await page
+    .locator(".creator-control-row", { hasText: "Extraction FPS" })
+    .locator('input[type="range"]')
+    .fill("60");
+  await expect(page.getByText("60 FPS", { exact: true })).toBeVisible();
   await expect(page).toHaveScreenshot("creator-video-extract-en-dark.png");
   await page.getByRole("button", { name: /Extract video frames/ }).click();
+  await expect(page.getByRole("heading", { name: "Clean up" })).toBeVisible({
+    timeout: 20_000,
+  });
   await expect(page.getByText(/\d+ frames/u)).toBeVisible();
   await expect(
     page.getByText(/could not be decoded|codec inside/u),
   ).toHaveCount(0);
+  const frameStrip = page.locator(".creator-frame-strip__items");
+  await expect(frameStrip).toBeVisible();
+  const frameStripChrome = await frameStrip.evaluate((element) => {
+    const scrollbar = getComputedStyle(element, "::-webkit-scrollbar");
+    const track = getComputedStyle(element, "::-webkit-scrollbar-track");
+    const firstFrame = element.firstElementChild!.getBoundingClientRect();
+    const bounds = element.getBoundingClientRect();
+    return {
+      scrollbarHeight: scrollbar.height,
+      trackBackground: track.backgroundColor,
+      bottomClearance: Math.round(bounds.bottom - firstFrame.bottom),
+      overflowsHorizontally: element.scrollWidth > element.clientWidth,
+    };
+  });
+  expect(frameStripChrome.scrollbarHeight).toBe("6px");
+  expect(frameStripChrome.trackBackground).toBe("rgba(0, 0, 0, 0)");
+  expect(frameStripChrome.bottomClearance).toBeGreaterThanOrEqual(8);
+  expect(frameStripChrome.overflowsHorizontally).toBe(true);
+  await frameStrip.scrollIntoViewIfNeeded();
+  await expect(page).toHaveScreenshot("creator-video-frames-en-dark.png");
 });
 
 test("light companion cleanup remains legible", async ({ page }) => {

@@ -310,7 +310,7 @@ export const docs: DocPage[] = [
         {
           heading: "Current Beta targets",
           paragraphs: [
-            "Unsigned Beta installers are available for macOS on Apple Silicon and Windows 11 x64. macOS has the current real-device evidence; Windows Beta 6 is produced and structurally checked in CI but explicitly awaits community validation. The RC gate requires at least two complete independent device reports per platform.",
+            "Unsigned Beta installers are available for macOS on Apple Silicon and Windows 11 x64. macOS has the current real-device evidence; Windows Beta 7 is produced and structurally checked in CI but explicitly awaits community validation. The RC gate requires at least two complete independent device reports per platform.",
           ],
         },
         {
@@ -324,7 +324,7 @@ export const docs: DocPage[] = [
         {
           heading: "当前 Beta 目标",
           paragraphs: [
-            "当前提供未签名的 Apple Silicon macOS 与 Windows 11 x64 Beta 安装包。macOS 已有现阶段真实设备证据；Windows Beta 6 由 CI 构建并完成结构校验，但明确等待社区实机验证。进入 RC 前，两个平台都至少需要两份独立的完整实机报告。",
+            "当前提供未签名的 Apple Silicon macOS 与 Windows 11 x64 Beta 安装包。macOS 已有现阶段真实设备证据；Windows Beta 7 由 CI 构建并完成结构校验，但明确等待社区实机验证。进入 RC 前，两个平台都至少需要两份独立的完整实机报告。",
           ],
         },
         {

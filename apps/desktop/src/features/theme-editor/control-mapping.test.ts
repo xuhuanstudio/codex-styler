@@ -8,7 +8,7 @@ import {
 describe("theme editor control mapping registry", () => {
   it("registers every visible control with a runtime signal", () => {
     const mappings = Object.values(themeEditorControlMappings);
-    expect(mappings).toHaveLength(21);
+    expect(mappings).toHaveLength(28);
     expect(new Set(mappings.map((mapping) => mapping.id)).size).toBe(
       mappings.length,
     );
@@ -31,7 +31,10 @@ describe("theme editor control mapping registry", () => {
       expect(coverage.scenarios).toEqual([
         "home",
         "task",
+        "changes",
+        "terminal",
         "settings",
+        "components",
         "dialog",
         "right-panel",
       ]);
@@ -43,5 +46,9 @@ describe("theme editor control mapping registry", () => {
       scenarios: [],
       recommendedScenario: null,
     });
+    expect(themeEditorSectionCoverage("motion").mode).toBe("hybrid");
+    expect(
+      themeEditorControlMappings["motion.intensity"].runtimeSignal,
+    ).toContain("data-codex-styler-motion");
   });
 });

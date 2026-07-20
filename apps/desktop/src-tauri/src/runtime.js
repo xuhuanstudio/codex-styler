@@ -1,5 +1,5 @@
 (() => {
-  if (window.__CODEX_STYLER_RUNTIME__?.version === 18) return;
+  if (window.__CODEX_STYLER_RUNTIME__?.version === 36) return;
   window.__CODEX_STYLER_RUNTIME__?.restore?.();
 
   const BACKDROP_ID = "codex-styler-scene-root";
@@ -35,6 +35,7 @@
   ]);
   let pointerHandler = null;
   let scenePointerHandler = null;
+  let sceneResetHandler = null;
   let sceneAnimationFrame = null;
   let resizeHandler = null;
   let layoutResizeHandler = null;
@@ -51,6 +52,112 @@
     Number.isFinite(value) &&
     value >= minimum &&
     value <= maximum;
+
+  const ENTITY_SAFE_INSET = 8;
+  const clampEntityCenter = (value, extent, viewportExtent) => {
+    const viewport = Math.max(0, viewportExtent);
+    const halfExtent = Math.max(0, extent) / 2;
+    const minimum = ENTITY_SAFE_INSET + halfExtent;
+    const maximum = viewport - ENTITY_SAFE_INSET - halfExtent;
+    if (minimum > maximum) return viewport / 2;
+    return Math.max(minimum, Math.min(maximum, value));
+  };
+  const safeFreeEntityPosition = (
+    x,
+    y,
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  ) => ({
+    x: clampEntityCenter(x, width, viewportWidth),
+    y: clampEntityCenter(y, height, viewportHeight),
+  });
+  const safeAttachedEntityPosition = (
+    target,
+    attachment,
+    width,
+    height,
+    viewportWidth,
+    viewportHeight,
+  ) => {
+    const rawY =
+      (attachment.edge === "bottom" ? target.bottom : target.top) +
+      attachment.offset.y;
+    const minimumY =
+      attachment.edge === "top"
+        ? ENTITY_SAFE_INSET + height
+        : ENTITY_SAFE_INSET;
+    const maximumY =
+      attachment.edge === "top"
+        ? viewportHeight - ENTITY_SAFE_INSET
+        : viewportHeight - ENTITY_SAFE_INSET - height;
+    const y =
+      minimumY > maximumY
+        ? attachment.edge === "top"
+          ? viewportHeight - ENTITY_SAFE_INSET
+          : ENTITY_SAFE_INSET
+        : Math.max(minimumY, Math.min(maximumY, rawY));
+    return {
+      x: clampEntityCenter(
+        target.left + target.width * attachment.align + attachment.offset.x,
+        width,
+        viewportWidth,
+      ),
+      y,
+    };
+  };
+
+  const resolveMaterialCharacter = (appearance) => {
+    const opacity = Math.min(
+      appearance.surfaceOpacity,
+      appearance.focusOpacity,
+    );
+    if (appearance.focusBlur <= 4 && opacity >= 0.93) return "solid";
+    if (appearance.focusBlur >= 16 || opacity <= 0.82) return "frosted";
+    return "layered";
+  };
+
+  // Keep these thresholds aligned with resolveThemeMotionProfile in the
+  // desktop preview. Motion may change paint and transform only; it must not
+  // alter Codex layout measurements or hit targets.
+  const resolveMotionProfile = (intensity) => {
+    const normalized = Math.max(0, Math.min(1, intensity));
+    if (normalized <= 0.05) {
+      return {
+        character: "still",
+        duration: 0,
+        lift: 0,
+        pressScale: 1,
+        overlayOpacity: 1,
+      };
+    }
+    if (normalized < 0.4) {
+      return {
+        character: "calm",
+        duration: 140,
+        lift: 1,
+        pressScale: 0.995,
+        overlayOpacity: 0.96,
+      };
+    }
+    if (normalized < 0.72) {
+      return {
+        character: "fluid",
+        duration: 190,
+        lift: 2,
+        pressScale: 0.99,
+        overlayOpacity: 0.9,
+      };
+    }
+    return {
+      character: "expressive",
+      duration: 240,
+      lift: 3,
+      pressScale: 0.985,
+      overlayOpacity: 0.84,
+    };
+  };
 
   const rgb = (hex) =>
     [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
@@ -202,6 +309,7 @@
       !finiteBetween(background.blur, 0, 40) ||
       !finiteBetween(background.overlayOpacity, 0, 1) ||
       !finiteBetween(appearance.surfaceOpacity, 0, 1) ||
+      !finiteBetween(appearance.focusOpacity, 0, 1) ||
       !finiteBetween(appearance.radius, 0, 32) ||
       !finiteBetween(appearance.focusBlur, 0, 32)
     ) {
@@ -396,8 +504,13 @@
   const remove = () => {
     if (scenePointerHandler)
       window.removeEventListener("pointermove", scenePointerHandler);
+    if (sceneResetHandler) {
+      window.removeEventListener("blur", sceneResetHandler);
+      document.removeEventListener("pointerleave", sceneResetHandler, true);
+    }
     if (sceneAnimationFrame !== null) cancelAnimationFrame(sceneAnimationFrame);
     scenePointerHandler = null;
+    sceneResetHandler = null;
     sceneAnimationFrame = null;
     mutationObserver?.disconnect();
     mutationObserver = null;
@@ -418,6 +531,10 @@
     document.documentElement.removeAttribute("data-codex-styler-layout");
     document.documentElement.removeAttribute("data-codex-styler-icons");
     document.documentElement.removeAttribute("data-codex-styler-decorations");
+    document.documentElement.removeAttribute("data-codex-styler-geometry");
+    document.documentElement.removeAttribute("data-codex-styler-material");
+    document.documentElement.removeAttribute("data-codex-styler-typography");
+    document.documentElement.removeAttribute("data-codex-styler-motion");
     document.documentElement.removeAttribute("data-codex-styler-variant");
     document.documentElement.removeAttribute("data-codex-styler-contrast");
     document.documentElement.removeAttribute(
@@ -566,6 +683,7 @@
       0.98,
       Math.max(
         authoredSurfaceOpacity,
+        appearance.focusOpacity,
         quietSurfaceOpacity + (imageBacked ? 0.12 : 0.08),
       ),
     );
@@ -733,11 +851,48 @@
     return true;
   };
 
-  const semanticPalette = (appearance, background, variant, contrastSystem) => {
+  const semanticPalette = (appearance, background, contrastSystem) => {
     const custom = appearance.palette || {};
+    const strength = {
+      none: {
+        raised: 0.04,
+        overlay: 0.07,
+        control: 0.05,
+        controlHover: 0.08,
+        controlActive: 0.12,
+      },
+      subtle: {
+        raised: 0.06,
+        overlay: 0.1,
+        control: 0.08,
+        controlHover: 0.13,
+        controlActive: 0.18,
+      },
+      expressive: {
+        raised: 0.1,
+        overlay: 0.16,
+        control: 0.12,
+        controlHover: 0.2,
+        controlActive: 0.28,
+      },
+    }[appearance.decorations || "none"] || {
+      raised: 0.04,
+      overlay: 0.07,
+      control: 0.05,
+      controlHover: 0.08,
+      controlActive: 0.12,
+    };
     const textPrimary = contrastSystem.textPrimary;
     const textSecondary = contrastSystem.textSecondary;
     const textTertiary = contrastSystem.textTertiary;
+    const preferredIconColor = (emphasis = false) => {
+      const style = appearance.iconStyle || "native";
+      const base = emphasis ? textPrimary : textSecondary;
+      if (style === "native") return base;
+      const accentAmount =
+        style === "themed" ? (emphasis ? 0.72 : 0.58) : emphasis ? 0.5 : 0.36;
+      return mix(base, appearance.accent, accentAmount);
+    };
     const readableSurface = (surface, minimum = 4.5) =>
       contrast(textPrimary, surface) >= minimum &&
       contrast(textSecondary, surface) >= minimum &&
@@ -749,11 +904,9 @@
       return readableSurface(fallback, minimum) ? fallback : appearance.surface;
     };
     const safeForeground = (candidate, backgrounds, fallback, minimum = 4.5) =>
-      candidate && minimumContrast(candidate, backgrounds) >= minimum
-        ? candidate
-        : readable(fallback, backgrounds, minimum);
+      readable(candidate || fallback, backgrounds, minimum);
     const statusDefaults =
-      variant === "dark"
+      contrastSystem.tone === "light"
         ? {
             success: "#4BC47D",
             warning: "#E7A645",
@@ -766,70 +919,123 @@
             danger: "#B93232",
             info: "#1F5F99",
           };
-    const success = safeForeground(
-      custom.success,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.success,
-    );
-    const warning = safeForeground(
-      custom.warning,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.warning,
-    );
-    const danger = safeForeground(
-      custom.danger,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.danger,
-    );
-    const info = safeForeground(
-      custom.info || appearance.accent,
-      contrastSystem.strongBackgrounds,
-      statusDefaults.info,
-    );
+    const preferredFeedbackColor = (role) => {
+      if (role === "success") return custom.success || statusDefaults.success;
+      if (role === "warning") return custom.warning || statusDefaults.warning;
+      if (role === "danger") return custom.danger || statusDefaults.danger;
+      if (role === "info") return custom.info || appearance.accent;
+      if (role === "added")
+        return custom.added || custom.success || statusDefaults.success;
+      if (role === "modified")
+        return custom.modified || custom.warning || statusDefaults.warning;
+      return custom.deleted || custom.danger || statusDefaults.danger;
+    };
     const onAccent = safeForeground(
       custom.onAccent,
       [appearance.accent],
       readable(appearance.surface, appearance.accent),
     );
+    const canvas = safeSurface(custom.canvas, background.color);
+    const surfaceRaised = safeSurface(
+      custom.surfaceRaised,
+      mix(appearance.surface, appearance.accent, strength.raised),
+    );
+    const surfaceOverlay = safeSurface(
+      custom.surfaceOverlay,
+      mix(appearance.surface, appearance.accent, strength.overlay),
+    );
+    const surfaceSunken = safeSurface(
+      custom.surfaceSunken,
+      mix(appearance.surface, background.color, 0.12),
+    );
+    const control = safeSurface(
+      custom.control,
+      mix(appearance.surface, appearance.accent, strength.control),
+    );
+    const controlHover = safeSurface(
+      custom.controlHover,
+      mix(appearance.surface, appearance.accent, strength.controlHover),
+    );
+    const controlActive = safeSurface(
+      custom.controlActive,
+      mix(appearance.surface, appearance.accent, strength.controlActive),
+    );
+    const boundaryBackgrounds = [
+      appearance.surface,
+      surfaceRaised,
+      surfaceOverlay,
+      surfaceSunken,
+      control,
+      controlHover,
+      controlActive,
+    ];
+    // Mirrors the desktop preview contract: quiet separators stay subtle,
+    // while regular and strong component boundaries cannot disappear.
+    const border = readable(appearance.border, boundaryBackgrounds, 1.5);
+    const borderSubtle = readable(
+      custom.borderSubtle || mix(appearance.surface, border, 0.72),
+      boundaryBackgrounds,
+      1.25,
+    );
+    const borderStrong = readable(
+      custom.borderStrong || mix(border, textPrimary, 0.3),
+      boundaryBackgrounds,
+      custom.borderStrong ? 3 : 2.5,
+    );
+    const icon = readable(preferredIconColor(), boundaryBackgrounds, 3);
+    const iconEmphasis = readable(
+      preferredIconColor(true),
+      boundaryBackgrounds,
+      3,
+    );
+    const feedbackSurfaces = boundaryBackgrounds;
+    // Mirrors the foreground-bearing inline diff (11%) and status (16%)
+    // surfaces. Stronger editor fills use normal text, not the status hue.
+    const feedbackTintAmounts = [0.11, 0.16];
+    const tintedFeedbackBackgrounds = (foreground) =>
+      feedbackSurfaces.flatMap((surface) =>
+        feedbackTintAmounts.map((amount) => mix(surface, foreground, amount)),
+      );
+    const feedbackColor = (role) => {
+      let resolved = readable(
+        preferredFeedbackColor(role),
+        feedbackSurfaces,
+        4.5,
+      );
+      for (let iteration = 0; iteration < 8; iteration += 1) {
+        const next = readable(
+          resolved,
+          [...feedbackSurfaces, ...tintedFeedbackBackgrounds(resolved)],
+          4.5,
+        );
+        if (next === resolved) break;
+        resolved = next;
+      }
+      return resolved;
+    };
+    const success = feedbackColor("success");
+    const warning = feedbackColor("warning");
+    const danger = feedbackColor("danger");
+    const info = feedbackColor("info");
     return {
-      canvas: safeSurface(custom.canvas, background.color),
+      canvas,
       surface: appearance.surface,
-      surfaceRaised: safeSurface(
-        custom.surfaceRaised,
-        mix(appearance.surface, appearance.text, 0.08),
-      ),
-      surfaceOverlay: safeSurface(
-        custom.surfaceOverlay,
-        mix(appearance.surface, appearance.text, 0.14),
-      ),
-      surfaceSunken: safeSurface(
-        custom.surfaceSunken,
-        mix(appearance.surface, background.color, 0.12),
-      ),
-      control: safeSurface(
-        custom.control,
-        mix(appearance.surface, appearance.text, 0.1),
-      ),
-      controlHover: safeSurface(
-        custom.controlHover,
-        mix(appearance.surface, appearance.text, 0.16),
-      ),
-      controlActive: safeSurface(
-        custom.controlActive,
-        mix(appearance.surface, appearance.text, 0.24),
-      ),
+      surfaceRaised,
+      surfaceOverlay,
+      surfaceSunken,
+      control,
+      controlHover,
+      controlActive,
       textPrimary,
       textSecondary,
       textTertiary,
+      icon,
+      iconEmphasis,
       accent: appearance.accent,
       onAccent,
-      border: appearance.border,
-      borderSubtle:
-        custom.borderSubtle ||
-        `color-mix(in srgb, ${appearance.border} 52%, transparent)`,
-      borderStrong:
-        custom.borderStrong ||
-        `color-mix(in srgb, ${appearance.border} 70%, ${appearance.text})`,
+      border,
+      borderSubtle,
+      borderStrong,
       focus: safeForeground(
         custom.focus || appearance.accent,
         contrastSystem.strongBackgrounds,
@@ -839,21 +1045,9 @@
       warning,
       danger,
       info,
-      added: safeForeground(
-        custom.added,
-        contrastSystem.strongBackgrounds,
-        success,
-      ),
-      modified: safeForeground(
-        custom.modified,
-        contrastSystem.strongBackgrounds,
-        warning,
-      ),
-      deleted: safeForeground(
-        custom.deleted,
-        contrastSystem.strongBackgrounds,
-        danger,
-      ),
+      added: feedbackColor("added"),
+      modified: feedbackColor("modified"),
+      deleted: feedbackColor("deleted"),
     };
   };
 
@@ -870,6 +1064,8 @@
     --codex-styler-text-primary: ${palette.textPrimary};
     --codex-styler-text-secondary: ${palette.textSecondary};
     --codex-styler-text-tertiary: ${palette.textTertiary};
+    --codex-styler-icon: ${palette.icon};
+    --codex-styler-icon-emphasis: ${palette.iconEmphasis};
     --codex-styler-accent: ${palette.accent};
     --codex-styler-on-accent: ${palette.onAccent};
     --codex-styler-border: ${palette.border};
@@ -912,8 +1108,8 @@
     --color-text-button-primary: var(--codex-styler-on-accent);
     --color-text-button-secondary: var(--codex-styler-text-primary);
     --color-text-button-tertiary: var(--codex-styler-text-secondary);
-    --color-icon-primary: var(--codex-styler-text-primary);
-    --color-icon-secondary: var(--codex-styler-text-secondary);
+    --color-icon-primary: var(--codex-styler-icon-emphasis);
+    --color-icon-secondary: var(--codex-styler-icon);
     --color-icon-tertiary: var(--codex-styler-text-tertiary);
     --color-border: var(--codex-styler-border);
     --color-border-light: var(--codex-styler-border-subtle);
@@ -1077,7 +1273,11 @@
 
   const installStyles = (theme, variant, safeMode) => {
     const visual = theme.variants[variant];
-    const { appearance, background } = visual;
+    const { background } = visual;
+    const authoredAppearance = visual.appearance;
+    const motionProfile = resolveMotionProfile(visual.motion.intensity);
+    const motionDuration = motionProfile.duration;
+    const interactionLift = motionProfile.lift;
     const contrastSystem = resolveContrastSystem(theme, variant);
     const protectedText = contrastSystem.textPrimary;
     const quietSurfacePercent = Math.round(
@@ -1086,13 +1286,16 @@
     const strongSurfacePercent = Math.round(
       contrastSystem.strongSurfaceOpacity * 100,
     );
-    const accentText = readable(appearance.surface, appearance.accent);
+    const accentText = readable(
+      authoredAppearance.surface,
+      authoredAppearance.accent,
+    );
     const palette = semanticPalette(
-      appearance,
+      authoredAppearance,
       background,
-      variant,
       contrastSystem,
     );
+    const appearance = { ...authoredAppearance, border: palette.border };
     const style = document.createElement("style");
     style.id = STYLE_ID;
     const semantic = safeMode
@@ -1102,12 +1305,107 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           color-scheme: ${variant} !important;
+          --codex-styler-motion-duration: ${motionDuration}ms;
+          --codex-styler-motion-lift: ${motionProfile.lift}px;
+          --codex-styler-motion-press-scale: ${motionProfile.pressScale};
+          --codex-styler-motion-overlay-opacity: ${motionProfile.overlayOpacity};
+          --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 26%, var(--codex-styler-border-strong));
+          --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 52%, var(--codex-styler-border-strong));
+          --codex-styler-material-raised: color-mix(in srgb, var(--codex-styler-surface-raised) 92%, transparent);
+          --codex-styler-material-overlay: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent);
+          --codex-styler-material-sunken: color-mix(in srgb, var(--codex-styler-surface-sunken) 92%, transparent);
+          --codex-styler-material-border: var(--codex-styler-border);
+          --codex-styler-material-filter: saturate(1.04) blur(${Math.max(4, Math.round(appearance.focusBlur * 0.65))}px);
+          --codex-styler-material-raised-shadow: 0 10px 28px rgb(0 0 0 / 9%);
+          --codex-styler-material-overlay-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 5%, transparent), 0 20px 54px rgb(0 0 0 / 17%);
           ${codexColorTokenDeclarations(palette)}
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-material="solid"] {
+          --codex-styler-material-raised: var(--codex-styler-surface-raised);
+          --codex-styler-material-overlay: var(--codex-styler-surface-overlay);
+          --codex-styler-material-sunken: var(--codex-styler-surface-sunken);
+          --codex-styler-material-border: var(--codex-styler-border-strong);
+          --codex-styler-material-filter: none;
+          --codex-styler-material-raised-shadow: 0 5px 16px rgb(0 0 0 / 8%);
+          --codex-styler-material-overlay-shadow: 0 14px 34px rgb(0 0 0 / 16%);
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-material="frosted"] {
+          --codex-styler-material-raised: linear-gradient(145deg, color-mix(in srgb, var(--codex-styler-surface-raised) 86%, transparent), color-mix(in srgb, var(--codex-styler-surface-overlay) 70%, transparent));
+          --codex-styler-material-overlay: linear-gradient(145deg, color-mix(in srgb, var(--codex-styler-surface-overlay) 88%, transparent), color-mix(in srgb, var(--codex-styler-surface-raised) 68%, transparent));
+          --codex-styler-material-sunken: color-mix(in srgb, var(--codex-styler-surface-sunken) 82%, transparent);
+          --codex-styler-material-border: color-mix(in srgb, var(--codex-styler-accent) 22%, var(--codex-styler-border));
+          --codex-styler-material-filter: saturate(1.14) blur(${Math.max(14, appearance.focusBlur)}px);
+          --codex-styler-material-raised-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 7%, transparent), 0 15px 38px rgb(0 0 0 / 13%);
+          --codex-styler-material-overlay-shadow: inset 0 1px color-mix(in srgb, var(--codex-styler-text-primary) 9%, transparent), 0 24px 64px rgb(0 0 0 / 21%);
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] {
+          --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 38%, var(--codex-styler-border-strong));
+          --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 64%, var(--codex-styler-border-strong));
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] {
+          --codex-styler-scrollbar-thumb: color-mix(in srgb, var(--codex-styler-accent) 54%, var(--codex-styler-border-strong));
+          --codex-styler-scrollbar-thumb-hover: color-mix(in srgb, var(--codex-styler-accent) 78%, var(--codex-styler-text-primary));
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="balanced"] {
+          --codex-styler-content-leading: 1.5;
+          --codex-styler-heading-leading: 1.28;
+          --codex-styler-heading-weight: 650;
+          --codex-styler-heading-tracking: -.008em;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="editorial"] {
+          --codex-styler-content-leading: 1.58;
+          --codex-styler-heading-leading: 1.2;
+          --codex-styler-heading-weight: 690;
+          --codex-styler-heading-tracking: -.018em;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-typography="cinematic"] {
+          --codex-styler-content-leading: 1.64;
+          --codex-styler-heading-leading: 1.16;
+          --codex-styler-heading-weight: 720;
+          --codex-styler-heading-tracking: -.026em;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] body,
         html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] {
           background: transparent !important;
           color: var(--codex-styler-text-primary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] * {
+          scrollbar-width: thin;
+          scrollbar-color: var(--codex-styler-scrollbar-thumb) transparent;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-track,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-thumb,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-thumb {
+          min-width: 28px;
+          min-height: 28px;
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background: var(--codex-styler-scrollbar-thumb) padding-box;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-thumb:hover,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-thumb:hover {
+          background: var(--codex-styler-scrollbar-thumb-hover) padding-box;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-button,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-button {
+          display: none;
+          width: 0;
+          height: 0;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-corner,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] *::-webkit-scrollbar-corner {
+          background: transparent;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] aside.app-shell-left-panel {
           color: var(--codex-styler-text-primary) !important;
@@ -1119,7 +1417,7 @@
           background: transparent !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] aside.app-shell-left-panel button {
-          transition: color 150ms ease, background 150ms ease, box-shadow 150ms ease !important;
+          transition: color var(--codex-styler-motion-duration) ease, background var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] aside.app-shell-left-panel button:hover {
           background: color-mix(in srgb, ${appearance.accent} 10%, transparent) !important;
@@ -1184,16 +1482,24 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface article,
         html[data-codex-styler][data-codex-styler-mode="semantic"] main.main-surface [data-message-author-role],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome,
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="dialog"],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="menu"],
-        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="listbox"] {
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          border-color: ${appearance.border} !important;
+        html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome {
+          background: var(--codex-styler-material-raised) !important;
+          border-color: var(--codex-styler-material-border) !important;
           border-radius: ${appearance.radius}px !important;
           color: var(--codex-styler-text-primary) !important;
-          box-shadow: 0 1px 0 color-mix(in srgb, ${protectedText} 5%, transparent), 0 14px 40px rgb(0 0 0 / 9%) !important;
-          backdrop-filter: saturate(1.08) blur(${appearance.focusBlur}px) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="dialog"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="alertdialog"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="menu"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [role="listbox"] {
+          background: var(--codex-styler-material-overlay) !important;
+          border-color: var(--codex-styler-material-border) !important;
+          border-radius: ${appearance.radius}px !important;
+          color: var(--codex-styler-text-primary) !important;
+          box-shadow: var(--codex-styler-material-overlay-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] .composer-surface-chrome:focus-within {
           border-color: color-mix(in srgb, ${appearance.accent} 55%, ${appearance.border}) !important;
@@ -1210,11 +1516,11 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] {
           color: var(--codex-styler-text-primary) !important;
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          border: 1px solid color-mix(in srgb, ${appearance.border} 88%, transparent) !important;
+          background: var(--codex-styler-material-overlay) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-radius: ${Math.max(12, appearance.radius + 4)}px !important;
-          box-shadow: 0 22px 70px rgb(0 0 0 / 16%), inset 0 1px color-mix(in srgb, ${protectedText} 5%, transparent) !important;
-          backdrop-filter: saturate(1.1) blur(${Math.max(12, appearance.focusBlur + 6)}px) !important;
+          box-shadow: var(--codex-styler-material-overlay-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] > div,
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] section {
@@ -1223,16 +1529,35 @@
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item"],
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item-button"] {
           border-radius: ${Math.max(8, appearance.radius - 3)}px !important;
-          transition: background 150ms ease, transform 150ms ease !important;
+          transition: background var(--codex-styler-motion-duration) ease, transform var(--codex-styler-motion-duration) ease !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item-button"]:hover {
           background: color-mix(in srgb, ${appearance.accent} 11%, transparent) !important;
-          transform: translateX(2px);
+          transform: translateX(${Math.round(interactionLift * 0.5)}px);
+        }
+        /* Full-page settings replaces Codex's semantic <main> with a routed
+           div. Keep that route inside the same material and palette system
+           instead of letting it fall back to the native Codex surface. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="settings"] body > [${APP_ROOT_ATTRIBUTE}] .main-surface {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.surface} ${quietSurfacePercent}%, transparent) !important;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.border} 84%, transparent) !important;
+          backdrop-filter: saturate(1.04) blur(${Math.max(2, Math.round(appearance.focusBlur * 0.35))}px) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="settings"] body > [${APP_ROOT_ATTRIBUTE}] .main-surface > :is(nav, [role="tablist"], [role="tabpanel"], section) {
+          color: var(--codex-styler-text-primary) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: inset 0 0 0 1px var(--codex-styler-material-border), var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is(input, textarea, select) {
           color: var(--codex-styler-text-primary) !important;
+          caret-color: ${appearance.accent} !important;
           border-color: ${appearance.border} !important;
           background-color: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] [contenteditable="true"] {
+          caret-color: ${appearance.accent} !important;
         }
         /* Codex's own appearance can leave utility classes with a stale
            foreground after a Styler theme changes. Exact semantic roles take
@@ -1279,24 +1604,211 @@
           opacity: 1 !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is(a, [role="link"]) {
+          color: var(--codex-styler-info) !important;
           text-decoration-color: color-mix(in srgb, ${appearance.accent} 55%, transparent);
           text-underline-offset: 3px;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :is(a, [role="link"]):hover {
+          color: color-mix(in srgb, var(--codex-styler-info) 72%, var(--codex-styler-text-primary)) !important;
+          text-decoration-color: ${appearance.accent};
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          button,
+          a,
+          input,
+          textarea,
+          select,
+          [role="button"],
+          [role="tab"],
+          [role="option"],
+          [role="switch"]
+        ) {
+          transition: color var(--codex-styler-motion-duration) ease, background-color var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease, transform var(--codex-styler-motion-duration) ease !important;
+        }
+        @media (hover: hover) and (pointer: fine) {
+          html[data-codex-styler][data-codex-styler-mode="semantic"]:not([data-codex-styler-motion="still"]) body > [${APP_ROOT_ATTRIBUTE}] :is(
+            aside.app-shell-left-panel nav button,
+            .composer-surface-chrome button,
+            [role="tab"],
+            [role="option"]
+          ):not(:disabled):not([aria-disabled="true"]):hover {
+            transform: translateY(calc(-1 * var(--codex-styler-motion-lift))) scale(1) !important;
+          }
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"]:not([data-codex-styler-motion="still"]) body > [${APP_ROOT_ATTRIBUTE}] :is(
+          aside.app-shell-left-panel nav button,
+          .composer-surface-chrome button,
+          [role="tab"],
+          [role="option"]
+        ):not(:disabled):not([aria-disabled="true"]):active {
+          transform: translateY(0) scale(var(--codex-styler-motion-press-scale)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          button,
+          a,
+          input,
+          textarea,
+          select,
+          [role="button"],
+          [role="tab"],
+          [role="option"],
+          [role="switch"]
+        ):focus-visible {
+          outline: 2px solid color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-focus)) !important;
+          outline-offset: 2px !important;
+          box-shadow: 0 0 0 4px color-mix(in srgb, ${appearance.accent} 14%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="tablist"] {
+          border-color: color-mix(in srgb, ${appearance.border} 78%, transparent) !important;
+          background: color-mix(in srgb, ${appearance.surface} ${Math.max(48, quietSurfacePercent - 12)}%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"] {
+          color: var(--codex-styler-text-secondary) !important;
+          border-color: transparent !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"]:hover {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 8%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"][aria-selected="true"] {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 13%, transparent) !important;
+          box-shadow: inset 0 -2px ${appearance.accent} !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="option"][aria-selected="true"] {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 14%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          input[type="checkbox"],
+          input[type="radio"],
+          input[type="range"]
+        ) {
+          accent-color: ${appearance.accent} !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] [role="switch"][aria-checked="true"] {
+          border-color: color-mix(in srgb, ${appearance.accent} 72%, ${appearance.border}) !important;
+          background-color: color-mix(in srgb, ${appearance.accent} 74%, var(--codex-styler-surface-raised)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          button,
+          input,
+          textarea,
+          select,
+          [role="button"],
+          [role="tab"],
+          [role="option"],
+          [role="switch"],
+          [role="checkbox"],
+          [role="radio"]
+        ):is(:disabled, [aria-disabled="true"]) {
+          color: var(--codex-styler-text-tertiary) !important;
+          border-color: color-mix(in srgb, ${appearance.border} 54%, transparent) !important;
+          background-color: color-mix(in srgb, var(--codex-styler-control) 48%, transparent) !important;
+          box-shadow: none !important;
+          filter: saturate(.72);
+          opacity: .58 !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          button,
+          [role="button"],
+          [role="option"],
+          [role="switch"],
+          [role="checkbox"],
+          [role="radio"]
+        ):is(
+          [aria-pressed="true"],
+          [aria-checked="true"],
+          [data-state="active"],
+          [data-state="open"],
+          [data-state="checked"],
+          [data-state="on"]
+        ) {
+          color: var(--codex-styler-text-primary) !important;
+          border-color: color-mix(in srgb, ${appearance.accent} 54%, ${appearance.border}) !important;
+          background-color: var(--codex-styler-control-active) !important;
+          box-shadow: inset 0 -2px color-mix(in srgb, ${appearance.accent} 82%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          input,
+          textarea,
+          select,
+          [role="textbox"],
+          [role="combobox"]
+        )[aria-invalid="true"] {
+          border-color: color-mix(in srgb, var(--codex-styler-danger) 70%, ${appearance.border}) !important;
+          background-color: color-mix(in srgb, var(--codex-styler-danger) 7%, var(--codex-styler-control)) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, var(--codex-styler-danger) 12%, transparent) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] :is([role="dialog"], [role="menu"], [role="listbox"]) button:hover {
           background-color: color-mix(in srgb, ${appearance.accent} 10%, transparent) !important;
         }
-
-        /* Icon treatments preserve every native SVG dimension and padding. */
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] aside.app-shell-left-panel button > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] [data-pip-obstacle="thread-summary-panel"] button > svg:first-child {
-          color: ${appearance.accent} !important;
-          filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 22%, transparent));
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(
+          [role="dialog"],
+          [role="alertdialog"],
+          [role="menu"],
+          [role="listbox"],
+          [role="tooltip"],
+          [role="alert"],
+          [role="status"],
+          [data-sonner-toast]
+        ) {
+          color: var(--codex-styler-text-primary) !important;
+          border-color: color-mix(in srgb, ${appearance.border} 88%, transparent) !important;
+          background: color-mix(in srgb, var(--codex-styler-surface-overlay) 96%, transparent) !important;
+          box-shadow: 0 20px 62px rgb(0 0 0 / 22%), inset 0 1px color-mix(in srgb, ${protectedText} 6%, transparent) !important;
+          backdrop-filter: saturate(1.08) blur(${Math.max(12, appearance.focusBlur + 4)}px) !important;
         }
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] aside.app-shell-left-panel button > svg:first-child,
-        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] [data-pip-obstacle="thread-summary-panel"] button > svg:first-child {
-          color: color-mix(in srgb, ${appearance.accent} 86%, ${protectedText}) !important;
-          stroke-width: 2.25px;
-          filter: drop-shadow(0 3px 7px color-mix(in srgb, ${appearance.accent} 34%, transparent));
+        html[data-codex-styler][data-codex-styler-mode="semantic"]:is(
+          [data-codex-styler-motion="fluid"],
+          [data-codex-styler-motion="expressive"]
+        ) body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(
+          [role="dialog"],
+          [role="alertdialog"],
+          [role="menu"],
+          [role="listbox"]
+        ) {
+          animation: codex-styler-surface-enter var(--codex-styler-motion-duration) cubic-bezier(.2, .72, .2, 1) both !important;
+        }
+        @keyframes codex-styler-surface-enter {
+          from {
+            opacity: var(--codex-styler-motion-overlay-opacity);
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] [role="tooltip"] {
+          border-radius: ${Math.max(6, appearance.radius - 5)}px !important;
+          box-shadow: 0 10px 28px rgb(0 0 0 / 20%), inset 0 1px color-mix(in srgb, ${protectedText} 6%, transparent) !important;
+        }
+
+        /*
+         * Icon treatments are semantic and geometry-safe. They cover native
+         * navigation, top bars, tabs, composer actions, side panels and
+         * transient overlays without changing SVG dimensions, padding or
+         * stroke geometry. Destructive, invalid and branded actions keep
+         * their native meaning instead of being recolored by the theme.
+         */
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="contained"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+          overflow: visible;
+          border-radius: max(3px, calc(${appearance.radius}px * 0.28));
+          color: var(--codex-styler-icon) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 10%, transparent);
+          filter: drop-shadow(0 2px 5px color-mix(in srgb, ${appearance.accent} 20%, transparent));
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${APP_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > svg:first-child,
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-icons="themed"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(button, [role="button"], [role="tab"], [role="menuitem"], [role="option"]):not([aria-invalid="true"]):not([data-variant="destructive"]):not([data-tone="danger"]):not([data-state="error"]):not([data-brand]):not([class*="destructive"]):not([class*="danger"]):not([class*="text-red"]) > :is(span, div):first-child > svg:only-child {
+          overflow: visible;
+          border-radius: 999px;
+          color: var(--codex-styler-icon-emphasis) !important;
+          box-shadow: 0 0 0 3px color-mix(in srgb, ${appearance.accent} 13%, transparent), 0 0 12px color-mix(in srgb, ${appearance.accent} 18%, transparent);
+          filter: drop-shadow(0 3px 7px color-mix(in srgb, ${appearance.accent} 30%, transparent));
         }
 
         /* Full home composition: hero, suggestions, project rail, and composer. */
@@ -1357,16 +1869,16 @@
           position: relative !important;
           min-height: clamp(96px, 14cqh, 118px) !important;
           padding: clamp(12px, 1.8cqh, 15px) !important;
-          border: 1px solid color-mix(in srgb, ${appearance.accent} 20%, ${appearance.border}) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-radius: ${Math.max(16, appearance.radius + 5)}px !important;
           color: ${protectedText} !important;
-          background: linear-gradient(145deg, color-mix(in srgb, ${appearance.surface} ${Math.min(98, strongSurfacePercent + 4)}%, transparent), color-mix(in srgb, ${appearance.surface} ${Math.max(56, strongSurfacePercent - 8)}%, transparent)) !important;
-          box-shadow: 0 12px 30px rgb(0 0 0 / 12%), inset 0 1px color-mix(in srgb, ${protectedText} 6%, transparent) !important;
-          backdrop-filter: blur(${Math.max(10, appearance.focusBlur)}px) saturate(1.08) !important;
-          transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
+          transition: transform var(--codex-styler-motion-duration) ease, border-color var(--codex-styler-motion-duration) ease, box-shadow var(--codex-styler-motion-duration) ease !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] .group\\/home-suggestions button:hover {
-          transform: translateY(-4px) !important;
+          transform: translateY(-${interactionLift}px) !important;
           border-color: color-mix(in srgb, ${appearance.accent} 58%, ${appearance.border}) !important;
           box-shadow: 0 18px 38px rgb(0 0 0 / 16%), 0 0 0 3px color-mix(in srgb, ${appearance.accent} 8%, transparent) !important;
         }
@@ -1385,11 +1897,11 @@
           /* Codex intentionally tucks the rail shell behind the composer.
              Keep its lower safe area so the interactive row never follows. */
           padding: clamp(26px, 4cqh, 32px) 10px 27px !important;
-          border: 1px solid color-mix(in srgb, ${appearance.accent} 14%, ${appearance.border}) !important;
+          border: 1px solid var(--codex-styler-material-border) !important;
           border-bottom: 0 !important;
           border-radius: ${Math.max(14, appearance.radius + 3)}px ${Math.max(14, appearance.radius + 3)}px 0 0;
-          background: color-mix(in srgb, ${appearance.surface} ${strongSurfacePercent}%, transparent) !important;
-          backdrop-filter: blur(${appearance.focusBlur}px) !important;
+          background: var(--codex-styler-material-raised) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] div:has(> .horizontal-scroll-fade-mask .group\\/project-selector)::before {
           content: "WORKSPACE";
@@ -1452,18 +1964,287 @@
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="task"] [data-message-author-role="user"] {
           border-left: 3px solid ${appearance.accent} !important;
+          border-radius: ${Math.max(8, appearance.radius - 2)}px !important;
+          background: color-mix(in srgb, var(--codex-styler-control-active) 72%, transparent) !important;
+          box-shadow: inset 0 1px color-mix(in srgb, ${appearance.accent} 10%, transparent), 0 8px 22px rgb(0 0 0 / 7%) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="task"][data-codex-styler-decorations="expressive"] [data-message-author-role="user"] {
+          border-left-color: color-mix(in srgb, ${appearance.accent} 82%, var(--codex-styler-text-primary)) !important;
+          box-shadow: inset 0 1px color-mix(in srgb, ${appearance.accent} 18%, transparent), 0 12px 30px rgb(0 0 0 / 11%) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] pre {
+          overflow: auto;
+          border: 1px solid var(--codex-styler-material-border) !important;
+          background: var(--codex-styler-material-sunken) !important;
+          box-shadow: inset 0 1px color-mix(in srgb, ${protectedText} 4%, transparent) !important;
+          scrollbar-color: color-mix(in srgb, ${appearance.accent} 42%, transparent) transparent;
         }
         html[data-codex-styler][data-codex-styler-mode="semantic"] pre,
-        html[data-codex-styler][data-codex-styler-mode="semantic"] code {
+        html[data-codex-styler][data-codex-styler-mode="semantic"] code,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] kbd {
           border-color: color-mix(in srgb, ${appearance.border} 75%, transparent) !important;
           border-radius: ${Math.max(6, appearance.radius - 4)}px !important;
         }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] :not(pre) > code,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] kbd {
+          color: var(--codex-styler-text-primary) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.border} 70%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] blockquote {
+          border-inline-start-color: color-mix(in srgb, ${appearance.accent} 68%, ${appearance.border}) !important;
+          background: color-mix(in srgb, ${appearance.accent} 6%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] hr {
+          border-color: color-mix(in srgb, ${appearance.border} 72%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] table {
+          overflow: hidden;
+          border: 1px solid var(--codex-styler-material-border) !important;
+          border-collapse: separate !important;
+          border-spacing: 0 !important;
+          border-radius: ${Math.max(8, appearance.radius - 2)}px !important;
+          color: var(--codex-styler-text-primary) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(th, td) {
+          border-color: color-mix(in srgb, ${appearance.border} 68%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] th {
+          color: var(--codex-styler-text-secondary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 7%, var(--codex-styler-surface-sunken)) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] tbody tr:hover > :is(th, td) {
+          background: color-mix(in srgb, ${appearance.accent} 6%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] details {
+          overflow: hidden;
+          border-color: var(--codex-styler-material-border) !important;
+          border-radius: ${Math.max(8, appearance.radius - 2)}px !important;
+          color: var(--codex-styler-text-primary) !important;
+          background: var(--codex-styler-material-raised) !important;
+          box-shadow: var(--codex-styler-material-raised-shadow) !important;
+          backdrop-filter: var(--codex-styler-material-filter) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] summary {
+          color: var(--codex-styler-text-primary) !important;
+          cursor: pointer;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] details[open] > summary {
+          border-bottom-color: color-mix(in srgb, ${appearance.border} 66%, transparent) !important;
+          background: color-mix(in srgb, ${appearance.accent} 5%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(progress, meter, [role="progressbar"]) {
+          accent-color: ${appearance.accent} !important;
+          --codex-styler-progress-accent: ${appearance.accent};
+          --codex-styler-progress-track: color-mix(in srgb, ${appearance.border} 52%, transparent);
+          overflow: hidden;
+          border-radius: 999px !important;
+          background: var(--codex-styler-progress-track) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] progress::-webkit-progress-bar {
+          border-radius: 999px;
+          background: var(--codex-styler-progress-track) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] progress::-webkit-progress-value {
+          border-radius: 999px;
+          background: var(--codex-styler-progress-accent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] mark {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 24%, transparent) !important;
+          border-radius: 4px;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] ins {
+          color: var(--codex-styler-added) !important;
+          background: color-mix(in srgb, var(--codex-styler-added) 11%, transparent) !important;
+          text-decoration: none !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] del {
+          color: var(--codex-styler-deleted) !important;
+          background: color-mix(in srgb, var(--codex-styler-deleted) 11%, transparent) !important;
+          text-decoration-color: color-mix(in srgb, var(--codex-styler-deleted) 68%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(samp, output) {
+          color: var(--codex-styler-text-secondary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] pre :is(samp, output) {
+          font-family: inherit !important;
+        }
+        /* Theme typography is content-scoped and geometry-safe: it changes
+           reading rhythm without replacing fonts, resizing text, or moving
+           controls. Codex keeps ownership of the underlying typefaces. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(p, li, blockquote),
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] .ProseMirror,
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(p, li) {
+          line-height: var(--codex-styler-content-leading) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(h1, h2, h3),
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(h1, h2, h3) {
+          font-weight: var(--codex-styler-heading-weight) !important;
+          line-height: var(--codex-styler-heading-leading) !important;
+          letter-spacing: var(--codex-styler-heading-tracking) !important;
+        }
+        html:lang(zh)[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(article, [data-message-author-role]) :is(h1, h2, h3),
+        html:lang(zh)[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is([role="dialog"], [role="tabpanel"]) :is(h1, h2, h3) {
+          letter-spacing: normal !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(fieldset, [role="tree"], [role="grid"]) {
+          border-color: color-mix(in srgb, ${appearance.border} 78%, transparent) !important;
+          color: var(--codex-styler-text-primary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(legend, figcaption, dt, [role="columnheader"], [role="rowheader"]) {
+          color: var(--codex-styler-text-secondary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(dd, output, samp, [role="cell"], [role="gridcell"]) {
+          color: var(--codex-styler-text-primary) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is([role="treeitem"], [role="row"]) {
+          border-radius: ${Math.max(6, appearance.radius - 5)}px !important;
+          transition: background-color 150ms ease, color 150ms ease !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is([role="treeitem"], [role="row"]):hover {
+          background: color-mix(in srgb, ${appearance.accent} 6%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+          [role="treeitem"][aria-selected="true"],
+          [role="row"][aria-selected="true"],
+          [aria-current]:not([aria-current="false"])
+        ) {
+          color: var(--codex-styler-text-primary) !important;
+          background: color-mix(in srgb, ${appearance.accent} 12%, transparent) !important;
+          box-shadow: inset 3px 0 color-mix(in srgb, ${appearance.accent} 76%, ${appearance.border}) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] [role="tab"][aria-selected="true"],
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] pre {
+          border-color: color-mix(in srgb, ${appearance.accent} 28%, ${appearance.border}) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] [role="tab"][aria-selected="true"] {
+          box-shadow: inset 0 -2px ${appearance.accent}, 0 0 16px color-mix(in srgb, ${appearance.accent} 12%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] pre {
+          border-color: color-mix(in srgb, ${appearance.accent} 42%, ${appearance.border}) !important;
+          box-shadow: inset 3px 0 ${appearance.accent}, inset 0 1px color-mix(in srgb, ${protectedText} 5%, transparent) !important;
+        }
+        /* Geometry is derived from the portable radius instead of theme ids,
+           so imported themes receive the same coherent component treatment. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="precise"] body > [${APP_ROOT_ATTRIBUTE}] [role="tablist"] {
+          border-radius: ${Math.max(6, appearance.radius - 4)}px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="precise"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"] {
+          border-radius: ${Math.max(4, appearance.radius - 6)}px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="precise"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"][aria-selected="true"] {
+          box-shadow: inset 3px 0 ${appearance.accent}, inset 0 0 0 1px color-mix(in srgb, ${appearance.accent} 24%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="precise"] :is(
+          .composer-surface-chrome,
+          [role="dialog"],
+          [role="menu"],
+          [role="listbox"],
+          [data-pip-obstacle="thread-summary-panel"]
+        ) {
+          border-radius: ${Math.max(7, appearance.radius - 3)}px !important;
+          box-shadow: inset 2px 0 color-mix(in srgb, ${appearance.accent} 30%, transparent), 0 16px 42px rgb(0 0 0 / 14%) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="soft"] body > [${APP_ROOT_ATTRIBUTE}] [role="tablist"] {
+          padding: 3px !important;
+          border-radius: 999px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="soft"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"] {
+          border-radius: 999px !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="soft"] body > [${APP_ROOT_ATTRIBUTE}] [role="tab"][aria-selected="true"] {
+          box-shadow: inset 0 -2px ${appearance.accent}, 0 7px 18px color-mix(in srgb, ${appearance.accent} 16%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-geometry="soft"] :is(
+          .composer-surface-chrome,
+          [role="dialog"],
+          [role="menu"],
+          [role="listbox"],
+          [data-pip-obstacle="thread-summary-panel"]
+        ) {
+          border-radius: ${Math.min(28, appearance.radius + 4)}px !important;
+          box-shadow: inset 0 1px color-mix(in srgb, ${protectedText} 7%, transparent), 0 22px 58px rgb(0 0 0 / 19%), 0 0 0 3px color-mix(in srgb, ${appearance.accent} 6%, transparent) !important;
+        }
+        /* Decoration depth is intentionally geometry-safe and comes after
+           shape rules so the selected detail level remains visible on every
+           Codex focus surface. It never changes layout, stacking or size. */
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="subtle"] :is(
+          .composer-surface-chrome,
+          [role="dialog"],
+          [role="alertdialog"],
+          [role="menu"],
+          [role="listbox"],
+          [data-pip-obstacle="thread-summary-panel"]
+        ) {
+          border-color: color-mix(in srgb, ${appearance.accent} 28%, ${appearance.border}) !important;
+          box-shadow: inset 0 1px color-mix(in srgb, ${appearance.accent} 12%, transparent), 0 16px 42px rgb(0 0 0 / 13%), 0 0 0 2px color-mix(in srgb, ${appearance.accent} 5%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="settings"][data-codex-styler-decorations="subtle"] body > [${APP_ROOT_ATTRIBUTE}] .main-surface > :is(nav, [role="tablist"], [role="tabpanel"], section) {
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, ${appearance.accent} 22%, ${appearance.border}), inset 0 1px color-mix(in srgb, ${appearance.accent} 8%, transparent) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] :is(
+          .composer-surface-chrome,
+          [role="dialog"],
+          [role="alertdialog"],
+          [role="menu"],
+          [role="listbox"],
+          [data-pip-obstacle="thread-summary-panel"]
+        ) {
+          border-color: color-mix(in srgb, ${appearance.accent} 48%, ${appearance.border}) !important;
+          box-shadow: inset 0 2px color-mix(in srgb, ${appearance.accent} 20%, transparent), 0 24px 64px rgb(0 0 0 / 20%), 0 0 0 3px color-mix(in srgb, ${appearance.accent} 8%, transparent) !important;
+          backdrop-filter: saturate(1.14) blur(${Math.max(12, appearance.focusBlur + 6)}px) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="settings"][data-codex-styler-decorations="expressive"] body > [${APP_ROOT_ATTRIBUTE}] .main-surface > :is(nav, [role="tablist"], [role="tabpanel"], section) {
+          background: color-mix(in srgb, var(--codex-styler-surface-raised) 84%, transparent) !important;
+          box-shadow: inset 3px 0 color-mix(in srgb, ${appearance.accent} 68%, ${appearance.border}), inset 0 1px color-mix(in srgb, ${appearance.accent} 14%, transparent), 0 18px 46px rgb(0 0 0 / 13%) !important;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-decorations="expressive"] :is(
+          [role="treeitem"][aria-selected="true"],
+          [role="row"][aria-selected="true"],
+          [aria-current]:not([aria-current="false"])
+        ) {
+          box-shadow: inset 3px 0 ${appearance.accent}, inset 0 0 0 1px color-mix(in srgb, ${appearance.accent} 18%, transparent), 0 8px 20px rgb(0 0 0 / 9%) !important;
+        }
         html[data-codex-styler][data-codex-styler-mode="semantic"] ::selection {
+          color: var(--codex-styler-text-primary);
           background: color-mix(in srgb, ${appearance.accent} 28%, transparent);
+          text-shadow: none;
+        }
+        html[data-codex-styler][data-codex-styler-mode="semantic"] ::target-text {
+          color: var(--codex-styler-text-primary);
+          background: color-mix(in srgb, ${appearance.accent} 24%, transparent);
         }
         @media (prefers-reduced-motion: reduce) {
-          html[data-codex-styler][data-codex-styler-mode="semantic"] aside.app-shell-left-panel button {
+          html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${APP_ROOT_ATTRIBUTE}] :is(
+            button,
+            a,
+            input,
+            textarea,
+            select,
+            [role="button"],
+            [role="tab"],
+            [role="option"],
+            [role="switch"],
+            [role="treeitem"],
+            [role="row"]
+          ) {
             transition: none !important;
+          }
+          html[data-codex-styler][data-codex-styler-mode="semantic"] [data-pip-obstacle="thread-summary-panel"] [data-slot="thread-summary-panel-item-button"]:hover,
+          html[data-codex-styler][data-codex-styler-mode="semantic"][data-codex-styler-page="home"] .group\\/home-suggestions button:hover {
+            transform: none !important;
+          }
+          html[data-codex-styler][data-codex-styler-mode="semantic"] body > [${OVERLAY_ROOT_ATTRIBUTE}] :is(
+            [role="dialog"],
+            [role="alertdialog"],
+            [role="menu"],
+            [role="listbox"]
+          ) {
+            animation: none !important;
           }
         }
       `;
@@ -1505,6 +2286,10 @@
         background-position: center;
         background-size: cover;
         transform: scale(1.015);
+      }
+      #${BACKDROP_ID} [data-parallax] {
+        will-change: transform;
+        transition: transform var(--codex-styler-motion-duration) cubic-bezier(.2, .8, .2, 1);
       }
       #${BACKDROP_ID} .cs-layer-gradient {
         background:
@@ -1681,29 +2466,50 @@
       typeof ResizeObserver === "undefined"
         ? null
         : new ResizeObserver(() => entityPositioner?.());
+    const positionAtAnchor = () => {
+      const point = safeFreeEntityPosition(
+        (entity.anchor.x / 100) * window.innerWidth,
+        (entity.anchor.y / 100) * window.innerHeight,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      canvas.style.left = `${point.x}px`;
+      canvas.style.top = `${point.y}px`;
+      canvas.style.transform = "translate(-50%, -50%)";
+    };
     const position = () => {
       const attachment = entity.attachment;
       if (!attachment) {
-        canvas.style.left = `${entity.anchor.x}%`;
-        canvas.style.top = `${entity.anchor.y}%`;
-        canvas.style.transform = "translate(-50%, -50%)";
+        positionAtAnchor();
         if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
         watchedTarget = null;
         return;
       }
       const target = entityTarget(attachment.target);
-      if (!target) return;
+      if (!target) {
+        positionAtAnchor();
+        if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
+        watchedTarget = null;
+        return;
+      }
       if (watchedTarget !== target) {
         if (watchedTarget) attachmentObserver?.unobserve(watchedTarget);
         watchedTarget = target;
         attachmentObserver?.observe(target);
       }
       const bounds = target.getBoundingClientRect();
-      canvas.style.left = `${bounds.left + bounds.width * attachment.align + attachment.offset.x}px`;
-      canvas.style.top = `${
-        (attachment.edge === "bottom" ? bounds.bottom : bounds.top) +
-        attachment.offset.y
-      }px`;
+      const point = safeAttachedEntityPosition(
+        bounds,
+        attachment,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
+      );
+      canvas.style.left = `${point.x}px`;
+      canvas.style.top = `${point.y}px`;
       canvas.style.transform =
         attachment.edge === "bottom"
           ? "translate(-50%, 0)"
@@ -1742,15 +2548,18 @@
         return;
       }
       delete entity.attachment;
-      const x = Math.max(
-        3,
-        Math.min(97, (event.clientX / window.innerWidth) * 100),
+      const point = safeFreeEntityPosition(
+        event.clientX,
+        event.clientY,
+        size,
+        logicalHeight,
+        window.innerWidth,
+        window.innerHeight,
       );
-      const y = Math.max(
-        5,
-        Math.min(95, (event.clientY / window.innerHeight) * 100),
-      );
-      entity.anchor = { x, y };
+      entity.anchor = {
+        x: window.innerWidth > 0 ? (point.x / window.innerWidth) * 100 : 50,
+        y: window.innerHeight > 0 ? (point.y / window.innerHeight) * 100 : 50,
+      };
       position();
     };
     const onUp = (event) => {
@@ -2037,6 +2846,11 @@
       scheduleDraw();
     };
     window.addEventListener("resize", resizeHandler, { passive: true });
+    const scrollHandler = () => position();
+    document.addEventListener("scroll", scrollHandler, {
+      capture: true,
+      passive: true,
+    });
     entityCleanup = () => {
       cancelIdle();
       document.removeEventListener("visibilitychange", onVisibilityChange);
@@ -2044,6 +2858,7 @@
         entry.image.removeAttribute("src");
       pageCache.clear();
       attachmentObserver?.disconnect();
+      document.removeEventListener("scroll", scrollHandler, true);
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerup", onUp);
@@ -2173,6 +2988,30 @@
       "data-codex-styler-decorations",
       appearance.decorations || "none",
     );
+    document.documentElement.setAttribute(
+      "data-codex-styler-geometry",
+      appearance.radius <= 11
+        ? "precise"
+        : appearance.radius >= 17
+          ? "soft"
+          : "balanced",
+    );
+    document.documentElement.setAttribute(
+      "data-codex-styler-material",
+      resolveMaterialCharacter(appearance),
+    );
+    document.documentElement.setAttribute(
+      "data-codex-styler-typography",
+      appearance.layout === "editorial"
+        ? "editorial"
+        : appearance.layout === "immersive"
+          ? "cinematic"
+          : "balanced",
+    );
+    document.documentElement.setAttribute(
+      "data-codex-styler-motion",
+      resolveMotionProfile(theme.variants[variant].motion.intensity).character,
+    );
     updateStackingRoots();
     installStyles(theme, variant, Boolean(safeMode));
     updatePageKind();
@@ -2231,13 +3070,16 @@
       globalParallax > 0 &&
       sceneLayers.some((element) => Number(element.dataset.parallax) !== 0)
     ) {
+      let pointerX = 0;
+      let pointerY = 0;
       scenePointerHandler = (event) => {
-        if (sceneAnimationFrame !== null)
-          cancelAnimationFrame(sceneAnimationFrame);
+        pointerX = event.clientX;
+        pointerY = event.clientY;
+        if (sceneAnimationFrame !== null) return;
         sceneAnimationFrame = requestAnimationFrame(() => {
           sceneAnimationFrame = null;
-          const x = event.clientX / Math.max(1, window.innerWidth) - 0.5;
-          const y = event.clientY / Math.max(1, window.innerHeight) - 0.5;
+          const x = pointerX / Math.max(1, window.innerWidth) - 0.5;
+          const y = pointerY / Math.max(1, window.innerHeight) - 0.5;
           sceneLayers.forEach((element) => {
             const authoredDepth = Number(element.dataset.parallax || 0);
             const cappedDepth =
@@ -2252,9 +3094,20 @@
           });
         });
       };
+      sceneResetHandler = () => {
+        if (sceneAnimationFrame !== null) {
+          cancelAnimationFrame(sceneAnimationFrame);
+          sceneAnimationFrame = null;
+        }
+        sceneLayers.forEach((element) => {
+          element.style.transform = "";
+        });
+      };
       window.addEventListener("pointermove", scenePointerHandler, {
         passive: true,
       });
+      window.addEventListener("blur", sceneResetHandler);
+      document.addEventListener("pointerleave", sceneResetHandler, true);
     }
 
     const entityRoot = document.createElement("div");
@@ -2496,8 +3349,12 @@
     };
   };
 
+  if (typeof process !== "undefined" && process.env?.NODE_ENV === "test") {
+    window.__CODEX_STYLER_RUNTIME_INTERNALS__ = { semanticPalette };
+  }
+
   window.__CODEX_STYLER_RUNTIME__ = {
-    version: 18,
+    version: 36,
     apply,
     updateEntity,
     pause: remove,

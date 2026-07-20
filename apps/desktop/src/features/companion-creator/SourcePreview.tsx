@@ -276,7 +276,7 @@ export function AtlasGridPreview({
     atlasOverflow(dimensions.width, dimensions.height, settings),
   );
   return (
-    <div className="atlas-grid-preview">
+    <div className="atlas-grid-preview" data-scroll-surface="canvas">
       {file ? (
         <canvas ref={canvasRef} aria-label="Decoded sprite atlas source" />
       ) : (

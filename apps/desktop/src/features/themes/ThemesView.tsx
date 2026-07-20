@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeft,
-  ChevronRight,
-  FolderOpen,
-  Plus,
-  Upload,
-} from "lucide-react";
+import { FolderOpen, Plus, Search, Upload } from "lucide-react";
 import { builtinThemes, type ThemeDefinition } from "@codex-styler/theme-core";
-import { PreviewWorkspace } from "../../components/PreviewWorkspace";
+import { ResourceLibraryToolbar } from "../../components/ui/ResourceLibraryToolbar";
 import type { ThemeVariantName } from "../../lib/app-session";
 import type { Locale, MessageKey } from "../../lib/i18n";
+import { matchesResourceSearch } from "../../lib/resource-search";
+import { ThemeDetailCard } from "./ThemeDetailCard";
 import { ThemeRow } from "./ThemeRow";
 
 export type ThemeCollection = "builtIn" | "mine";
@@ -17,7 +13,7 @@ export type ThemeCollection = "builtIn" | "mine";
 export interface ThemesViewProps {
   locale: Locale;
   selectedTheme: ThemeDefinition;
-  previewTheme: ThemeDefinition;
+  previewThemeFor: (theme: ThemeDefinition) => ThemeDefinition;
   localThemes: ThemeDefinition[];
   collection: ThemeCollection;
   variant: ThemeVariantName;
@@ -37,7 +33,7 @@ export interface ThemesViewProps {
 export function ThemesView({
   locale,
   selectedTheme,
-  previewTheme,
+  previewThemeFor,
   localThemes,
   collection,
   variant,
@@ -51,10 +47,12 @@ export function ThemesView({
   onImport,
   resolveAsset,
   liveThemeId,
-  busy,
 }: ThemesViewProps) {
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [browsedThemeId, setBrowsedThemeId] = useState(selectedTheme.id);
   const workspaceRef = useRef<HTMLElement>(null);
+  const themeListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
     const element = workspaceRef.current?.closest<HTMLElement>(
@@ -71,23 +69,42 @@ export function ThemesView({
     }
   }, [compactDetailOpen, reduceMotion]);
   const themes = collection === "builtIn" ? builtinThemes : localThemes;
-  const localized = selectedTheme.locales[locale] ?? selectedTheme.locales.en;
+  const filteredThemes = themes.filter((theme) => {
+    const localizedTheme = theme.locales[locale] ?? theme.locales.en;
+    return matchesResourceSearch(searchQuery, [
+      localizedTheme.name,
+      localizedTheme.description,
+      theme.metadata.author,
+      ...theme.metadata.tags,
+    ]);
+  });
+  const selectedThemeInCollection = themes.find(
+    (theme) => theme.id === selectedTheme.id,
+  );
+  const browsedTheme =
+    filteredThemes.find((theme) => theme.id === browsedThemeId) ??
+    filteredThemes[0] ??
+    selectedThemeInCollection ??
+    selectedTheme;
+  useEffect(() => {
+    setBrowsedThemeId((current) => {
+      if (themes.some((theme) => theme.id === current)) return current;
+      return selectedThemeInCollection?.id ?? themes[0]?.id ?? selectedTheme.id;
+    });
+  }, [selectedTheme.id, selectedThemeInCollection?.id, themes]);
+  useEffect(() => {
+    const active = themeListRef.current?.querySelector<HTMLElement>(
+      '[aria-pressed="true"]',
+    );
+    active?.scrollIntoView?.({ block: "nearest" });
+  }, [collection, filteredThemes.length, searchQuery, selectedTheme.id]);
   const selectedIndex =
-    themes.findIndex((theme) => theme.id === selectedTheme.id) + 1;
-  const performance =
-    selectedTheme.scene.entities.length > 0 ||
-    Object.values(selectedTheme.variants).some((item) =>
-      Boolean(item.background.image),
-    ) ||
-    selectedTheme.scene.layers.some((layer) => Math.abs(layer.parallax) > 0)
-      ? t("medium")
-      : t("low");
-  const selectedThemeIsLive = liveThemeId === selectedTheme.id;
+    themes.findIndex((theme) => theme.id === browsedTheme.id) + 1;
   return (
     <div className="page page--themes">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">VISUAL SYSTEM LIBRARY</span>
+          <span className="page-kicker">{t("themeLibraryKicker")}</span>
           <h1>{t("themeLibrary")}</h1>
           <p>{t("themeLibraryDetail")}</p>
         </div>
@@ -103,36 +120,40 @@ export function ThemesView({
         </div>
       </section>
 
-      <div
-        className="theme-collection-tabs"
-        role="tablist"
-        aria-label={t("themes")}
-      >
-        <button
-          role="tab"
-          aria-selected={collection === "builtIn"}
-          className={collection === "builtIn" ? "is-active" : ""}
-          onClick={() => {
-            setCompactDetailOpen(false);
-            onCollectionChange("builtIn");
-          }}
-        >
-          {t("builtInThemes")}
-          <small>{builtinThemes.length}</small>
-        </button>
-        <button
-          role="tab"
-          aria-selected={collection === "mine"}
-          className={collection === "mine" ? "is-active" : ""}
-          onClick={() => {
-            setCompactDetailOpen(false);
-            onCollectionChange("mine");
-          }}
-        >
-          {t("myThemes")}
-          <small>{localThemes.length}</small>
-        </button>
-      </div>
+      <ResourceLibraryToolbar
+        ariaLabel={t("themes")}
+        tabs={[
+          {
+            id: "builtIn",
+            label: t("builtInThemes"),
+            count: builtinThemes.length,
+          },
+          {
+            id: "mine",
+            label: t("myThemes"),
+            count: localThemes.length,
+          },
+        ]}
+        activeTab={collection}
+        onTabChange={(nextCollection) => {
+          setSearchQuery("");
+          setCompactDetailOpen(false);
+          onCollectionChange(nextCollection);
+        }}
+        search={
+          themes.length > 0
+            ? {
+                value: searchQuery,
+                label: t("searchThemes"),
+                placeholder: t("searchThemes"),
+                clearLabel: t("clearSearch"),
+                resultCount: filteredThemes.length,
+                totalCount: themes.length,
+                onChange: setSearchQuery,
+              }
+            : undefined
+        }
+      />
 
       {themes.length === 0 ? (
         <section className="empty-state theme-empty-state">
@@ -161,7 +182,7 @@ export function ThemesView({
           <div className="theme-library-master">
             <div className="section-heading section-heading--compact">
               <div>
-                <span>THEME INDEX</span>
+                <span>{t("themeIndexKicker")}</span>
                 <h2>
                   {collection === "builtIn"
                     ? t("builtInThemes")
@@ -172,17 +193,33 @@ export function ThemesView({
                 {themes.length} {t("themesCount")}
               </span>
             </div>
-            <div className="theme-list" aria-label={t("allThemes")}>
-              {themes.map((theme, index) => (
+            <div
+              ref={themeListRef}
+              className="theme-list"
+              aria-label={t("allThemes")}
+              data-scroll-surface="panel"
+            >
+              {filteredThemes.length === 0 && (
+                <div className="library-filter-empty" role="status">
+                  <Search size={20} aria-hidden="true" />
+                  <strong>{t("noThemeMatches")}</strong>
+                  <span>{t("searchAgainDetail")}</span>
+                  <button type="button" onClick={() => setSearchQuery("")}>
+                    {t("clearSearch")}
+                  </button>
+                </div>
+              )}
+              {filteredThemes.map((theme) => (
                 <ThemeRow
                   key={theme.id}
                   theme={theme}
-                  index={index + 1}
+                  index={themes.findIndex((item) => item.id === theme.id) + 1}
                   locale={locale}
                   active={selectedTheme.id === theme.id}
                   live={liveThemeId === theme.id}
                   resolveAsset={resolveAsset}
                   onSelect={() => {
+                    setBrowsedThemeId(theme.id);
                     onSelect(theme);
                     setCompactDetailOpen(true);
                   }}
@@ -194,62 +231,24 @@ export function ThemesView({
               ))}
             </div>
           </div>
-          <section className="featured-theme theme-detail-card">
-            <button
-              className="compact-detail-back"
-              onClick={() => setCompactDetailOpen(false)}
-            >
-              <ArrowLeft size={14} />
-              {t("backToThemes")}
-            </button>
-            <div className="featured-theme__preview">
-              <div className="featured-theme__label">
-                {busy
-                  ? t("applying")
-                  : selectedThemeIsLive
-                    ? t("liveInCodex")
-                    : t("previewOnly")}
-              </div>
-              <PreviewWorkspace
-                theme={previewTheme}
-                variant={variant}
-                locale={locale}
-                reduceMotion={reduceMotion}
-                resolveAsset={resolveAsset}
-              />
-            </div>
-            <div className="featured-theme__copy">
-              <span>
-                THEME {String(Math.max(1, selectedIndex)).padStart(2, "0")} /{" "}
-                {localized.name.toUpperCase()}
-              </span>
-              <h2>{localized.name}</h2>
-              <p>{localized.description}</p>
-              <div className="theme-facts">
-                <div>
-                  <small>{t("performance")}</small>
-                  <strong>{performance}</strong>
-                </div>
-                <div>
-                  <small>{t("interactive")}</small>
-                  <strong>
-                    {selectedTheme.scene.entities.length ? "Pointer" : "—"}
-                  </strong>
-                </div>
-              </div>
-              <div className="button-row">
-                <button
-                  className="secondary-button"
-                  onClick={() => onEdit(selectedTheme)}
-                >
-                  {collection === "builtIn"
-                    ? t("customizeCopy")
-                    : t("editTheme")}
-                  <ChevronRight size={15} />
-                </button>
-              </div>
-            </div>
-          </section>
+          <ThemeDetailCard
+            theme={browsedTheme}
+            previewTheme={previewThemeFor(browsedTheme)}
+            themeIndex={selectedIndex}
+            collectionLabel={
+              collection === "builtIn" ? t("builtInThemes") : t("myThemes")
+            }
+            editLabel={
+              collection === "builtIn" ? t("customizeCopy") : t("editTheme")
+            }
+            locale={locale}
+            variant={variant}
+            reduceMotion={reduceMotion}
+            t={t}
+            resolveAsset={resolveAsset}
+            onBack={() => setCompactDetailOpen(false)}
+            onEdit={() => onEdit(browsedTheme)}
+          />
         </section>
       )}
     </div>

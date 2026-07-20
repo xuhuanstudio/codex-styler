@@ -6,7 +6,7 @@ import {
   within,
   waitFor,
 } from "@testing-library/react";
-import { builtinThemes } from "@codex-styler/theme-core";
+import { builtinCompanions, builtinThemes } from "@codex-styler/theme-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { createCompanionProject } from "./features/companion-creator/model";
@@ -224,6 +224,55 @@ describe("Codex Styler shell", () => {
         "Moss",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("browses another theme collection without silently changing the setup", () => {
+    const localTheme = structuredClone(builtinThemes[0]);
+    localTheme.id = "local.library-preview";
+    localTheme.locales.en = {
+      name: "Library Preview",
+      description: "A local theme shown without applying it.",
+    };
+    localStorage.setItem(
+      "codex-styler.local-themes.v1",
+      JSON.stringify([localTheme]),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    fireEvent.click(screen.getByRole("tab", { name: /My themes/i }));
+
+    expect(screen.getAllByText("Library Preview").length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByRole("region", { name: "Current setup" })).getByText(
+        "Native Refined",
+      ),
+    ).toBeVisible();
+  });
+
+  it("previews another companion collection without replacing the selection", () => {
+    const localCompanion = structuredClone(builtinCompanions[0]);
+    localCompanion.id = "local.companion-preview";
+    localCompanion.name = "Orbit Fox";
+    localCompanion.locales.en = {
+      name: "Orbit Fox",
+      description: "A local companion shown without applying it.",
+    };
+    localStorage.setItem(
+      "codex-styler.local-companions.v1",
+      JSON.stringify([localCompanion]),
+    );
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Companions" }));
+    fireEvent.click(screen.getByRole("tab", { name: /My companions/i }));
+
+    expect(screen.getAllByText("Orbit Fox").length).toBeGreaterThan(0);
+    expect(
+      within(screen.getByRole("region", { name: "Current setup" })).getByText(
+        "Moss",
+      ),
+    ).toBeVisible();
   });
 
   it("routes a missing Codex installation to location settings", async () => {
@@ -447,7 +496,8 @@ describe("Codex Styler shell", () => {
     });
     expect(applied).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    fireEvent.click(screen.getByText("Fine tune"));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
       { target: { value: "immersive" } },
@@ -470,7 +520,9 @@ describe("Codex Styler shell", () => {
       state: "connected",
     });
     vi.mocked(applyConfiguration).mockRejectedValueOnce(
-      new Error("Could not open the Codex debugging socket: connection refused"),
+      new Error(
+        "Could not open the Codex debugging socket: connection refused",
+      ),
     );
 
     render(<App />);
@@ -578,7 +630,7 @@ describe("Codex Styler shell", () => {
   it("checks for updates from settings and reports the current version", async () => {
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.getByText("Codex Styler 0.2.0-beta.6")).toBeInTheDocument();
+    expect(screen.getByText("Codex Styler 0.2.0-beta.7")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
     await waitFor(() => expect(checkForUpdates).toHaveBeenCalledWith("en"));
     expect(await screen.findByText("You’re up to date")).toBeInTheDocument();
@@ -1092,11 +1144,17 @@ describe("Codex Styler shell", () => {
     expect(screen.getByLabelText("Token Thief")).toBeInTheDocument();
   });
 
-  it("reports theme capabilities independently from the selected companion", () => {
+  it("reports the theme visual personality without coupling it to a companion", () => {
     const { container } = render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     const facts = container.querySelector(".theme-facts");
-    expect(facts).toHaveTextContent("Interactive—");
+    expect(
+      container.querySelector(".featured-theme__preview .workspace-preview"),
+    ).toHaveClass("workspace-preview--compact");
+    expect(facts).toHaveTextContent("CompositionNative rhythm · Balanced");
+    expect(facts).toHaveTextContent("Icon treatmentContained");
+    expect(facts).toHaveTextContent("Motion styleFluid");
+    expect(facts).not.toHaveTextContent("Companion");
   });
 
   it("keeps companions independent and exposes draggable placement", () => {
@@ -1109,6 +1167,24 @@ describe("Codex Styler shell", () => {
     expect(
       document.querySelector('.scene-entity[data-draggable="true"]'),
     ).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "Companion size" }), {
+      target: { value: "180" },
+    });
+    expect(document.querySelector(".scene-entity")).toHaveStyle({
+      "--entity-size": "180px",
+    });
+    expect(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    ).toBeEnabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    );
+    expect(document.querySelector(".scene-entity")).toHaveStyle({
+      "--entity-size": "136px",
+    });
+    expect(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    ).toBeDisabled();
   });
 
   it("uses independent portraits instead of decoding atlases in the list", () => {
@@ -1145,28 +1221,38 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
-    expect(screen.getByText("Contrast protected")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    expect(screen.getByText("Visual safety")).toBeInTheDocument();
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Visual safety"));
+    expect(screen.getByText("Primary text")).toBeInTheDocument();
+    expect(screen.getByText("Interface icons")).toBeInTheDocument();
+    expect(screen.getByText("Status feedback")).toBeInTheDocument();
+    expect(screen.getByText("Code changes")).toBeInTheDocument();
+    expect(screen.getByText("Accent controls")).toBeInTheDocument();
+    expect(screen.getByText("Component boundaries")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
     expect(
       screen.getByRole("menuitem", { name: "Revert to saved" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "More actions" }));
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Workspace layout" }),
-      { target: { value: "immersive" } },
-    );
-    fireEvent.change(screen.getByRole("combobox", { name: "Icon treatment" }), {
-      target: { value: "themed" },
-    });
-    fireEvent.change(
-      screen.getByRole("combobox", { name: "Detail treatment" }),
-      { target: { value: "expressive" } },
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Editorial" }));
     const preview = container.querySelector(".workspace-preview");
+    expect(preview).toHaveAttribute("data-layout", "editorial");
+    expect(preview).toHaveAttribute("data-icon-style", "themed");
+    expect(preview).toHaveAttribute("data-decorations", "subtle");
+    fireEvent.click(screen.getByRole("button", { name: "Immersive" }));
     expect(preview).toHaveAttribute("data-layout", "immersive");
     expect(preview).toHaveAttribute("data-icon-style", "themed");
     expect(preview).toHaveAttribute("data-decorations", "expressive");
+    fireEvent.click(screen.getByRole("button", { name: "Undo theme change" }));
+    expect(preview).toHaveAttribute("data-layout", "editorial");
+    expect(preview).toHaveAttribute("data-icon-style", "themed");
+    expect(preview).toHaveAttribute("data-decorations", "subtle");
+    fireEvent.click(screen.getByRole("button", { name: "Undo theme change" }));
+    expect(preview).toHaveAttribute("data-layout", "native");
+    expect(preview).toHaveAttribute("data-icon-style", "native");
+    expect(preview).toHaveAttribute("data-decorations", "none");
     fireEvent.click(screen.getByRole("button", { name: "Add layer" }));
     expect(
       screen.getByRole("menuitem", { name: "Gradient layer" }),
@@ -1189,25 +1275,72 @@ describe("Codex Styler shell", () => {
 
     expect(
       screen.getByRole("region", { name: "Live effect mapped" }),
-    ).toHaveTextContent("5 preview views");
+    ).toHaveTextContent("8 preview views");
     expect(
       container.querySelector('[data-theme-control="background.brightness"]'),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
     expect(
       screen.getByRole("region", { name: "Enhanced mode effect" }),
-    ).toHaveTextContent("Panels, controls, icons, and layout update together");
+    ).toHaveTextContent(
+      "Panels, controls, selected and disabled states, status feedback, diffs, icons, and layout update together",
+    );
     fireEvent.click(
-      screen.getByRole("button", { name: "Preview on Task & composer" }),
+      screen.getByRole("button", { name: "Preview on Components & states" }),
     );
     expect(container.querySelector(".workspace-preview")).toHaveAttribute(
       "data-preview-scenario",
-      "task",
+      "components",
     );
+    expect(
+      container.querySelector(".workspace-component-grid"),
+    ).toBeInTheDocument();
     expect(
       container.querySelector('[data-theme-control="surfaces.layout"]'),
     ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-theme-control="surfaces.treatment"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-theme-control="surfaces.material"]'),
+    ).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-theme-control="surfaces.focus-opacity"]'),
+    ).toBeInTheDocument();
+    const harmony = container.querySelector(
+      '[data-theme-control="surfaces.color-harmony"]',
+    );
+    expect(harmony).toHaveTextContent("Automatic");
+    expect(harmony).toHaveTextContent("Tonal harmony");
+    expect(harmony).toHaveTextContent("Clear hierarchy");
+    const preview = container.querySelector(
+      ".workspace-preview",
+    ) as HTMLElement;
+    const automaticBorder = preview.style.getPropertyValue(
+      "--preview-border-strong",
+    );
+    const clearHierarchy = screen.getByRole("button", {
+      name: /Clear hierarchy/,
+    });
+    fireEvent.click(clearHierarchy);
+    expect(clearHierarchy).toHaveAttribute("aria-pressed", "true");
+    expect(preview.style.getPropertyValue("--preview-border-strong")).not.toBe(
+      automaticBorder,
+    );
+
+    const frostedMaterial = screen.getByRole("button", { name: "Frosted" });
+    fireEvent.click(frostedMaterial);
+    expect(frostedMaterial).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("slider", { name: /Focused panel opacity/ }),
+    ).toHaveValue("0.92");
+    expect(screen.getByRole("slider", { name: /Glass blur/ })).toHaveValue(
+      "20",
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveStyle({
+      "--preview-focus-blur": "20px",
+    });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Recommended pairing" }),
@@ -1231,7 +1364,7 @@ describe("Codex Styler shell", () => {
     expect(appearance).toHaveAttribute("aria-expanded", "false");
     expect(editorLayout).not.toHaveClass("editor-layout--inspector-open");
 
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
     expect(appearance).toHaveAttribute("aria-expanded", "true");
     expect(editorLayout).toHaveClass("editor-layout--inspector-open");
 
@@ -1250,7 +1383,8 @@ describe("Codex Styler shell", () => {
     const savedPreview = screen.getByRole("button", { name: "Saved" });
     expect(savedPreview).toBeDisabled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    fireEvent.click(screen.getByText("Fine tune"));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
       { target: { value: "immersive" } },
@@ -1293,6 +1427,36 @@ describe("Codex Styler shell", () => {
       "inert",
     );
 
+    const versionControl = container.querySelector(".canvas-version-control");
+    expect(versionControl).not.toBeNull();
+    fireEvent.click(
+      within(versionControl as HTMLElement).getByRole("button", {
+        name: "Official",
+      }),
+    );
+    expect(container.querySelector(".canvas-stage")).toHaveAttribute(
+      "data-preview-version",
+      "official",
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-preview-presentation",
+      "official",
+    );
+    expect(screen.getByText("Official Codex reference")).toBeInTheDocument();
+    expect(container.querySelector(".inspector-content")).toHaveAttribute(
+      "inert",
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Return" }));
+    expect(container.querySelector(".canvas-stage")).toHaveAttribute(
+      "data-preview-version",
+      "current",
+    );
+    expect(container.querySelector(".workspace-preview")).toHaveAttribute(
+      "data-preview-presentation",
+      "styled",
+    );
+
     fireEvent.click(savedPreview);
     fireEvent.click(screen.getByRole("button", { name: "Background" }));
     expect(container.querySelector(".canvas-stage")).toHaveAttribute(
@@ -1306,7 +1470,8 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    fireEvent.click(screen.getByText("Fine tune"));
 
     const layout = screen.getByRole("combobox", { name: "Workspace layout" });
     const undo = screen.getByRole("button", { name: "Undo theme change" });
@@ -1363,7 +1528,8 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    fireEvent.click(screen.getByText("Fine tune"));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
       { target: { value: "immersive" } },
@@ -1408,7 +1574,8 @@ describe("Codex Styler shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Themes" }));
     fireEvent.click(screen.getByRole("button", { name: "New theme" }));
     fireEvent.click(screen.getByRole("button", { name: /Start blank/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Surfaces" }));
+    fireEvent.click(screen.getByRole("button", { name: "Interface system" }));
+    fireEvent.click(screen.getByText("Fine tune"));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Workspace layout" }),
       { target: { value: "immersive" } },
@@ -1481,6 +1648,80 @@ describe("Codex Styler shell", () => {
     ).toBeInTheDocument();
   });
 
+  it("compares a styled theme with an uncluttered official baseline", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+    const previewControls = screen.getByRole("button", {
+      name: "Task & composer",
+    });
+    expect(previewControls).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(previewControls);
+    expect(previewControls).toHaveAttribute("aria-expanded", "true");
+
+    const comparison = screen.getByRole("group", {
+      name: "Compare appearance",
+    });
+    const styled = within(comparison).getByRole("button", { name: "Styled" });
+    const official = within(comparison).getByRole("button", {
+      name: "Official",
+    });
+    const preview = document.querySelector(
+      ".featured-theme__preview .workspace-preview",
+    );
+
+    expect(styled).toHaveAttribute("aria-pressed", "true");
+    expect(preview).toHaveAttribute("data-preview-presentation", "styled");
+
+    fireEvent.click(official);
+    expect(official).toHaveAttribute("aria-pressed", "true");
+    expect(preview).toHaveAttribute("data-preview-presentation", "official");
+    expect(preview).toHaveAttribute("data-layout", "native");
+    expect(
+      document.querySelector(".featured-theme__preview .workspace-entity"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
+    fireEvent.click(styled);
+    expect(preview).toHaveAttribute("data-preview-presentation", "styled");
+  });
+
+  it("previews representative Codex surfaces before applying a theme", () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Themes" }));
+
+    const preview = document.querySelector(
+      ".featured-theme__preview .workspace-preview",
+    );
+
+    expect(preview).toHaveAttribute("data-preview-scenario", "task");
+    fireEvent.click(screen.getByRole("button", { name: "Task & composer" }));
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Preview scenario" }),
+      { target: { value: "settings" } },
+    );
+    expect(preview).toHaveAttribute("data-preview-scenario", "settings");
+
+    fireEvent.click(
+      document.querySelector<HTMLButtonElement>(
+        ".theme-preview-controls__trigger",
+      ) as HTMLButtonElement,
+    );
+    fireEvent.change(
+      screen.getByRole("combobox", { name: "Preview scenario" }),
+      { target: { value: "dialog" } },
+    );
+    expect(preview).toHaveAttribute("data-preview-scenario", "dialog");
+
+    const controlsEffect = screen.getByRole("button", {
+      name: "Inspect this effect: Controls",
+    });
+    fireEvent.click(controlsEffect);
+    expect(preview).toHaveAttribute("data-preview-scenario", "components");
+    expect(
+      screen.getByRole("button", { name: "Components & states" }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
   it("deletes a local theme after confirmation", async () => {
     const localTheme = structuredClone(builtinThemes[0]);
     localTheme.id = "local.theme-to-delete";
@@ -1534,7 +1775,9 @@ describe("Codex Styler shell", () => {
     );
     expect(
       screen.getByRole("dialog", { name: "Delete this creator draft?" }),
-    ).toHaveTextContent("An installed companion with the same name will not be deleted.");
+    ).toHaveTextContent(
+      "An installed companion with the same name will not be deleted.",
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(deleteCompanionProject).not.toHaveBeenCalled();

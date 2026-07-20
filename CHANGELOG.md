@@ -4,6 +4,57 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.7] - 2026-07-20
+
+### Added
+
+- A shared real-Codex preview shell with Home, Task & composer, Settings,
+  Dialog, Components & states, and Right panel scenarios across the theme
+  library and Theme Editor.
+- Surface-aware color harmony, typography rhythm, icon roles, component
+  boundaries, semantic status colors, code-change colors, material recipes,
+  and reduced-motion-safe theme animation recipes.
+- Companion placement modes, global frame scaling and alignment assistance,
+  behavior audition, compiler-ready output summaries, and explicit edge-quality
+  review on black, white, and theme-colored surfaces.
+- Companion Studio now requires an explicit final edge review on black, white,
+  and theme-colored surfaces before building. Reviews advance between
+  backdrops, remain part of the local draft, and automatically expire whenever
+  source pixels, cleanup, shared crop, global scale, frame inclusion, or
+  alignment changes.
+- Companion edge review now runs a bounded local preflight over neutral,
+  reduced-motion, direction-anchor, motion-boundary, and representative frames.
+  It flags retained backgrounds, canvas contact, isolated pixels, and sampled
+  color spill, then links each advisory finding back to an affected cleanup
+  frame without replacing the user's final visual review.
+
+### Changed
+
+- Theme and companion libraries now use responsive master-detail workspaces,
+  accurate companion scale and attachment previews, unobtrusive preview
+  controls, and one persistent configuration action.
+- Theme rendering now treats backgrounds, quiet and raised surfaces, text,
+  icons, borders, feedback states, typography, depth, and motion as one
+  semantic system shared by local preview and the injected Codex runtime.
+- Companion creation now keeps crop, baseline, scaling, inclusion, cleanup,
+  direction poses, idle motion, and final-quality evidence non-destructive and
+  observable before packaging.
+- Cross-platform scroll surfaces, fixed workspace navigation, compact editor
+  layouts, and keyboard focus behavior now share the desktop design system.
+
+### Fixed
+
+- Theme previews no longer use an invented application skeleton or let preview
+  controls permanently cover the themed workspace.
+- Companion previews no longer place characters at arbitrary scales or outside
+  the same safe composer attachment rules used by the runtime.
+- Global companion scaling preserves a shared canvas, ground line, and frame
+  alignment instead of allowing per-frame size drift or out-of-bounds output.
+- Motion recipes preserve Codex-owned transforms and automatically reduce to
+  non-displacing feedback when reduced motion is requested.
+- Visual safety checks report readable text, icon, border, status, diff, and
+  image-surface results before a theme is saved or applied.
+
 ## [0.2.0-beta.6] - 2026-07-19
 
 ### Added

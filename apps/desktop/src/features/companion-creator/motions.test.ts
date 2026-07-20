@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createCompanionProject } from "./model";
 import {
+  assignedPoseIdsForMotion,
   clampMotionRange,
   diagnoseMotionRange,
   motionPreviewFrames,
   motionRangeSignature,
+  resolveMotionAudition,
   validateMotionRanges,
 } from "./motions";
 
@@ -74,6 +76,91 @@ describe("motion range helpers", () => {
     expect(diagnostics.overlappingMotionIds).toEqual(["existing"]);
     expect(diagnostics.recommendedPoseAnchorId).toBe("east");
     expect(diagnostics.hasDirectionDrift).toBe(true);
+  });
+
+  it("resolves the nearest pose and only exposes motions assigned to it", () => {
+    const project = projectWithFrames();
+    project.motionRanges.push(
+      {
+        id: "east-blink",
+        name: "East blink",
+        poseAnchorIds: ["east"],
+        startFrame: 1,
+        endFrame: 3,
+        playback: "forward",
+        speed: 1,
+        minimumDelayMs: 1_000,
+        maximumDelayMs: 2_000,
+      },
+      {
+        id: "west-breathe",
+        name: "West breathe",
+        poseAnchorIds: ["west"],
+        startFrame: 5,
+        endFrame: 7,
+        playback: "forward",
+        speed: 1,
+        minimumDelayMs: 1_000,
+        maximumDelayMs: 2_000,
+      },
+    );
+
+    const plan = resolveMotionAudition(project, 94);
+    expect(plan.activeAnchor?.id).toBe("east");
+    expect(plan.motions).toEqual([
+      expect.objectContaining({
+        id: "east-blink",
+        frames: [1, 2, 3],
+        frameDurationMs: 42,
+        durationMs: 126,
+      }),
+    ]);
+  });
+
+  it("expands an anchor assignment across its interpolated pose sector", () => {
+    const anchors = projectWithFrames().directionAnchors;
+    const poses = [
+      { id: "pose-0", angle: 0 },
+      { id: "pose-1", angle: 30 },
+      { id: "pose-2", angle: 70 },
+      { id: "pose-3", angle: 100 },
+      { id: "pose-4", angle: 340 },
+    ];
+
+    expect(assignedPoseIdsForMotion(poses, anchors, ["north"])).toEqual([
+      "pose-0",
+      "pose-1",
+      "pose-4",
+    ]);
+    expect(assignedPoseIdsForMotion(poses, anchors, ["east"])).toEqual([
+      "pose-2",
+      "pose-3",
+    ]);
+  });
+
+  it("handles the zero-degree seam, exclusions and unsafe draft speeds", () => {
+    const project = projectWithFrames(5);
+    project.frames[2]!.excluded = true;
+    project.motionRanges.push({
+      id: "north-idle",
+      name: "",
+      poseAnchorIds: ["north"],
+      startFrame: 0,
+      endFrame: 4,
+      playback: "ping-pong",
+      speed: 0,
+      minimumDelayMs: 1_000,
+      maximumDelayMs: 2_000,
+    });
+
+    const plan = resolveMotionAudition(project, 359);
+    expect(plan.activeAnchor?.id).toBe("north");
+    expect(plan.motions[0]).toMatchObject({
+      name: "Idle motion",
+      frames: [0, 1, 3, 4, 3, 1],
+      frameDurationMs: 417,
+      durationMs: 2_502,
+    });
   });
 
   it("rejects incomplete pose links and unsafe timing values", () => {

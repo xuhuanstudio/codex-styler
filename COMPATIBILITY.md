@@ -2,7 +2,7 @@
 
 Compatibility is claimed only after real-device validation.
 
-| Platform   | Architecture  | Beta 6 status                                                           | RC requirement                            |
+| Platform   | Architecture  | Beta 7 status                                                           | RC requirement                            |
 | ---------- | ------------- | ----------------------------------------------------------------------- | ----------------------------------------- |
 | macOS 13+  | Apple Silicon | Ad-hoc signed Beta; locally built, installed, and exercised             | Two complete real-device runs             |
 | Windows 11 | x64           | CI-built unsigned Beta; lifecycle fixes await community device evidence | Two complete independent real-device runs |

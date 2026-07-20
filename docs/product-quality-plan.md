@@ -209,6 +209,55 @@ working control behind another page, revert it.
 - disconnected theme, variant, and companion selection now communicates
   through the selected row and live setup bar instead of redundant Toasts that
   could cover the next action. Save, apply, recovery, and error Toasts remain.
+- final companion output now includes a guided black, white, and theme-surface
+  edge review for color spill, halos, broken transparency, and residual
+  background pixels. Review evidence is stored with a compact output
+  fingerprint and automatically expires after any pixel, crop, scale,
+  inclusion, or alignment change.
+- edge review now shares the compiler's exact crop, baseline, scale, and canvas
+  renderer and performs a bounded local scan across behavior-defining and
+  representative frames. Advisory findings identify likely retained
+  backgrounds, canvas contact, isolated residue, and sampled-color spill, then
+  return the user to an affected cleanup frame. Heuristic findings never block
+  packaging or replace the explicit three-surface review.
+- semantic theme rendering now protects component boundaries as part of the
+  same surface-aware color contract used for text, status colors, and accent
+  controls. Authored border hues are retained when safe and move only as far
+  as required to preserve subtle, regular, and strong interface hierarchy;
+- the Theme Editor replaces its generic contrast promise with an expandable
+  visual safety result derived from the exact preview/runtime palette. It shows
+  primary and secondary text, accent-control, boundary, and image-surface guard
+  evidence without mutating the authored theme data.
+- contained and themed icon treatments now use dedicated surface-aware icon
+  roles instead of raw accent/text mixing. Their non-layout visual plates keep
+  the original SVG size, padding, and stroke geometry intact, while preview,
+  injected Codex tokens, and visual-safety evidence share the same result.
+- status, validation, and inline diff foregrounds are now validated against
+  both the component surface and the tinted feedback surface they actually
+  render on. Success, warning, error, info, added, modified, and deleted roles
+  retain authored hues when safe and receive the smallest necessary neutral
+  correction otherwise; the Theme Editor exposes status and code-change
+  evidence from the same preview/runtime contract.
+- theme layout now carries a bounded typography rhythm into Codex content.
+  Balanced, editorial, and cinematic treatments coordinate heading weight,
+  heading spacing, and prose leading without replacing Codex fonts, resizing
+  text, or changing component geometry; CJK headings keep neutral tracking and
+  the library preview uses the same derived personality as the runtime.
+- theme surface controls now derive solid, layered, and frosted material
+  behavior without extending the public theme format. Preview and runtime use
+  the same raised, overlay, and sunken roles across cards, composer, code,
+  settings, dialogs, menus, and the right panel while preserving Codex layout,
+  hit targets, and component geometry.
+- theme motion intensity now resolves to still, calm, fluid, or expressive
+  interaction profiles in both preview and runtime. The profiles coordinate
+  geometry-safe control feedback, native overlay entry, scene parallax, and
+  reduced-motion fallback without changing Codex measurements or hit targets.
+- the final companion stage now auditions direction selection and saved idle
+  motion as one runtime behavior. The inspector exposes the active direction,
+  only offers clips assigned to that direction sector, uses compiled playback
+  timing, and cancels the motion as soon as the pointer moves. Compiler pose
+  assignments use the same angular sectors, so interpolated poses no longer
+  make a valid idle motion practically unreachable after installation.
 
 ## RC — reliability proof
 

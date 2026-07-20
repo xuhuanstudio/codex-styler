@@ -68,15 +68,28 @@ describe("workspace UI preferences", () => {
       focusMode: false,
       themeEditorLayersWidth: 900,
       themeEditorInspectorWidth: 20,
-      themeEditorPreviewScenario: "settings",
+      themeEditorPreviewScenario: "components",
     });
 
     expect(loadWorkspaceUiPreferences()).toMatchObject({
       focusMode: false,
       themeEditorLayersWidth: 320,
       themeEditorInspectorWidth: 264,
-      themeEditorPreviewScenario: "settings",
+      themeEditorPreviewScenario: "components",
     });
+  });
+
+  it("persists dedicated changes and terminal preview scenarios", () => {
+    saveWorkspaceUiPreferences({
+      focusMode: true,
+      themeEditorLayersWidth: 220,
+      themeEditorInspectorWidth: 300,
+      themeEditorPreviewScenario: "terminal",
+    });
+
+    expect(loadWorkspaceUiPreferences().themeEditorPreviewScenario).toBe(
+      "terminal",
+    );
   });
 
   it("falls back from corrupt non-finite widths and unknown scenarios", () => {

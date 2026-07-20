@@ -19,12 +19,15 @@ describe("CompanionsView installed companion management", () => {
     const onEditProject = vi.fn();
     const onExport = vi.fn();
     const onDelete = vi.fn();
+    const onSizeChange = vi.fn();
+    const onPlacementModeChange = vi.fn();
+    const onResetPlacement = vi.fn();
 
     render(
       <CompanionsView
         locale="en"
         selected={companion}
-        theme={builtinThemes[0]}
+        previewThemeFor={() => builtinThemes[0]}
         localCompanions={[companion]}
         projects={[project]}
         collection="mine"
@@ -39,6 +42,12 @@ describe("CompanionsView installed companion management", () => {
         onImport={vi.fn()}
         onExport={onExport}
         onDelete={onDelete}
+        selectedSize={136}
+        placementCustomized
+        placementMode="composer"
+        onSizeChange={onSizeChange}
+        onPlacementModeChange={onPlacementModeChange}
+        onResetPlacement={onResetPlacement}
         onAnchorChange={vi.fn()}
         onAttachmentChange={vi.fn()}
         resolveAsset={() => ""}
@@ -65,5 +74,41 @@ describe("CompanionsView installed companion management", () => {
     expect(onEditProject).toHaveBeenCalledWith(project);
     expect(onExport).toHaveBeenCalledWith(companion);
     expect(onDelete).toHaveBeenCalledWith(companion);
+
+    fireEvent.change(screen.getByRole("slider", { name: "Companion size" }), {
+      target: { value: "180" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset size & placement" }),
+    );
+    expect(onSizeChange).toHaveBeenCalledWith(180);
+    expect(
+      screen.getByRole("button", { name: "Composer edge" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const freePositionButton = screen.getByRole("button", {
+      name: "Free position",
+    });
+    expect(freePositionButton).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(freePositionButton);
+    expect(onPlacementModeChange).toHaveBeenCalledWith("free");
+    expect(onResetPlacement).toHaveBeenCalledOnce();
+
+    const search = screen.getByRole("searchbox", {
+      name: "Search companions",
+    });
+    const list = screen.getByRole("region", { name: "Companions" });
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(
+      within(list).getByText("No companions match this search."),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(screen.getByRole("search")).getByRole("button", {
+        name: "Clear search",
+      }),
+    );
+    expect(
+      within(list).getByRole("button", { name: /Orbit Fox/ }),
+    ).toBeVisible();
   });
 });

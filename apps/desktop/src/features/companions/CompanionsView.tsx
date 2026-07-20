@@ -5,15 +5,19 @@ import {
   Download,
   Film,
   FolderOpen,
+  Magnet,
   MoreHorizontal,
   MousePointer2,
   PencilLine,
   Plus,
+  RotateCcw,
+  Search,
   Trash2,
   Upload,
+  Move,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   builtinCompanions,
   type CompanionDefinition,
@@ -21,6 +25,7 @@ import {
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import { PreviewWorkspace } from "../../components/PreviewWorkspace";
+import { ResourceLibraryToolbar } from "../../components/ui/ResourceLibraryToolbar";
 import type {
   CompanionCreatorProject,
   CreatorStep,
@@ -28,6 +33,11 @@ import type {
 import type { Locale, MessageKey } from "../../lib/i18n";
 import type { ThemeVariantName } from "../../lib/app-session";
 import { findCompanionSourceProject } from "./companion-project-link";
+import type {
+  CompanionPlacementMode,
+  SelectableCompanionPlacementMode,
+} from "../../lib/companion-placement-modes";
+import { matchesResourceSearch } from "../../lib/resource-search";
 
 export type CompanionCollection = "builtIn" | "mine";
 
@@ -65,7 +75,7 @@ const creatorStepLabels: Record<Locale, Record<CreatorStep, string>> = {
 export interface CompanionsViewProps {
   locale: Locale;
   selected: CompanionDefinition | null;
-  theme: ThemeDefinition;
+  previewThemeFor: (companion: CompanionDefinition | null) => ThemeDefinition;
   localCompanions: CompanionDefinition[];
   projects: CompanionCreatorProject[];
   collection: CompanionCollection;
@@ -80,6 +90,12 @@ export interface CompanionsViewProps {
   onImport: () => void;
   onExport: (companion: CompanionDefinition) => void;
   onDelete: (companion: CompanionDefinition) => void;
+  selectedSize: number | null;
+  placementCustomized: boolean;
+  placementMode: CompanionPlacementMode;
+  onSizeChange: (size: number) => void;
+  onPlacementModeChange: (mode: SelectableCompanionPlacementMode) => void;
+  onResetPlacement: () => void;
   onAnchorChange: (anchor: { x: number; y: number }) => void;
   onAttachmentChange: (attachment: EntityAttachment | null) => void;
   resolveAsset: (theme: ThemeDefinition, path: string) => string;
@@ -94,7 +110,7 @@ export interface CompanionsViewProps {
 export function CompanionsView({
   locale,
   selected,
-  theme,
+  previewThemeFor,
   localCompanions,
   projects,
   collection,
@@ -109,6 +125,12 @@ export function CompanionsView({
   onImport,
   onExport,
   onDelete,
+  selectedSize,
+  placementCustomized,
+  placementMode,
+  onSizeChange,
+  onPlacementModeChange,
+  onResetPlacement,
   onAnchorChange,
   onAttachmentChange,
   resolveAsset,
@@ -117,8 +139,13 @@ export function CompanionsView({
   busy,
 }: CompanionsViewProps) {
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAllProjects, setShowAllProjects] = useState(false);
+  const [browsedCompanionId, setBrowsedCompanionId] = useState<string | null>(
+    selected?.id ?? null,
+  );
   const layoutRef = useRef<HTMLDivElement>(null);
+  const companionListRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
     const element = layoutRef.current?.closest<HTMLElement>(
@@ -136,19 +163,62 @@ export function CompanionsView({
   }, [compactDetailOpen, reduceMotion]);
   const companions =
     collection === "builtIn" ? builtinCompanions : localCompanions;
-  const selectedCopy = selected
-    ? (selected.locales[locale] ??
-      selected.locales.en ?? {
-        name: selected.name,
-        description: selected.description,
+  const filteredCompanions = companions.filter((item) => {
+    const copy = item.locales[locale] ?? item.locales.en ?? {
+      name: item.name,
+      description: item.description,
+    };
+    return matchesResourceSearch(searchQuery, [
+      copy.name,
+      copy.description,
+      item.metadata.author,
+      ...item.metadata.tags,
+    ]);
+  });
+  const selectedInCollection = selected
+    ? companions.find((item) => item.id === selected.id)
+    : null;
+  const browsedCompanion =
+    (browsedCompanionId
+      ? filteredCompanions.find((item) => item.id === browsedCompanionId)
+      : null) ??
+    (searchQuery ? filteredCompanions[0] : null) ??
+    selectedInCollection ??
+    (browsedCompanionId ? companions[0] : null) ??
+    null;
+  useEffect(() => {
+    setBrowsedCompanionId((current) => {
+      if (current === null && selected === null) return null;
+      if (current && companions.some((item) => item.id === current)) {
+        return current;
+      }
+      return selectedInCollection?.id ?? companions[0]?.id ?? null;
+    });
+  }, [companions, selected?.id, selectedInCollection?.id]);
+  useEffect(() => {
+    const active = companionListRef.current?.querySelector<HTMLElement>(
+      '[aria-pressed="true"]',
+    );
+    active?.scrollIntoView?.({ block: "nearest" });
+  }, [collection, filteredCompanions.length, searchQuery, selected?.id]);
+  const browsedCopy = browsedCompanion
+    ? (browsedCompanion.locales[locale] ??
+      browsedCompanion.locales.en ?? {
+        name: browsedCompanion.name,
+        description: browsedCompanion.description,
       })
     : null;
-  const selectedIsLocal = Boolean(
-    selected && localCompanions.some((item) => item.id === selected.id),
+  const browsedIsLocal = Boolean(
+    browsedCompanion &&
+    localCompanions.some((item) => item.id === browsedCompanion.id),
   );
-  const selectedSourceProject = selectedIsLocal
-    ? findCompanionSourceProject(selected, projects)
+  const browsedSourceProject = browsedIsLocal
+    ? findCompanionSourceProject(browsedCompanion, projects)
     : null;
+  const browsedIsSelected = browsedCompanion?.id === selected?.id;
+  const sizeProgress = selectedSize
+    ? ((selectedSize - 24) / (512 - 24)) * 100
+    : 0;
   const visibleProjects = showAllProjects ? projects : projects.slice(0, 3);
   const dateFormatter = new Intl.DateTimeFormat(locale, {
     month: "short",
@@ -161,11 +231,9 @@ export function CompanionsView({
     <div className="page companions-page">
       <section className="page-heading">
         <div>
-          <span className="page-kicker">INDEPENDENT SCENE ENTITIES</span>
+          <span className="page-kicker">{t("companionLibraryKicker")}</span>
           <h1>{t("companions")}</h1>
-          <p>
-            {t("dragCompanion")}. {t("companionIndependence")}
-          </p>
+          <p>{t("companionLibraryDescription")}</p>
         </div>
         <div className="page-heading__actions">
           <button className="secondary-button" onClick={onImport}>
@@ -179,44 +247,47 @@ export function CompanionsView({
         </div>
       </section>
 
-      <div className="companions-toolbar">
-        <div
-          className="theme-collection-tabs"
-          role="tablist"
-          aria-label={t("companions")}
-        >
-          <button
-            role="tab"
-            aria-selected={collection === "builtIn"}
-            className={collection === "builtIn" ? "is-active" : ""}
-            onClick={() => {
-              setCompactDetailOpen(false);
-              onCollectionChange("builtIn");
-            }}
-          >
-            {t("builtInCompanions")}
-            <small>{builtinCompanions.length}</small>
-          </button>
-          <button
-            role="tab"
-            aria-selected={collection === "mine"}
-            className={collection === "mine" ? "is-active" : ""}
-            onClick={() => {
-              setCompactDetailOpen(false);
-              onCollectionChange("mine");
-            }}
-          >
-            {t("myCompanions")}
-            <small>{localCompanions.length}</small>
-          </button>
-        </div>
-      </div>
+      <ResourceLibraryToolbar
+        className="companions-toolbar"
+        ariaLabel={t("companions")}
+        tabs={[
+          {
+            id: "builtIn",
+            label: t("builtInCompanions"),
+            count: builtinCompanions.length,
+          },
+          {
+            id: "mine",
+            label: t("myCompanions"),
+            count: localCompanions.length,
+          },
+        ]}
+        activeTab={collection}
+        onTabChange={(nextCollection) => {
+          setSearchQuery("");
+          setCompactDetailOpen(false);
+          onCollectionChange(nextCollection);
+        }}
+        search={
+          companions.length > 0
+            ? {
+                value: searchQuery,
+                label: t("searchCompanions"),
+                placeholder: t("searchCompanions"),
+                clearLabel: t("clearSearch"),
+                resultCount: filteredCompanions.length,
+                totalCount: companions.length,
+                onChange: setSearchQuery,
+              }
+            : undefined
+        }
+      />
 
       {collection === "mine" && projects.length > 0 && (
         <section className="companion-projects">
           <div className="companion-projects__heading">
             <div>
-              <span className="page-kicker">AUTOSAVED CREATOR PROJECTS</span>
+              <span className="page-kicker">{t("companionDraftsKicker")}</span>
               <strong>{t("companionDrafts")}</strong>
               <p>{t("companionDraftsDetail")}</p>
             </div>
@@ -302,32 +373,44 @@ export function CompanionsView({
             <ArrowLeft size={14} />
             {t("backToCompanions")}
           </button>
-          <PreviewWorkspace
-            theme={theme}
-            variant={variant}
-            locale={locale}
-            reduceMotion={reduceMotion}
-            resolveAsset={resolveAsset}
-            onEntityAnchorChange={onAnchorChange}
-            onEntityAttachmentChange={onAttachmentChange}
-          />
-          {selected && (
-            <span className="drag-hint">
-              <MousePointer2 size={13} />
-              {t("dragCompanion")}
-            </span>
-          )}
+          <div className="companion-preview-stage">
+            <PreviewWorkspace
+              theme={previewThemeFor(browsedCompanion)}
+              variant={variant}
+              locale={locale}
+              reduceMotion={reduceMotion}
+              resolveAsset={resolveAsset}
+              onEntityAnchorChange={
+                browsedIsSelected ? onAnchorChange : undefined
+              }
+              onEntityAttachmentChange={
+                browsedIsSelected ? onAttachmentChange : undefined
+              }
+            />
+            {browsedCompanion && browsedIsSelected && (
+              <span className="drag-hint">
+                <MousePointer2 size={13} />
+                {t("dragCompanion")}
+              </span>
+            )}
+          </div>
           <div className="companion-detail-summary">
             <div>
-              <span>{selected ? t("selectedCompanion") : t("themeOnly")}</span>
-              <strong>{selectedCopy?.name ?? t("noCompanion")}</strong>
-              <p>{selectedCopy?.description ?? t("companionIndependence")}</p>
+              <span>
+                {browsedIsSelected
+                  ? browsedCompanion
+                    ? t("selectedCompanion")
+                    : t("themeOnly")
+                  : t("previewOnly")}
+              </span>
+              <strong>{browsedCopy?.name ?? t("noCompanion")}</strong>
+              <p>{browsedCopy?.description ?? t("companionIndependence")}</p>
             </div>
             <div className="companion-detail-summary__side">
               <div className="companion-detail-summary__badges">
-                {selected && (
+                {browsedCompanion && (
                   <span>
-                    {selectedIsLocal
+                    {browsedIsLocal
                       ? t("installedLocally")
                       : t("builtInCompanion")}
                   </span>
@@ -335,21 +418,93 @@ export function CompanionsView({
                 <span>
                   {busy
                     ? t("statusApplying")
-                    : isLive
-                      ? t("statusApplied")
-                      : t("statusPending")}
+                    : !browsedIsSelected
+                      ? t("previewOnly")
+                      : isLive
+                        ? t("statusApplied")
+                        : t("statusPending")}
                 </span>
               </div>
-              {selected && selectedIsLocal && (
+              {browsedCompanion && browsedIsSelected && selectedSize && (
+                <div
+                  className="companion-placement-controls"
+                  title={t("companionPlacementDetail")}
+                >
+                  <div className="companion-placement-controls__heading">
+                    <strong>{t("companionPlacement")}</strong>
+                    <small>
+                      {placementCustomized
+                        ? t("customized")
+                        : t("packageDefault")}
+                    </small>
+                  </div>
+                  <div
+                    className="companion-placement-modes"
+                    role="group"
+                    aria-label={t("placementMode")}
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={placementMode === "composer"}
+                      onClick={() => onPlacementModeChange("composer")}
+                    >
+                      <Magnet size={12} aria-hidden="true" />
+                      {t("composerEdge")}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={placementMode === "free"}
+                      onClick={() => onPlacementModeChange("free")}
+                    >
+                      <Move size={12} aria-hidden="true" />
+                      {t("freePosition")}
+                    </button>
+                    {placementMode === "custom" && (
+                      <span>{t("customAttachment")}</span>
+                    )}
+                  </div>
+                  <div className="companion-placement-controls__row">
+                    <label className="range-control companion-size-control">
+                      <input
+                        type="range"
+                        min={24}
+                        max={512}
+                        step={4}
+                        value={selectedSize}
+                        aria-label={t("companionSize")}
+                        style={
+                          {
+                            "--range-progress": `${sizeProgress}%`,
+                          } as CSSProperties
+                        }
+                        onChange={(event) =>
+                          onSizeChange(Number(event.target.value))
+                        }
+                      />
+                    </label>
+                    <output>{selectedSize}px</output>
+                    <button
+                      className="secondary-button companion-placement-reset"
+                      onClick={onResetPlacement}
+                      disabled={!placementCustomized}
+                      aria-label={t("resetCompanionPlacement")}
+                    >
+                      <RotateCcw size={12} />
+                      {t("reset")}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {browsedCompanion && browsedIsLocal && (
                 <div
                   className="companion-detail-summary__actions"
                   role="group"
                   aria-label={t("installedCompanionActions")}
                 >
-                  {selectedSourceProject && (
+                  {browsedSourceProject && (
                     <button
                       className="secondary-button"
-                      onClick={() => onEditProject(selectedSourceProject)}
+                      onClick={() => onEditProject(browsedSourceProject)}
                     >
                       <PencilLine size={13} />
                       {t("editSourceProject")}
@@ -357,14 +512,14 @@ export function CompanionsView({
                   )}
                   <button
                     className="secondary-button"
-                    onClick={() => onExport(selected)}
+                    onClick={() => onExport(browsedCompanion)}
                   >
                     <Download size={13} />
                     {t("exportCompanion")}
                   </button>
                   <button
                     className="danger-button danger-button--quiet"
-                    onClick={() => onDelete(selected)}
+                    onClick={() => onDelete(browsedCompanion)}
                   >
                     <Trash2 size={13} />
                     {t("deleteCompanion")}
@@ -375,13 +530,19 @@ export function CompanionsView({
           </div>
         </section>
 
-        <section className="companion-list" aria-label={t("companions")}>
+        <section
+          ref={companionListRef}
+          className="companion-list"
+          aria-label={t("companions")}
+          data-scroll-surface="panel"
+        >
           <button
             className={
               "companion-option" +
               (!selected ? " companion-option--active" : "")
             }
             onClick={() => {
+              setBrowsedCompanionId(null);
               onSelect(null);
               setCompactDetailOpen(true);
             }}
@@ -408,7 +569,18 @@ export function CompanionsView({
             </div>
           )}
 
-          {companions.map((item) => {
+          {companions.length > 0 && filteredCompanions.length === 0 && (
+            <div className="library-filter-empty" role="status">
+              <Search size={20} aria-hidden="true" />
+              <strong>{t("noCompanionMatches")}</strong>
+              <span>{t("searchAgainDetail")}</span>
+              <button type="button" onClick={() => setSearchQuery("")}>
+                {t("clearSearch")}
+              </button>
+            </div>
+          )}
+
+          {filteredCompanions.map((item) => {
             const copy = item.locales[locale] ??
               item.locales.en ?? {
                 name: item.name,
@@ -481,6 +653,7 @@ export function CompanionsView({
                     (active ? " companion-option--active" : "")
                   }
                   onClick={() => {
+                    setBrowsedCompanionId(item.id);
                     onSelect(item);
                     setCompactDetailOpen(true);
                   }}

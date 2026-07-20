@@ -111,7 +111,7 @@ export function Onboarding({
           ))}
         </nav>
 
-        <div className="onboarding-content">
+        <div className="onboarding-content" data-scroll-surface="panel">
           {step === 0 && (
             <div className="onboarding-stage onboarding-stage--safety">
               <div className="onboarding__eyebrow">

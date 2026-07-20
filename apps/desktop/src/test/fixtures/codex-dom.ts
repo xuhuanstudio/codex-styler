@@ -23,10 +23,25 @@ export function codexFixture(page: CodexFixturePage): string {
           <div data-feature="game-source"></div>
         `
       : `
-          <article data-testid="conversation-thread">
-            <p class="text-token-text-primary">Conversation</p>
-            <small class="text-token-text-secondary">Supporting context</small>
-          </article>
+          <section data-testid="conversation-thread">
+            <article data-message-author-role="user">
+              <p class="text-token-text-primary">Refine the task experience</p>
+            </article>
+            <article data-message-author-role="assistant">
+              <p class="text-token-text-primary">Implementation plan</p>
+              <small class="text-token-text-secondary">Two of three steps complete</small>
+              <progress max="3" value="2"></progress>
+              <details open>
+                <summary>Run checks</summary>
+                <pre><code>pnpm test</code><samp>All checks passed</samp></pre>
+              </details>
+              <p><del>legacy surface</del> <ins>semantic surface</ins></p>
+              <table>
+                <thead><tr><th>File</th><th>Change</th></tr></thead>
+                <tbody><tr><td>runtime.js</td><td>Updated</td></tr></tbody>
+              </table>
+            </article>
+          </section>
           <div class="composer-surface-chrome" contenteditable="true">
             <span data-placeholder="Ask Codex"></span>
           </div>
