@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { gildedGrandeur } from "@codex-styler/theme-core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { translate, type MessageKey } from "../../lib/i18n";
@@ -71,5 +77,29 @@ describe("ThemesView", () => {
     expect(container.querySelector(".workspace-preview")).not.toHaveAttribute(
       "data-motion-preview",
     );
+  });
+
+  it("filters the library by localized copy and clears with Escape", () => {
+    const { container } = renderThemesView();
+    const search = screen.getByRole("searchbox", { name: "Search themes" });
+    const list = screen.getByLabelText("All themes");
+
+    fireEvent.change(search, { target: { value: "garden" } });
+
+    expect(
+      within(list).getByRole("button", { name: "Preview: Quiet Garden" }),
+    ).toBeVisible();
+    expect(
+      within(list).queryByRole("button", { name: "Preview: Native Refined" }),
+    ).not.toBeInTheDocument();
+    expect(
+      container.querySelector(".featured-theme__copy h2"),
+    ).toHaveTextContent("Quiet Garden");
+
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(search).toHaveValue("");
+    expect(
+      within(list).getByRole("button", { name: "Preview: Native Refined" }),
+    ).toBeVisible();
   });
 });

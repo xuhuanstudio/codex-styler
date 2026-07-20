@@ -11,6 +11,7 @@ import {
   PencilLine,
   Plus,
   RotateCcw,
+  Search,
   Trash2,
   Upload,
   Move,
@@ -24,6 +25,7 @@ import {
   type ThemeDefinition,
 } from "@codex-styler/theme-core";
 import { PreviewWorkspace } from "../../components/PreviewWorkspace";
+import { LibrarySearchField } from "../../components/ui/LibrarySearchField";
 import type {
   CompanionCreatorProject,
   CreatorStep,
@@ -35,6 +37,7 @@ import type {
   CompanionPlacementMode,
   SelectableCompanionPlacementMode,
 } from "../../lib/companion-placement-modes";
+import { matchesResourceSearch } from "../../lib/resource-search";
 
 export type CompanionCollection = "builtIn" | "mine";
 
@@ -136,11 +139,13 @@ export function CompanionsView({
   busy,
 }: CompanionsViewProps) {
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [browsedCompanionId, setBrowsedCompanionId] = useState<string | null>(
     selected?.id ?? null,
   );
   const layoutRef = useRef<HTMLDivElement>(null);
+  const companionListRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
     const element = layoutRef.current?.closest<HTMLElement>(
@@ -158,15 +163,29 @@ export function CompanionsView({
   }, [compactDetailOpen, reduceMotion]);
   const companions =
     collection === "builtIn" ? builtinCompanions : localCompanions;
+  const filteredCompanions = companions.filter((item) => {
+    const copy = item.locales[locale] ?? item.locales.en ?? {
+      name: item.name,
+      description: item.description,
+    };
+    return matchesResourceSearch(searchQuery, [
+      copy.name,
+      copy.description,
+      item.metadata.author,
+      ...item.metadata.tags,
+    ]);
+  });
   const selectedInCollection = selected
     ? companions.find((item) => item.id === selected.id)
     : null;
-  const browsedCompanion = browsedCompanionId
-    ? (companions.find((item) => item.id === browsedCompanionId) ??
-      selectedInCollection ??
-      companions[0] ??
-      null)
-    : null;
+  const browsedCompanion =
+    (browsedCompanionId
+      ? filteredCompanions.find((item) => item.id === browsedCompanionId)
+      : null) ??
+    (searchQuery ? filteredCompanions[0] : null) ??
+    selectedInCollection ??
+    (browsedCompanionId ? companions[0] : null) ??
+    null;
   useEffect(() => {
     setBrowsedCompanionId((current) => {
       if (current === null && selected === null) return null;
@@ -176,6 +195,12 @@ export function CompanionsView({
       return selectedInCollection?.id ?? companions[0]?.id ?? null;
     });
   }, [companions, selected?.id, selectedInCollection?.id]);
+  useEffect(() => {
+    const active = companionListRef.current?.querySelector<HTMLElement>(
+      '[aria-pressed="true"]',
+    );
+    active?.scrollIntoView?.({ block: "nearest" });
+  }, [collection, filteredCompanions.length, searchQuery, selected?.id]);
   const browsedCopy = browsedCompanion
     ? (browsedCompanion.locales[locale] ??
       browsedCompanion.locales.en ?? {
@@ -222,7 +247,7 @@ export function CompanionsView({
         </div>
       </section>
 
-      <div className="companions-toolbar">
+      <div className="companions-toolbar resource-library-toolbar">
         <div
           className="theme-collection-tabs"
           role="tablist"
@@ -233,6 +258,7 @@ export function CompanionsView({
             aria-selected={collection === "builtIn"}
             className={collection === "builtIn" ? "is-active" : ""}
             onClick={() => {
+              setSearchQuery("");
               setCompactDetailOpen(false);
               onCollectionChange("builtIn");
             }}
@@ -245,6 +271,7 @@ export function CompanionsView({
             aria-selected={collection === "mine"}
             className={collection === "mine" ? "is-active" : ""}
             onClick={() => {
+              setSearchQuery("");
               setCompactDetailOpen(false);
               onCollectionChange("mine");
             }}
@@ -253,6 +280,17 @@ export function CompanionsView({
             <small>{localCompanions.length}</small>
           </button>
         </div>
+        {companions.length > 0 && (
+          <LibrarySearchField
+            value={searchQuery}
+            label={t("searchCompanions")}
+            placeholder={t("searchCompanions")}
+            clearLabel={t("clearSearch")}
+            resultCount={filteredCompanions.length}
+            totalCount={companions.length}
+            onChange={setSearchQuery}
+          />
+        )}
       </div>
 
       {collection === "mine" && projects.length > 0 && (
@@ -503,6 +541,7 @@ export function CompanionsView({
         </section>
 
         <section
+          ref={companionListRef}
           className="companion-list"
           aria-label={t("companions")}
           data-scroll-surface="panel"
@@ -540,7 +579,18 @@ export function CompanionsView({
             </div>
           )}
 
-          {companions.map((item) => {
+          {companions.length > 0 && filteredCompanions.length === 0 && (
+            <div className="library-filter-empty" role="status">
+              <Search size={20} aria-hidden="true" />
+              <strong>{t("noCompanionMatches")}</strong>
+              <span>{t("searchAgainDetail")}</span>
+              <button type="button" onClick={() => setSearchQuery("")}>
+                {t("clearSearch")}
+              </button>
+            </div>
+          )}
+
+          {filteredCompanions.map((item) => {
             const copy = item.locales[locale] ??
               item.locales.en ?? {
                 name: item.name,

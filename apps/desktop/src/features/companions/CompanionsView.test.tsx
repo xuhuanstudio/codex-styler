@@ -92,5 +92,23 @@ describe("CompanionsView installed companion management", () => {
     fireEvent.click(freePositionButton);
     expect(onPlacementModeChange).toHaveBeenCalledWith("free");
     expect(onResetPlacement).toHaveBeenCalledOnce();
+
+    const search = screen.getByRole("searchbox", {
+      name: "Search companions",
+    });
+    const list = screen.getByRole("region", { name: "Companions" });
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(
+      within(list).getByText("No companions match this search."),
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(screen.getByRole("search")).getByRole("button", {
+        name: "Clear search",
+      }),
+    );
+    expect(
+      within(list).getByRole("button", { name: /Orbit Fox/ }),
+    ).toBeVisible();
   });
 });

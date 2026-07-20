@@ -4,13 +4,16 @@ import {
   ChevronRight,
   FolderOpen,
   Plus,
+  Search,
   Sparkles,
   Upload,
 } from "lucide-react";
 import { builtinThemes, type ThemeDefinition } from "@codex-styler/theme-core";
 import { PreviewWorkspace } from "../../components/PreviewWorkspace";
+import { LibrarySearchField } from "../../components/ui/LibrarySearchField";
 import type { ThemeVariantName } from "../../lib/app-session";
 import type { Locale, MessageKey } from "../../lib/i18n";
+import { matchesResourceSearch } from "../../lib/resource-search";
 import type { PreviewScenario } from "../../lib/storage";
 import { useGuidedMotionPreview } from "../../lib/use-guided-motion-preview";
 import {
@@ -62,6 +65,7 @@ export function ThemesView({
   liveThemeId,
 }: ThemesViewProps) {
   const [compactDetailOpen, setCompactDetailOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [browsedThemeId, setBrowsedThemeId] = useState(selectedTheme.id);
   const [previewPresentation, setPreviewPresentation] = useState<
     "styled" | "official"
@@ -78,6 +82,7 @@ export function ThemesView({
     stop: stopMotionPreview,
   } = useGuidedMotionPreview();
   const workspaceRef = useRef<HTMLElement>(null);
+  const themeListRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!compactDetailOpen) return;
     const element = workspaceRef.current?.closest<HTMLElement>(
@@ -94,13 +99,22 @@ export function ThemesView({
     }
   }, [compactDetailOpen, reduceMotion]);
   const themes = collection === "builtIn" ? builtinThemes : localThemes;
+  const filteredThemes = themes.filter((theme) => {
+    const localizedTheme = theme.locales[locale] ?? theme.locales.en;
+    return matchesResourceSearch(searchQuery, [
+      localizedTheme.name,
+      localizedTheme.description,
+      theme.metadata.author,
+      ...theme.metadata.tags,
+    ]);
+  });
   const selectedThemeInCollection = themes.find(
     (theme) => theme.id === selectedTheme.id,
   );
   const browsedTheme =
-    themes.find((theme) => theme.id === browsedThemeId) ??
+    filteredThemes.find((theme) => theme.id === browsedThemeId) ??
+    filteredThemes[0] ??
     selectedThemeInCollection ??
-    themes[0] ??
     selectedTheme;
   useEffect(() => {
     setBrowsedThemeId((current) => {
@@ -108,6 +122,12 @@ export function ThemesView({
       return selectedThemeInCollection?.id ?? themes[0]?.id ?? selectedTheme.id;
     });
   }, [selectedTheme.id, selectedThemeInCollection?.id, themes]);
+  useEffect(() => {
+    const active = themeListRef.current?.querySelector<HTMLElement>(
+      '[aria-pressed="true"]',
+    );
+    active?.scrollIntoView?.({ block: "nearest" });
+  }, [collection, filteredThemes.length, searchQuery, selectedTheme.id]);
   const localized = browsedTheme.locales[locale] ?? browsedTheme.locales.en;
   const selectedIndex =
     themes.findIndex((theme) => theme.id === browsedTheme.id) + 1;
@@ -202,35 +222,50 @@ export function ThemesView({
         </div>
       </section>
 
-      <div
-        className="theme-collection-tabs"
-        role="tablist"
-        aria-label={t("themes")}
-      >
-        <button
-          role="tab"
-          aria-selected={collection === "builtIn"}
-          className={collection === "builtIn" ? "is-active" : ""}
-          onClick={() => {
-            setCompactDetailOpen(false);
-            onCollectionChange("builtIn");
-          }}
+      <div className="resource-library-toolbar">
+        <div
+          className="theme-collection-tabs"
+          role="tablist"
+          aria-label={t("themes")}
         >
-          {t("builtInThemes")}
-          <small>{builtinThemes.length}</small>
-        </button>
-        <button
-          role="tab"
-          aria-selected={collection === "mine"}
-          className={collection === "mine" ? "is-active" : ""}
-          onClick={() => {
-            setCompactDetailOpen(false);
-            onCollectionChange("mine");
-          }}
-        >
-          {t("myThemes")}
-          <small>{localThemes.length}</small>
-        </button>
+          <button
+            role="tab"
+            aria-selected={collection === "builtIn"}
+            className={collection === "builtIn" ? "is-active" : ""}
+            onClick={() => {
+              setSearchQuery("");
+              setCompactDetailOpen(false);
+              onCollectionChange("builtIn");
+            }}
+          >
+            {t("builtInThemes")}
+            <small>{builtinThemes.length}</small>
+          </button>
+          <button
+            role="tab"
+            aria-selected={collection === "mine"}
+            className={collection === "mine" ? "is-active" : ""}
+            onClick={() => {
+              setSearchQuery("");
+              setCompactDetailOpen(false);
+              onCollectionChange("mine");
+            }}
+          >
+            {t("myThemes")}
+            <small>{localThemes.length}</small>
+          </button>
+        </div>
+        {themes.length > 0 && (
+          <LibrarySearchField
+            value={searchQuery}
+            label={t("searchThemes")}
+            placeholder={t("searchThemes")}
+            clearLabel={t("clearSearch")}
+            resultCount={filteredThemes.length}
+            totalCount={themes.length}
+            onChange={setSearchQuery}
+          />
+        )}
       </div>
 
       {themes.length === 0 ? (
@@ -272,15 +307,26 @@ export function ThemesView({
               </span>
             </div>
             <div
+              ref={themeListRef}
               className="theme-list"
               aria-label={t("allThemes")}
               data-scroll-surface="panel"
             >
-              {themes.map((theme, index) => (
+              {filteredThemes.length === 0 && (
+                <div className="library-filter-empty" role="status">
+                  <Search size={20} aria-hidden="true" />
+                  <strong>{t("noThemeMatches")}</strong>
+                  <span>{t("searchAgainDetail")}</span>
+                  <button type="button" onClick={() => setSearchQuery("")}>
+                    {t("clearSearch")}
+                  </button>
+                </div>
+              )}
+              {filteredThemes.map((theme) => (
                 <ThemeRow
                   key={theme.id}
                   theme={theme}
-                  index={index + 1}
+                  index={themes.findIndex((item) => item.id === theme.id) + 1}
                   locale={locale}
                   active={selectedTheme.id === theme.id}
                   live={liveThemeId === theme.id}

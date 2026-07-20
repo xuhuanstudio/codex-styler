@@ -12,7 +12,7 @@
 }
 
 .page--themes > .page-heading,
-.page--themes > .theme-collection-tabs,
+.page--themes > .resource-library-toolbar,
 .companions-page > .page-heading,
 .companions-page > .companions-toolbar,
 .companions-page > .companion-projects {
@@ -24,9 +24,146 @@
   margin-bottom: 18px;
 }
 
-.page--themes > .theme-collection-tabs,
+.page--themes > .resource-library-toolbar,
 .companions-page > .companions-toolbar {
   margin-bottom: 16px;
+}
+
+.resource-library-toolbar {
+  display: flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-subtle);
+}
+
+.resource-library-toolbar .theme-collection-tabs {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.library-search-field {
+  display: grid;
+  width: min(280px, 42%);
+  min-height: 34px;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 7px 0 10px;
+  border: 1px solid transparent;
+  border-radius: calc(var(--radius-md) - 3px);
+  color: var(--text-tertiary);
+  background: var(--surface-base);
+  transition:
+    border-color var(--motion-micro) var(--ease-standard),
+    box-shadow var(--motion-micro) var(--ease-standard),
+    color var(--motion-micro) var(--ease-standard);
+}
+
+.library-search-field:focus-within {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--border-strong));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 11%, transparent);
+}
+
+.library-search-field input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: var(--type-caption);
+}
+
+.library-search-field input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.library-search-field input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.library-search-field output {
+  color: var(--text-tertiary);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+}
+
+.library-search-field button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.library-search-field button:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.library-search-field button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.library-filter-empty {
+  display: grid;
+  min-height: 100%;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  padding: 24px;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.library-filter-empty strong {
+  color: var(--text-primary);
+  font-size: var(--type-label);
+}
+
+.library-filter-empty span {
+  max-width: 260px;
+  color: var(--text-secondary);
+  font-size: var(--type-caption);
+  line-height: 1.45;
+}
+
+.library-filter-empty button {
+  min-height: 30px;
+  margin-top: 4px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  background: var(--surface-base);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--type-caption);
+  font-weight: 650;
+}
+
+.library-filter-empty button:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+  background: var(--surface-hover);
 }
 
 .theme-library-workspace {
@@ -901,6 +1038,14 @@
 }
 
 @media (max-width: 980px) {
+  .resource-library-toolbar {
+    gap: 8px;
+  }
+
+  .library-search-field {
+    width: min(260px, 46%);
+  }
+
   .companion-projects__list {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -990,6 +1135,17 @@
   .companion-detail-summary__badges,
   .companion-detail-summary__actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 700px) {
+  .resource-library-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .library-search-field {
+    width: 100%;
   }
 }
 

@@ -2104,6 +2104,7 @@ export function App() {
 
           {view === "settings" && (
             <SettingsView
+              locale={locale}
               settings={settings}
               detection={detection}
               currentVersion={currentVersion}

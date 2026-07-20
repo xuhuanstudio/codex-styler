@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
 import { SelectField } from "../../components/ui/SelectField";
-import type { LocalePreference, MessageKey } from "../../lib/i18n";
+import type { Locale, LocalePreference, MessageKey } from "../../lib/i18n";
 import type { CodexDetection } from "../../lib/runtime";
 import type {
   ManagerAppearance,
@@ -24,6 +24,7 @@ import type {
 type UpdateStatus = "idle" | "checking" | "current" | "error";
 
 export interface SettingsViewProps {
+  locale: Locale;
   settings: UserSettings;
   detection: CodexDetection | null;
   currentVersion: string;
@@ -44,6 +45,7 @@ export interface SettingsViewProps {
 }
 
 export function SettingsView({
+  locale,
   settings,
   detection,
   currentVersion,
@@ -59,7 +61,7 @@ export function SettingsView({
   onOpenOnboarding,
   focusRequest,
 }: SettingsViewProps) {
-  const lastChecked = formatLastChecked(settings.lastUpdateCheckAt, t);
+  const lastChecked = formatLastChecked(settings.lastUpdateCheckAt, locale, t);
   const codexLocationRef = useRef<HTMLElement>(null);
   const diagnosticsRef = useRef<HTMLElement>(null);
 
@@ -297,12 +299,13 @@ export function SettingsView({
 
 function formatLastChecked(
   lastUpdateCheckAt: string | null,
+  locale: Locale,
   t: SettingsViewProps["t"],
 ): string {
   if (!lastUpdateCheckAt) return t("neverChecked");
   const date = new Date(lastUpdateCheckAt);
   if (Number.isNaN(date.getTime())) return t("neverChecked");
-  return new Intl.DateTimeFormat(undefined, {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
