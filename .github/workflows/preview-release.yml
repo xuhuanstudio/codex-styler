@@ -275,9 +275,13 @@ jobs:
           path: release
           merge-multiple: true
 
+      - name: Download Syft
+        id: syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610
+        with:
+          syft-version: v1.50.0
+
       - name: Create update manifest, checksums, and SBOM
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -312,10 +316,17 @@ jobs:
             release/latest.json >/dev/null
 
           (cd release && sha256sum "$DMG_NAME" "$MAC_UPDATER_NAME" "$EXE_NAME" > SHA256SUMS.txt)
-          gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" \
-            --jq '.sbom' > "release/$SBOM_NAME"
+          "${{ steps.syft.outputs.cmd }}" scan dir:. \
+            --source-name codex-styler \
+            --source-version "$RELEASE_VERSION" \
+            --exclude './release/**' \
+            --exclude './**/node_modules/**' \
+            --exclude './**/target/**' \
+            --exclude './**/dist/**' \
+            --output "spdx-json=release/$SBOM_NAME"
           jq -e \
-            '.spdxVersion == "SPDX-2.3" and (.packages | length) > 0 and (.relationships | length) > 0' \
+            --arg version "$RELEASE_VERSION" \
+            '.spdxVersion == "SPDX-2.3" and (.packages | length) > 0 and (.relationships | length) > 0 and any(.packages[]; .name == "codex-styler" and .versionInfo == $version)' \
             "release/$SBOM_NAME" >/dev/null
 
       - name: Attest macOS SBOM
