@@ -1,0 +1,39 @@
+{
+  "format": "codex-styler-release-notes-v1",
+  "version": "0.2.0-beta.9",
+  "defaultLocale": "en",
+  "locales": {
+    "en": {
+      "summary": "Managed launch now selects the stable Codex workspace from every trusted loopback CDP page and reports bounded, actionable failures.",
+      "highlights": [
+        "All trusted loopback page targets are checked, so avatar overlays and other auxiliary Codex pages no longer hide the main workspace.",
+        "The same ready workspace WebSocket must pass three consecutive samples even when target ordering changes.",
+        "Per-candidate and overall time bounds prevent a temporary or unresponsive renderer from blocking launch indefinitely.",
+        "The affected multi-page macOS launch and theme-application path was verified with Codex 26.715.61943 on Apple Silicon."
+      ],
+      "fixes": [
+        "Fixed Restart Codex & apply remaining disconnected when an avatar-overlay page appeared before the main workspace.",
+        "Fixed the first trusted CDP candidate preventing later ready candidates from being evaluated.",
+        "Fixed failed launch discovery remaining permanently in the launching state with no lifecycle event.",
+        "Added redacted launch-error diagnostics while preserving loopback-only validation and renderer-replacement recovery.",
+        "Cleared the frontend dependency audit by resolving astro, fast-uri, js-yaml, nanoid, and postcss to patched releases."
+      ]
+    },
+    "zh-CN": {
+      "summary": "受控启动现在会从全部可信的本地 CDP 页面中选择稳定的 Codex 主工作区，并以有界、可诊断的方式处理失败。",
+      "highlights": [
+        "检查全部可信的本地 page 目标，头像浮层及其他 Codex 辅助页面不再遮蔽主工作区。",
+        "即使目标顺序发生变化，同一工作区 WebSocket 仍须连续三次通过就绪检查。",
+        "单候选和整体等待均有明确上限，临时或无响应的渲染器不会再无限阻塞启动。",
+        "已在 Apple Silicon 上使用 Codex 26.715.61943 验证受影响的多页面 macOS 启动与主题应用链路。"
+      ],
+      "fixes": [
+        "修复头像浮层页面排在主工作区之前时，“重启 Codex 并应用”始终保持未连接的问题。",
+        "修复第一个可信 CDP 候选阻止后续已就绪候选继续检查的问题。",
+        "修复启动发现失败后永久停留在 launching 且没有生命周期事件的问题。",
+        "新增脱敏的启动错误诊断，同时保留仅限本机回环的校验与渲染器替换恢复机制。",
+        "已将 astro、fast-uri、js-yaml、nanoid 与 postcss 升级到补丁版本，清零前端依赖审计告警。"
+      ]
+    }
+  }
+}

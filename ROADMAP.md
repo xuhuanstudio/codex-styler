@@ -107,8 +107,9 @@ depends on an undocumented manual restart or hidden application state.
 6. `v0.2.0-beta.6`: ordinary-user setup journey, one application model, compact resource details, and readability/accessibility convergence.
 7. `v0.2.0-beta.7`: creator task completion, observable validation, and full error/recovery coverage without new formats.
 8. `v0.2.0-beta.8`: verified composer interactions, current-Codex compatibility recovery, polished generated interaction assets, and documentation-complete release evidence.
-9. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
-10. `v0.2.0`: only when RC evidence supports it.
+9. `v0.2.0-beta.9`: bounded multi-page CDP workspace discovery, explicit launch-failure diagnostics, and affected-device macOS regression evidence.
+10. `v0.2.0-rc.1`: at least two independent complete macOS and Windows device runs; no P0/P1; migration, upgrade, and recovery pass.
+11. `v0.2.0`: only when RC evidence supports it.
 
 ## v1 Stable
 

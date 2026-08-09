@@ -15,13 +15,13 @@
 
 <p align="center">
   <a href="README.md">English</a> ·
-  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.8">下载 Beta</a> ·
+  <a href="https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.9">下载 Beta</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/zh-cn/">项目网站</a> ·
   <a href="https://xuhuanstudio.github.io/codex-styler/zh-cn/docs/getting-started/">使用文档</a>
 </p>
 
 > [!IMPORTANT]
-> Codex Styler 0.2 当前处于创作器 Beta 阶段。macOS DMG 采用临时 ad-hoc 签名但尚未公证，Windows EXE 尚未进行 Authenticode 代码签名；Windows Beta 8 延续已重构的 Store 启动与有界重启链路，但仍等待社区实机验证，完成证据闭环和双平台签名前不会标记为稳定版。
+> Codex Styler 0.2 当前处于创作器 Beta 阶段。macOS DMG 采用临时 ad-hoc 签名但尚未公证，Windows EXE 尚未进行 Authenticode 代码签名；Beta 9 新增经过受影响 Apple Silicon Mac 验证的有界多页面 CDP 目标选择，Windows 仍等待社区实机验证，完成证据闭环和双平台签名前不会标记为稳定版。
 
 ![金辉盛境 Codex 主题与 Reset God 互动伙伴](docs/media/codex-theme-gilded-grandeur.webp)
 
@@ -107,14 +107,14 @@ Codex Styler 管理器可以跟随系统，也可以固定使用亮色或暗色�
 
 所有随项目分发的图片和序列帧都是原创资源。参考仓库只用于研究思路，不复制或重新分发其代码与素材。
 
-## 下载创作器 Beta 8
+## 下载创作器 Beta 9
 
-- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.8/Codex-Styler_0.2.0-beta.8_aarch64-unsigned.dmg)**
-- **[Windows 11 / x64 — 安装 EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.8/Codex-Styler_0.2.0-beta.8_x64-unsigned-setup.exe)**
+- **[macOS 13+ / Apple Silicon — DMG](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.9/Codex-Styler_0.2.0-beta.9_aarch64-unsigned.dmg)**
+- **[Windows 11 / x64 — 安装 EXE](https://github.com/xuhuanstudio/codex-styler/releases/download/v0.2.0-beta.9/Codex-Styler_0.2.0-beta.9_x64-unsigned-setup.exe)**
 
 在 macOS 上打开 DMG，把 Codex Styler 拖入“应用程序”，首次启动时按住 Control 点击应用并选择“打开”。Windows 版因为当前 Beta 尚无 Authenticode 证书，SmartScreen 可能显示提醒；继续前请先核对 Release 中的校验和与构建证明。不要全局关闭 Gatekeeper 或 SmartScreen。
 
-[预发布页面](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.8)同时提供 SHA-256 校验文件、SPDX SBOM、构建证明、更新包、已验证范围和已知限制。本次不提供 Intel Mac 安装包；Windows Beta 8 由 CI 构建并完成结构校验，但仍明确标记为等待社区实机验证。
+[预发布页面](https://github.com/xuhuanstudio/codex-styler/releases/tag/v0.2.0-beta.9)同时提供 SHA-256 校验文件、SPDX SBOM、构建证明、更新包、已验证范围和已知限制。本次不提供 Intel Mac 安装包；Windows Beta 9 由 CI 构建并完成结构校验，但仍明确标记为等待社区实机验证。
 
 ## 从源码运行
 

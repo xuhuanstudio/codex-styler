@@ -727,14 +727,27 @@ async fn launch_codex(
         runtime.message = None;
     }
 
-    let session = cdp::launch_and_connect(
+    let session = match cdp::launch_and_connect(
         detection
             .path
             .as_deref()
             .ok_or_else(|| "Codex executable path is unavailable".to_string())?,
     )
     .await
-    .map_err(|error| error.to_string())?;
+    {
+        Ok(session) => session,
+        Err(error) => {
+            let detail = error.to_string();
+            if let Ok(mut runtime) = state.lock() {
+                record_launch_failure(
+                    &mut runtime,
+                    detail.clone(),
+                    started_at.elapsed().as_millis() as u64,
+                );
+            }
+            return Err(detail);
+        }
+    };
 
     let mut runtime = state
         .lock()
@@ -754,6 +767,11 @@ async fn launch_codex(
         started_at.elapsed().as_millis() as u64,
     );
     Ok(runtime.status())
+}
+
+fn record_launch_failure(runtime: &mut AppRuntime, detail: String, duration_ms: u64) {
+    runtime.invalidate_connection(model::RuntimeState::Error, detail);
+    runtime.record("launch", "error", duration_ms);
 }
 
 async fn injected_runtime_is_active(websocket_url: &str) -> bool {
@@ -1250,6 +1268,31 @@ mod tests {
             model::Compatibility::Safe
         );
         assert_eq!(compatibility_for_version(None), model::Compatibility::Safe);
+    }
+
+    #[test]
+    fn failed_target_discovery_does_not_leave_runtime_launching() {
+        let mut runtime = AppRuntime {
+            state: model::RuntimeState::Launching,
+            ..Default::default()
+        };
+
+        record_launch_failure(
+            &mut runtime,
+            "Codex did not expose a ready workspace".into(),
+            12_000,
+        );
+
+        assert_eq!(runtime.state, model::RuntimeState::Error);
+        assert!(!runtime.connected);
+        assert_eq!(
+            runtime.message.as_deref(),
+            Some("Codex did not expose a ready workspace")
+        );
+        let event = runtime.lifecycle.back().unwrap();
+        assert_eq!(event.action, "launch");
+        assert_eq!(event.outcome, "error");
+        assert_eq!(event.duration_ms, 12_000);
     }
 
     #[test]
