@@ -4,6 +4,31 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 ## [Unreleased]
 
+## [0.2.0-beta.9] - 2026-08-09
+
+### Changed
+
+- Managed launch now evaluates every trusted loopback CDP page concurrently and
+  selects the workspace renderer that passes the live readiness check, instead
+  of assuming the first trusted page is the main Codex window.
+- Ready-renderer tracking is keyed by WebSocket identity, so target ordering can
+  change while the same workspace still satisfies three consecutive stable
+  samples.
+
+### Fixed
+
+- Codex installations that expose an avatar overlay or another auxiliary app
+  page before the main workspace no longer remain disconnected after
+  **Restart Codex & apply**.
+- A slow or unresponsive auxiliary renderer can no longer block discovery of a
+  later ready workspace; each candidate and the overall discovery operation
+  now have explicit time bounds.
+- Failed managed launches now enter an actionable error state and record a
+  redacted `launch/error` lifecycle event instead of remaining indefinitely in
+  `launching` with an empty diagnostic history.
+- Cleared the frontend dependency audit by resolving `astro`, `fast-uri`,
+  `js-yaml`, `nanoid`, and `postcss` to fixed releases.
+
 ## [0.2.0-beta.8] - 2026-07-20
 
 ### Added

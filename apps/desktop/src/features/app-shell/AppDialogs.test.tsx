@@ -33,7 +33,7 @@ describe("application dialogs", () => {
     render(
       <UpdateDialog
         update={{
-          version: "0.2.0-beta.8",
+          version: "0.2.0-beta.9",
           notes: null,
           releaseNotes: {
             locale: "en",

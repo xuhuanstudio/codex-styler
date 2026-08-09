@@ -297,7 +297,7 @@ export function App() {
   } | null>(null);
   const [installPathBusy, setInstallPathBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.8");
+  const [currentVersion, setCurrentVersion] = useState("0.2.0-beta.9");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>("idle");
   const [availableUpdate, setAvailableUpdate] =
     useState<AvailableUpdate | null>(null);

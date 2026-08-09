@@ -1,17 +1,24 @@
 use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
     net::TcpListener,
     path::Path,
     process::{Command, Stdio},
     time::Duration,
 };
 
-use futures_util::{SinkExt, StreamExt};
+use futures_util::{SinkExt, StreamExt, stream::FuturesUnordered};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 use crate::{codex::executable_from_install, error::StylerError};
+
+const TARGET_POLL_INTERVAL: Duration = Duration::from_millis(200);
+const TARGET_HTTP_TIMEOUT: Duration = Duration::from_millis(900);
+const RENDERER_READY_TIMEOUT: Duration = Duration::from_millis(750);
+const READY_TARGET_STABLE_SAMPLES: usize = 3;
 
 #[cfg(target_os = "windows")]
 use crate::codex::{is_windows_store_install, windows_store_app_user_model_ids};
@@ -112,6 +119,55 @@ struct CdpTarget {
     web_socket_debugger_url: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct TargetWaitPolicy {
+    attempts: usize,
+    poll_interval: Duration,
+    candidate_timeout: Duration,
+    overall_timeout: Duration,
+}
+
+impl TargetWaitPolicy {
+    fn production(attempts: usize) -> Self {
+        Self {
+            attempts,
+            poll_interval: TARGET_POLL_INTERVAL,
+            candidate_timeout: RENDERER_READY_TIMEOUT,
+            // Preserve the existing polling budget while placing a hard bound
+            // around HTTP, websocket, and renderer work performed inside it.
+            overall_timeout: TARGET_POLL_INTERVAL
+                .saturating_mul(attempts as u32)
+                .saturating_add(Duration::from_secs(2)),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct ReadyTargetTracker {
+    streaks: HashMap<String, usize>,
+}
+
+impl ReadyTargetTracker {
+    fn observe(&mut self, ready_websockets: Vec<String>) -> Option<String> {
+        let mut seen = HashSet::new();
+        let ready_websockets = ready_websockets
+            .into_iter()
+            .filter(|websocket_url| seen.insert(websocket_url.clone()))
+            .collect::<Vec<_>>();
+
+        self.streaks
+            .retain(|websocket_url, _| seen.contains(websocket_url));
+        for websocket_url in ready_websockets {
+            let samples = self.streaks.entry(websocket_url.clone()).or_default();
+            *samples += 1;
+            if *samples >= READY_TARGET_STABLE_SAMPLES {
+                return Some(websocket_url);
+            }
+        }
+        None
+    }
+}
+
 pub async fn launch_and_connect(install_path: &str) -> Result<CdpSession, StylerError> {
     let port = reserve_loopback_port()?;
     let executable =
@@ -129,42 +185,101 @@ pub async fn launch_and_connect(install_path: &str) -> Result<CdpSession, Styler
 
 pub async fn wait_for_ready_target(port: u16, attempts: usize) -> Result<String, StylerError> {
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(900))
+        .timeout(TARGET_HTTP_TIMEOUT)
         .build()?;
     let endpoint = format!("http://127.0.0.1:{port}/json/list");
 
-    let mut stable_websocket = None;
-    let mut stable_samples = 0;
-    for _ in 0..attempts {
-        if let Ok(response) = client.get(&endpoint).send().await
-            && let Ok(targets) = response.json::<Vec<CdpTarget>>().await
-            && let Some(target) = targets.into_iter().find(is_trusted_codex_target)
-            && let Some(websocket_url) = target.web_socket_debugger_url
-            && is_loopback_debugger_url(&websocket_url, port)
-        {
-            if renderer_is_ready(&websocket_url).await {
-                if stable_websocket.as_deref() == Some(websocket_url.as_str()) {
-                    stable_samples += 1;
-                } else {
-                    stable_websocket = Some(websocket_url.clone());
-                    stable_samples = 1;
-                }
-                // Electron can expose a trusted page before the React shell has
-                // finished replacing its bootstrap renderer. Requiring three
-                // consecutive ready samples prevents applying to that transient
-                // page and losing the runtime during the first launch.
-                if stable_samples >= 3 {
-                    return Ok(websocket_url);
-                }
+    wait_for_ready_target_with(
+        port,
+        TargetWaitPolicy::production(attempts),
+        move || {
+            let client = client.clone();
+            let endpoint = endpoint.clone();
+            async move {
+                let response = client.get(endpoint).send().await.ok()?;
+                response.json::<Vec<CdpTarget>>().await.ok()
+            }
+        },
+        |websocket_url| async move { renderer_is_ready(&websocket_url).await },
+    )
+    .await
+}
+
+async fn wait_for_ready_target_with<FetchTargets, FetchFuture, CheckReady, CheckFuture>(
+    port: u16,
+    policy: TargetWaitPolicy,
+    mut fetch_targets: FetchTargets,
+    mut check_ready: CheckReady,
+) -> Result<String, StylerError>
+where
+    FetchTargets: FnMut() -> FetchFuture,
+    FetchFuture: Future<Output = Option<Vec<CdpTarget>>>,
+    CheckReady: FnMut(String) -> CheckFuture,
+    CheckFuture: Future<Output = bool>,
+{
+    let wait = async {
+        let mut tracker = ReadyTargetTracker::default();
+        for attempt in 0..policy.attempts {
+            let ready_websockets = if let Some(targets) = fetch_targets().await {
+                ready_websockets(targets, port, policy.candidate_timeout, &mut check_ready).await
             } else {
-                stable_websocket = None;
-                stable_samples = 0;
+                Vec::new()
+            };
+
+            // Electron can expose trusted auxiliary pages before the React
+            // workspace is ready. Requiring the same ready websocket in three
+            // consecutive polls prevents applying to a transient renderer.
+            if let Some(websocket_url) = tracker.observe(ready_websockets) {
+                return Ok(websocket_url);
+            }
+
+            if attempt + 1 < policy.attempts {
+                sleep(policy.poll_interval).await;
             }
         }
-        sleep(Duration::from_millis(200)).await;
+        Err(StylerError::TargetTimeout)
+    };
+
+    tokio::time::timeout(policy.overall_timeout, wait)
+        .await
+        .unwrap_or(Err(StylerError::TargetTimeout))
+}
+
+async fn ready_websockets<CheckReady, CheckFuture>(
+    targets: Vec<CdpTarget>,
+    port: u16,
+    candidate_timeout: Duration,
+    check_ready: &mut CheckReady,
+) -> Vec<String>
+where
+    CheckReady: FnMut(String) -> CheckFuture,
+    CheckFuture: Future<Output = bool>,
+{
+    let mut checks = FuturesUnordered::new();
+    for target in targets.into_iter().filter(is_trusted_codex_target) {
+        let Some(websocket_url) = target.web_socket_debugger_url else {
+            continue;
+        };
+        if !is_loopback_debugger_url(&websocket_url, port) {
+            continue;
+        }
+
+        let check = check_ready(websocket_url.clone());
+        checks.push(async move {
+            let ready = tokio::time::timeout(candidate_timeout, check)
+                .await
+                .unwrap_or(false);
+            (websocket_url, ready)
+        });
     }
 
-    Err(StylerError::TargetTimeout)
+    let mut ready = Vec::new();
+    while let Some((websocket_url, is_ready)) = checks.next().await {
+        if is_ready {
+            ready.push(websocket_url);
+        }
+    }
+    ready
 }
 
 async fn renderer_is_ready(websocket_url: &str) -> bool {
@@ -175,9 +290,10 @@ async fn renderer_is_ready(websocket_url: &str) -> bool {
       );
       return document.readyState !== 'loading' && Boolean(root && surface);
     })()"#;
-    evaluate(websocket_url, expression)
+    tokio::time::timeout(RENDERER_READY_TIMEOUT, evaluate(websocket_url, expression))
         .await
         .ok()
+        .and_then(Result::ok)
         .and_then(|response| {
             response
                 .pointer("/result/result/value")
@@ -257,9 +373,43 @@ fn is_loopback_debugger_url(url: &str, port: u16) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::time::{Duration, Instant};
+
     use super::{
-        CdpTarget, is_loopback_debugger_url, is_trusted_codex_target, reserve_loopback_port,
+        CdpTarget, TargetWaitPolicy, is_loopback_debugger_url, is_trusted_codex_target,
+        ready_websockets, reserve_loopback_port, wait_for_ready_target_with,
     };
+
+    const TEST_PORT: u16 = 43123;
+
+    fn target(name: &str, url: &str) -> CdpTarget {
+        CdpTarget {
+            target_type: "page".into(),
+            title: "Codex".into(),
+            url: url.into(),
+            web_socket_debugger_url: Some(format!(
+                "ws://127.0.0.1:{TEST_PORT}/devtools/page/{name}"
+            )),
+        }
+    }
+
+    fn websocket(name: &str) -> String {
+        format!("ws://127.0.0.1:{TEST_PORT}/devtools/page/{name}")
+    }
+
+    fn ready_names(targets: Vec<CdpTarget>) -> Vec<String> {
+        tauri::async_runtime::block_on(async {
+            let mut check_ready =
+                |websocket_url: String| async move { websocket_url.ends_with("/workspace") };
+            ready_websockets(
+                targets,
+                TEST_PORT,
+                Duration::from_millis(20),
+                &mut check_ready,
+            )
+            .await
+        })
+    }
 
     #[test]
     fn reserves_only_a_loopback_port() {
@@ -291,5 +441,141 @@ mod tests {
             "ws://127.0.0.1:43124/devtools/page/abc",
             43123
         ));
+    }
+
+    #[test]
+    fn selects_ready_workspace_when_overlay_precedes_it() {
+        let ready = ready_names(vec![
+            target(
+                "avatar-overlay",
+                "app://-/index.html?initialRoute=%2Favatar-overlay",
+            ),
+            target("workspace", "app://-/index.html"),
+        ]);
+
+        assert_eq!(ready, vec![websocket("workspace")]);
+    }
+
+    #[test]
+    fn selects_ready_workspace_when_it_precedes_overlay() {
+        let ready = ready_names(vec![
+            target("workspace", "app://-/index.html"),
+            target(
+                "avatar-overlay",
+                "app://-/index.html?initialRoute=%2Favatar-overlay",
+            ),
+        ]);
+
+        assert_eq!(ready, vec![websocket("workspace")]);
+    }
+
+    #[test]
+    fn skips_multiple_unready_trusted_pages_before_workspace() {
+        let ready = ready_names(vec![
+            target("login", "app://-/index.html?initialRoute=%2Flogin"),
+            target("upgrade", "app://-/index.html?initialRoute=%2Fupgrade"),
+            target("settings", "app://-/index.html?initialRoute=%2Fsettings"),
+            target("workspace", "app://-/index.html"),
+        ]);
+
+        assert_eq!(ready, vec![websocket("workspace")]);
+    }
+
+    #[test]
+    fn timed_out_candidate_does_not_block_ready_workspace() {
+        let ready = tauri::async_runtime::block_on(async {
+            let mut check_ready = |websocket_url: String| async move {
+                if websocket_url.ends_with("/avatar-overlay") {
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
+                websocket_url.ends_with("/workspace")
+            };
+            ready_websockets(
+                vec![
+                    target(
+                        "avatar-overlay",
+                        "app://-/index.html?initialRoute=%2Favatar-overlay",
+                    ),
+                    target("workspace", "app://-/index.html"),
+                ],
+                TEST_PORT,
+                Duration::from_millis(5),
+                &mut check_ready,
+            )
+            .await
+        });
+
+        assert_eq!(ready, vec![websocket("workspace")]);
+    }
+
+    #[test]
+    fn stable_workspace_survives_candidate_order_changes() {
+        let result = tauri::async_runtime::block_on(async {
+            let mut fetch_count = 0;
+            wait_for_ready_target_with(
+                TEST_PORT,
+                TargetWaitPolicy {
+                    attempts: 3,
+                    poll_interval: Duration::from_millis(1),
+                    candidate_timeout: Duration::from_millis(20),
+                    overall_timeout: Duration::from_millis(100),
+                },
+                move || {
+                    fetch_count += 1;
+                    let targets = if fetch_count % 2 == 0 {
+                        vec![
+                            target("workspace", "app://-/index.html"),
+                            target(
+                                "avatar-overlay",
+                                "app://-/index.html?initialRoute=%2Favatar-overlay",
+                            ),
+                        ]
+                    } else {
+                        vec![
+                            target(
+                                "avatar-overlay",
+                                "app://-/index.html?initialRoute=%2Favatar-overlay",
+                            ),
+                            target("workspace", "app://-/index.html"),
+                        ]
+                    };
+                    async move { Some(targets) }
+                },
+                |websocket_url| async move { websocket_url.ends_with("/workspace") },
+            )
+            .await
+        });
+
+        assert_eq!(result.unwrap(), websocket("workspace"));
+    }
+
+    #[test]
+    fn unavailable_workspace_fails_within_overall_bound() {
+        let started_at = Instant::now();
+        let result = tauri::async_runtime::block_on(wait_for_ready_target_with(
+            TEST_PORT,
+            TargetWaitPolicy {
+                attempts: 100,
+                poll_interval: Duration::from_millis(100),
+                candidate_timeout: Duration::from_secs(1),
+                overall_timeout: Duration::from_millis(30),
+            },
+            || async {
+                Some(vec![target(
+                    "avatar-overlay",
+                    "app://-/index.html?initialRoute=%2Favatar-overlay",
+                )])
+            },
+            |_| async {
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                false
+            },
+        ));
+
+        assert!(matches!(
+            result,
+            Err(crate::error::StylerError::TargetTimeout)
+        ));
+        assert!(started_at.elapsed() < Duration::from_millis(250));
     }
 }
