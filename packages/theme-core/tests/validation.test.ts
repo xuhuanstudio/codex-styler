@@ -31,7 +31,14 @@ describe("built-in themes", () => {
   it("declares replaceable shell treatments instead of hard-coded theme ids", () => {
     expect(
       builtinThemes.map((theme) => theme.variants.dark.appearance.layout),
-    ).toEqual(["native", "editorial", "immersive", "editorial", "immersive"]);
+    ).toEqual([
+      "native",
+      "editorial",
+      "immersive",
+      "immersive",
+      "editorial",
+      "immersive",
+    ]);
     expect(
       builtinThemes.every(
         (theme) => theme.variants.dark.appearance.iconStyle !== undefined,
@@ -126,6 +133,7 @@ describe("built-in themes", () => {
     ).toEqual([
       "moss-gecko",
       "reset-god",
+      "moss-gecko",
       "token-thief",
       "moss-gecko",
       "moss-gecko",

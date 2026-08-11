@@ -173,6 +173,7 @@ export const mossCompanion = calibratedCompanion({
   size: 136,
   defaultThemeIds: [
     "codex-styler.native-refined",
+    "codex-styler.caishen-readable",
     "codex-styler.nocturne-studio",
     "codex-styler.quiet-garden",
   ],
