@@ -1,3 +1,5 @@
+
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="apps/site/public/media/codex-styler-logo-dark.png">
@@ -130,7 +132,7 @@ The [pre-release page](https://github.com/xuhuanstudio/codex-styler/releases/tag
 
 - Node.js 22 or newer
 - pnpm 11 or newer
-- Rust stable
+- Rust 1.88 or newer
 - OpenAI Codex Desktop for real runtime testing
 
 ```bash
